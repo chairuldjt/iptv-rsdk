@@ -181,45 +181,63 @@ fun SettingsScreen(
                             val isSelected = index == activeMenuIdx
                             var isFocused by remember { mutableStateOf(false) }
 
-                            Row(
+                            Box(
                                 modifier = Modifier
                                     .fillMaxWidth()
+                                    .padding(vertical = if (isFocused) 2.dp else 0.dp)
                                     .shadow(
-                                        elevation = if (isFocused) 18.dp else 0.dp,
-                                        shape = RoundedCornerShape(12.dp),
-                                        ambientColor = Color(0xFF818CF8).copy(alpha = if (isFocused) 0.95f else 0f),
-                                        spotColor = Color(0xFF6366F1).copy(alpha = if (isFocused) 0.95f else 0f)
+                                        elevation = if (isFocused) 28.dp else 0.dp,
+                                        shape = RoundedCornerShape(14.dp),
+                                        ambientColor = Color(0xFFFFF7CC).copy(alpha = if (isFocused) 1f else 0f),
+                                        spotColor = Color(0xFF38BDF8).copy(alpha = if (isFocused) 1f else 0f)
                                     )
-                                    .clip(RoundedCornerShape(10.dp))
-                                    .background(
-                                        if (isFocused) Color(0xFF6366F1).copy(alpha = 0.42f)
-                                        else if (isSelected) Color(0xFF312E81)
-                                        else Color.Transparent
-                                    )
+                                    .clip(RoundedCornerShape(14.dp))
+                                    .background(if (isFocused) Color(0xFFFFE082).copy(alpha = 0.30f) else Color.Transparent)
                                     .border(
                                         BorderStroke(
-                                            if (isFocused) 2.dp else 1.dp,
-                                            if (isFocused) Color(0xFFC4B5FD) else Color.Transparent
+                                            if (isFocused) 3.dp else 0.dp,
+                                            if (isFocused) Color(0xFFFFF7CC) else Color.Transparent
                                         ),
-                                        shape = RoundedCornerShape(10.dp)
+                                        shape = RoundedCornerShape(14.dp)
                                     )
-                                    .scale(if (isFocused) 1.035f else 1.0f)
-                                    .focusRequester(menuFocusRequesters[index])
-                                    .clickable {
-                                        activeMenuIdx = index
-                                        menuFocusRequesters[index].requestFocus()
-                                    }
-                                    .focusable()
-                                    .onFocusChanged { isFocused = it.isFocused }
-                                    .padding(horizontal = 14.dp, vertical = 10.dp),
-                                verticalAlignment = Alignment.CenterVertically
+                                    .padding(if (isFocused) 3.dp else 0.dp)
                             ) {
-                                Text(
-                                    text = item,
-                                    color = if (isSelected || isFocused) Color.White else Color(0xFF94A3B8),
-                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
-                                    fontSize = 14.sp
-                                )
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .clip(RoundedCornerShape(10.dp))
+                                        .background(
+                                            if (isFocused) Color(0xFFFFD54F)
+                                            else if (isSelected) Color(0xFF312E81)
+                                            else Color.Transparent
+                                        )
+                                        .border(
+                                            BorderStroke(
+                                                if (isFocused) 2.dp else 1.dp,
+                                                if (isFocused) Color.White else Color.Transparent
+                                            ),
+                                            shape = RoundedCornerShape(10.dp)
+                                        )
+                                        .scale(if (isFocused) 1.035f else 1.0f)
+                                        .focusRequester(menuFocusRequesters[index])
+                                        .clickable {
+                                            activeMenuIdx = index
+                                            menuFocusRequesters[index].requestFocus()
+                                        }
+                                        .focusable()
+                                        .onFocusChanged { isFocused = it.isFocused }
+                                        .padding(horizontal = 14.dp, vertical = 10.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Text(
+                                        text = item,
+                                        color = if (isFocused) Color(0xFF111827)
+                                        else if (isSelected) Color.White
+                                        else Color(0xFF94A3B8),
+                                        fontWeight = if (isSelected || isFocused) FontWeight.ExtraBold else FontWeight.Medium,
+                                        fontSize = 14.sp
+                                    )
+                                }
                             }
                         }
                     }
