@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.*
@@ -21,6 +22,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
@@ -69,10 +71,103 @@ fun PlayerScreen(
     var showMenu by remember { mutableStateOf(selectedChannel == null) }
     var showPinDialog by remember { mutableStateOf(false) }
     var showZapOverlay by remember { mutableStateOf(false) }
+    var drawerFocusPane by remember { mutableIntStateOf(0) }
+    var drawerFocusedCategoryIndex by remember { mutableIntStateOf(0) }
+    var drawerFocusedChannelIndex by remember { mutableIntStateOf(0) }
+    val drawerCategoryListState = rememberLazyListState()
+    val drawerChannelListState = rememberLazyListState()
     val rootFocusRequester = remember { FocusRequester() }
+    val canShowChannelDrawer = errorMessage == null && !isLoading
 
     LaunchedEffect(Unit) {
         rootFocusRequester.requestFocus()
+    }
+
+    LaunchedEffect(showMenu) {
+        if (showMenu) {
+            drawerFocusPane = 0
+            drawerFocusedCategoryIndex = categories.indexOf(selectedCategory).coerceAtLeast(0)
+            drawerFocusedChannelIndex = channels
+                .filter { it.groupName == selectedCategory }
+                .indexOfFirst { it.id == selectedChannel?.id }
+                .coerceAtLeast(0)
+        }
+    }
+
+    LaunchedEffect(selectedCategory, showMenu) {
+        if (showMenu) {
+            val categoryChannels = channels.filter { it.groupName == selectedCategory }
+            drawerFocusedChannelIndex = drawerFocusedChannelIndex
+                .coerceIn(0, categoryChannels.lastIndex.coerceAtLeast(0))
+        }
+    }
+
+    LaunchedEffect(drawerFocusedCategoryIndex, showMenu) {
+        if (showMenu && categories.isNotEmpty()) {
+            drawerCategoryListState.animateScrollToItem(
+                drawerFocusedCategoryIndex.coerceIn(categories.indices)
+            )
+        }
+    }
+
+    LaunchedEffect(drawerFocusedChannelIndex, selectedCategory, showMenu) {
+        val categoryChannels = channels.filter { it.groupName == selectedCategory }
+        if (showMenu && categoryChannels.isNotEmpty()) {
+            drawerChannelListState.animateScrollToItem(
+                drawerFocusedChannelIndex.coerceIn(categoryChannels.indices)
+            )
+        }
+    }
+
+    fun handleDrawerKey(key: Key): Boolean {
+        val categoryChannels = channels.filter { it.groupName == selectedCategory }
+
+        return when (key) {
+            Key.DirectionLeft -> {
+                drawerFocusPane = 0
+                true
+            }
+            Key.DirectionRight -> {
+                drawerFocusPane = 1
+                drawerFocusedChannelIndex = drawerFocusedChannelIndex
+                    .coerceIn(0, categoryChannels.lastIndex.coerceAtLeast(0))
+                true
+            }
+            Key.DirectionUp -> {
+                if (drawerFocusPane == 0) {
+                    drawerFocusedCategoryIndex = (drawerFocusedCategoryIndex - 1).coerceAtLeast(0)
+                } else {
+                    drawerFocusedChannelIndex = (drawerFocusedChannelIndex - 1).coerceAtLeast(0)
+                }
+                true
+            }
+            Key.DirectionDown -> {
+                if (drawerFocusPane == 0) {
+                    drawerFocusedCategoryIndex = (drawerFocusedCategoryIndex + 1)
+                        .coerceAtMost(categories.lastIndex.coerceAtLeast(0))
+                } else {
+                    drawerFocusedChannelIndex = (drawerFocusedChannelIndex + 1)
+                        .coerceAtMost(categoryChannels.lastIndex.coerceAtLeast(0))
+                }
+                true
+            }
+            Key.DirectionCenter, Key.Enter, Key.NumPadEnter -> {
+                if (drawerFocusPane == 0) {
+                    categories.getOrNull(drawerFocusedCategoryIndex)?.let {
+                        viewModel.selectCategory(it)
+                        drawerFocusPane = 1
+                        drawerFocusedChannelIndex = 0
+                    }
+                } else {
+                    categoryChannels.getOrNull(drawerFocusedChannelIndex)?.let {
+                        viewModel.playChannel(it)
+                        showMenu = false
+                    }
+                }
+                true
+            }
+            else -> false
+        }
     }
 
     // Auto-play channel when initialChannelId is provided
@@ -106,6 +201,12 @@ fun PlayerScreen(
         }
     }
 
+    LaunchedEffect(errorMessage, isLoading) {
+        if (!canShowChannelDrawer) {
+            showMenu = false
+        }
+    }
+
     // Toggle menu or channel zapping with physical D-pad keys
     Box(
         modifier = Modifier
@@ -132,11 +233,19 @@ fun PlayerScreen(
                         inputHistory.clear()
                     }
 
+                    if (showMenu && canShowChannelDrawer && handleDrawerKey(key)) {
+                        return@onPreviewKeyEvent true
+                    }
+
                     // Remote D-pad triggers
                     when (key) {
                         Key.DirectionCenter, Key.Enter -> {
-                            if (!showMenu) {
-                                showMenu = true
+                            if (!showMenu && canShowChannelDrawer) {
+                                if (selectedChannel != null && !showZapOverlay) {
+                                    showZapOverlay = true
+                                } else {
+                                    onBack()
+                                }
                                 return@onPreviewKeyEvent true
                             }
                         }
@@ -153,13 +262,13 @@ fun PlayerScreen(
                             }
                         }
                         Key.DirectionLeft -> {
-                            if (!showMenu) {
+                            if (!showMenu && canShowChannelDrawer) {
                                 showMenu = true
                                 return@onPreviewKeyEvent true
                             }
                         }
                         Key.DirectionRight -> {
-                            if (!showMenu) {
+                            if (!showMenu && canShowChannelDrawer) {
                                 showMenu = true
                                 return@onPreviewKeyEvent true
                             }
@@ -229,7 +338,7 @@ fun PlayerScreen(
                         Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                             var isBtnFocused by remember { mutableStateOf(false) }
                             Button(
-                                onClick = { showMenu = true },
+                                onClick = { if (canShowChannelDrawer) showMenu = true },
                                 colors = ButtonDefaults.buttonColors(
                                     containerColor = if (isBtnFocused) Color(0xFF6366F1) else Color(0xFF1E293B)
                                 ),
@@ -407,7 +516,7 @@ fun PlayerScreen(
 
             // Semi-transparent sliding menu drawer
             AnimatedVisibility(
-                visible = showMenu,
+                visible = showMenu && canShowChannelDrawer,
                 enter = slideInHorizontally(initialOffsetX = { -it }) + fadeIn(),
                 exit = slideOutHorizontally(targetOffsetX = { -it }) + fadeOut()
             ) {
@@ -422,7 +531,66 @@ fun PlayerScreen(
                             .border(BorderStroke(1.dp, Color(0xFF334155)), shape = RoundedCornerShape(topEnd = 24.dp, bottomEnd = 24.dp))
                             .padding(24.dp)
                     ) {
-                        Row(modifier = Modifier.fillMaxSize()) {
+                        val activeCategoryChannels = channels.filter { it.groupName == selectedCategory }
+
+                        Row(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .onPreviewKeyEvent { keyEvent ->
+                                    if (keyEvent.type != KeyEventType.KeyDown) {
+                                        return@onPreviewKeyEvent false
+                                    }
+
+                                    when (keyEvent.key) {
+                                        Key.DirectionLeft -> {
+                                            drawerFocusPane = 0
+                                            true
+                                        }
+                                        Key.DirectionRight -> {
+                                            drawerFocusPane = 1
+                                            drawerFocusedChannelIndex = drawerFocusedChannelIndex
+                                                .coerceIn(0, activeCategoryChannels.lastIndex.coerceAtLeast(0))
+                                            true
+                                        }
+                                        Key.DirectionUp -> {
+                                            if (drawerFocusPane == 0) {
+                                                drawerFocusedCategoryIndex = (drawerFocusedCategoryIndex - 1)
+                                                    .coerceAtLeast(0)
+                                            } else {
+                                                drawerFocusedChannelIndex = (drawerFocusedChannelIndex - 1)
+                                                    .coerceAtLeast(0)
+                                            }
+                                            true
+                                        }
+                                        Key.DirectionDown -> {
+                                            if (drawerFocusPane == 0) {
+                                                drawerFocusedCategoryIndex = (drawerFocusedCategoryIndex + 1)
+                                                    .coerceAtMost(categories.lastIndex.coerceAtLeast(0))
+                                            } else {
+                                                drawerFocusedChannelIndex = (drawerFocusedChannelIndex + 1)
+                                                    .coerceAtMost(activeCategoryChannels.lastIndex.coerceAtLeast(0))
+                                            }
+                                            true
+                                        }
+                                        Key.DirectionCenter, Key.Enter, Key.NumPadEnter -> {
+                                            if (drawerFocusPane == 0) {
+                                                categories.getOrNull(drawerFocusedCategoryIndex)?.let {
+                                                    viewModel.selectCategory(it)
+                                                    drawerFocusPane = 1
+                                                    drawerFocusedChannelIndex = 0
+                                                }
+                                            } else {
+                                                activeCategoryChannels.getOrNull(drawerFocusedChannelIndex)?.let {
+                                                    viewModel.playChannel(it)
+                                                    showMenu = false
+                                                }
+                                            }
+                                            true
+                                        }
+                                        else -> false
+                                    }
+                                }
+                        ) {
                             // Column 1: Kategori (Sidebar)
                             Column(
                                 modifier = Modifier
@@ -437,32 +605,51 @@ fun PlayerScreen(
                                     modifier = Modifier.padding(bottom = 12.dp)
                                 )
                                 LazyColumn(
+                                    state = drawerCategoryListState,
                                     verticalArrangement = Arrangement.spacedBy(6.dp),
                                     modifier = Modifier.fillMaxSize()
                                 ) {
-                                    itemsIndexed(categories) { _, cat ->
+                                    itemsIndexed(categories) { index, cat ->
                                         val isCatSelected = cat == selectedCategory
-                                        var isCatFocused by remember { mutableStateOf(false) }
+                                        var hasRealCatFocus by remember { mutableStateOf(false) }
+                                        val isCatFocused = hasRealCatFocus || (drawerFocusPane == 0 && drawerFocusedCategoryIndex == index)
 
                                         Box(
                                             modifier = Modifier
                                                 .fillMaxWidth()
+                                                .shadow(
+                                                    elevation = if (isCatFocused) 18.dp else 0.dp,
+                                                    shape = RoundedCornerShape(8.dp),
+                                                    ambientColor = Color.White.copy(alpha = if (isCatFocused) 0.9f else 0f),
+                                                    spotColor = Color.White.copy(alpha = if (isCatFocused) 0.9f else 0f)
+                                                )
                                                 .clip(RoundedCornerShape(8.dp))
                                                 .background(
-                                                    if (isCatFocused) Color(0xFF6366F1).copy(alpha = 0.2f)
+                                                    if (isCatFocused) Color(0xFF7DD3FC).copy(alpha = 0.26f)
                                                     else if (isCatSelected) Color(0xFF1E293B)
                                                     else Color.Transparent
                                                 )
                                                 .border(
                                                     BorderStroke(
-                                                        1.dp,
-                                                        if (isCatFocused) Color(0xFF6366F1) else Color.Transparent
+                                                        if (isCatFocused) 3.dp else 1.dp,
+                                                        if (isCatFocused) Color.White else Color.Transparent
                                                     ),
                                                     shape = RoundedCornerShape(8.dp)
                                                 )
-                                                .clickable { viewModel.selectCategory(cat) }
                                                 .focusable()
-                                                .onFocusChanged { isCatFocused = it.isFocused }
+                                                .onFocusChanged {
+                                                    hasRealCatFocus = it.isFocused
+                                                    if (it.isFocused) {
+                                                        drawerFocusPane = 0
+                                                        drawerFocusedCategoryIndex = index
+                                                    }
+                                                }
+                                                .clickable {
+                                                    drawerFocusPane = 1
+                                                    drawerFocusedCategoryIndex = index
+                                                    drawerFocusedChannelIndex = 0
+                                                    viewModel.selectCategory(cat)
+                                                }
                                                 .padding(horizontal = 14.dp, vertical = 10.dp)
                                         ) {
                                             Text(
@@ -492,39 +679,53 @@ fun PlayerScreen(
                                     modifier = Modifier.padding(bottom = 12.dp)
                                 )
                                 
-                                val activeCategoryChannels = channels.filter { it.groupName == selectedCategory }
-                                
                                 LazyColumn(
+                                    state = drawerChannelListState,
                                     verticalArrangement = Arrangement.spacedBy(6.dp),
                                     modifier = Modifier.fillMaxSize()
                                 ) {
-                                    itemsIndexed(activeCategoryChannels) { _, ch ->
+                                    itemsIndexed(activeCategoryChannels) { itemIndex, ch ->
                                         val isChSelected = ch.id == selectedChannel?.id
-                                        var isChFocused by remember { mutableStateOf(false) }
+                                        var hasRealChFocus by remember { mutableStateOf(false) }
+                                        val isChFocused = hasRealChFocus || (drawerFocusPane == 1 && drawerFocusedChannelIndex == itemIndex)
 
                                         Row(
                                             modifier = Modifier
                                                 .fillMaxWidth()
+                                                .shadow(
+                                                    elevation = if (isChFocused) 22.dp else 0.dp,
+                                                    shape = RoundedCornerShape(10.dp),
+                                                    ambientColor = Color.White.copy(alpha = if (isChFocused) 0.9f else 0f),
+                                                    spotColor = Color.White.copy(alpha = if (isChFocused) 0.9f else 0f)
+                                                )
                                                 .clip(RoundedCornerShape(10.dp))
                                                 .background(
-                                                    if (isChFocused) Color(0xFF6366F1).copy(alpha = 0.25f)
+                                                    if (isChFocused) Color(0xFF7DD3FC).copy(alpha = 0.24f)
                                                     else if (isChSelected) Color(0xFF312E81)
                                                     else Color(0xFF1E293B)
                                                 )
                                                 .border(
                                                     BorderStroke(
-                                                        1.dp,
-                                                        if (isChFocused) Color(0xFF6366F1) else Color.Transparent
+                                                        if (isChFocused) 3.dp else 1.dp,
+                                                        if (isChFocused) Color.White else Color.Transparent
                                                     ),
                                                     shape = RoundedCornerShape(10.dp)
                                                 )
                                                 .scale(if (isChFocused) 1.03f else 1.0f)
+                                                .focusable()
+                                                .onFocusChanged {
+                                                    hasRealChFocus = it.isFocused
+                                                    if (it.isFocused) {
+                                                        drawerFocusPane = 1
+                                                        drawerFocusedChannelIndex = itemIndex
+                                                    }
+                                                }
                                                 .clickable {
+                                                    drawerFocusPane = 1
+                                                    drawerFocusedChannelIndex = itemIndex
                                                     viewModel.playChannel(ch)
                                                     showMenu = false
                                                 }
-                                                .focusable()
-                                                .onFocusChanged { isChFocused = it.isFocused }
                                                 .padding(10.dp),
                                             verticalAlignment = Alignment.CenterVertically,
                                             horizontalArrangement = Arrangement.spacedBy(10.dp)
@@ -565,29 +766,6 @@ fun PlayerScreen(
                             }
                         }
 
-                        // Button settings bottom right (Technician trigger)
-                        Box(modifier = Modifier.fillMaxSize()) {
-                            Row(
-                                modifier = Modifier.align(Alignment.BottomEnd),
-                                horizontalArrangement = Arrangement.spacedBy(8.dp)
-                            ) {
-                                TextButton(
-                                    onClick = onBack,
-                                    modifier = Modifier.focusable()
-                                ) {
-                                    Text("← Kembali", color = Color(0xFF94A3B8), fontWeight = FontWeight.Bold)
-                                }
-                                TextButton(
-                                    onClick = {
-                                        showMenu = false
-                                        onOpenSettings()
-                                    },
-                                    modifier = Modifier.focusable()
-                                ) {
-                                    Text("Pengaturan", color = Color(0xFF6366F1), fontWeight = FontWeight.Bold)
-                                }
-                            }
-                        }
                     }
 
                     // Click outside to dismiss menu

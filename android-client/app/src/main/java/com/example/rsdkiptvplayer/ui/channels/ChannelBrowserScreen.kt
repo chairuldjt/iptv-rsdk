@@ -11,10 +11,13 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.grid.LazyGridState
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.itemsIndexed
+import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
@@ -29,6 +32,11 @@ import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.ui.input.key.type
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
@@ -57,9 +65,15 @@ fun ChannelBrowserScreen(
 
     var selectedCategory by remember { mutableStateOf("ALL") }
     val backFocusRequester = remember { FocusRequester() }
+    val screenFocusRequester = remember { FocusRequester() }
+    var focusSection by remember { mutableIntStateOf(1) }
+    var focusedCategoryIndex by remember { mutableIntStateOf(0) }
+    var focusedChannelIndex by remember { mutableIntStateOf(0) }
+    val categoryListState = rememberLazyListState()
+    val channelGridState = rememberLazyGridState()
 
     LaunchedEffect(Unit) {
-        backFocusRequester.requestFocus()
+        screenFocusRequester.requestFocus()
     }
 
     // Responsive grid column count based on screen width
@@ -77,10 +91,93 @@ fun ChannelBrowserScreen(
     } else {
         channels.filter { it.groupName == selectedCategory }
     }
+    val categoryOptions = listOf("ALL") + categories
+
+    LaunchedEffect(selectedCategory, filteredChannels.size) {
+        focusedCategoryIndex = categoryOptions.indexOf(selectedCategory).coerceAtLeast(0)
+        focusedChannelIndex = focusedChannelIndex.coerceIn(0, filteredChannels.lastIndex.coerceAtLeast(0))
+    }
+
+    LaunchedEffect(focusedCategoryIndex) {
+        if (categoryOptions.isNotEmpty()) {
+            categoryListState.animateScrollToItem(focusedCategoryIndex.coerceIn(categoryOptions.indices))
+        }
+    }
+
+    LaunchedEffect(focusedChannelIndex) {
+        if (filteredChannels.isNotEmpty()) {
+            channelGridState.animateScrollToItem(focusedChannelIndex.coerceIn(filteredChannels.indices))
+        }
+    }
+
+    fun selectFocusedCategory() {
+        categoryOptions.getOrNull(focusedCategoryIndex)?.let { category ->
+            selectedCategory = category
+            focusedChannelIndex = 0
+        }
+    }
 
     Box(
         modifier = Modifier
             .fillMaxSize()
+            .focusRequester(screenFocusRequester)
+            .focusable()
+            .onPreviewKeyEvent { keyEvent ->
+                if (keyEvent.type != KeyEventType.KeyDown) {
+                    return@onPreviewKeyEvent false
+                }
+
+                when (keyEvent.key) {
+                    Key.DirectionLeft -> {
+                        if (focusSection == 1) {
+                            focusedCategoryIndex = (focusedCategoryIndex - 1).coerceAtLeast(0)
+                        } else {
+                            focusedChannelIndex = (focusedChannelIndex - 1).coerceAtLeast(0)
+                        }
+                        true
+                    }
+                    Key.DirectionRight -> {
+                        if (focusSection == 1) {
+                            focusedCategoryIndex = (focusedCategoryIndex + 1)
+                                .coerceAtMost(categoryOptions.lastIndex.coerceAtLeast(0))
+                        } else {
+                            focusedChannelIndex = (focusedChannelIndex + 1)
+                                .coerceAtMost(filteredChannels.lastIndex.coerceAtLeast(0))
+                        }
+                        true
+                    }
+                    Key.DirectionUp -> {
+                        if (focusSection == 2) {
+                            if (focusedChannelIndex - gridColumns >= 0) {
+                                focusedChannelIndex -= gridColumns
+                            } else {
+                                focusSection = 1
+                            }
+                        }
+                        true
+                    }
+                    Key.DirectionDown -> {
+                        if (focusSection == 1) {
+                            selectFocusedCategory()
+                            focusSection = 2
+                        } else {
+                            focusedChannelIndex = (focusedChannelIndex + gridColumns)
+                                .coerceAtMost(filteredChannels.lastIndex.coerceAtLeast(0))
+                        }
+                        true
+                    }
+                    Key.DirectionCenter, Key.Enter, Key.NumPadEnter -> {
+                        if (focusSection == 1) {
+                            selectFocusedCategory()
+                            focusSection = 2
+                        } else {
+                            filteredChannels.getOrNull(focusedChannelIndex)?.let { onChannelSelected(it.id) }
+                        }
+                        true
+                    }
+                    else -> false
+                }
+            }
             .background(
                 Brush.verticalGradient(
                     colors = listOf(
@@ -119,14 +216,20 @@ fun ChannelBrowserScreen(
                         modifier = Modifier
                             .size(40.dp)
                             .focusRequester(backFocusRequester)
+                            .shadow(
+                                elevation = if (isBackFocused) 18.dp else 0.dp,
+                                shape = CircleShape,
+                                ambientColor = Color.White.copy(alpha = if (isBackFocused) 0.9f else 0f),
+                                spotColor = Color.White.copy(alpha = if (isBackFocused) 0.9f else 0f)
+                            )
                             .clip(CircleShape)
                             .background(
-                                if (isBackFocused) Color(0xFF6366F1).copy(alpha = 0.3f)
+                                if (isBackFocused) Color(0xFF7DD3FC).copy(alpha = 0.28f)
                                 else Color(0xFF334155).copy(alpha = 0.5f)
                             )
                             .border(
-                                1.dp,
-                                if (isBackFocused) Color(0xFF6366F1) else Color(0xFF475569),
+                                if (isBackFocused) 3.dp else 1.dp,
+                                if (isBackFocused) Color.White else Color(0xFF475569),
                                 CircleShape
                             )
                             .focusable()
@@ -136,7 +239,7 @@ fun ChannelBrowserScreen(
                     }
 
                     Image(
-                        painter = painterResource(id = R.drawable.ic_app_logo),
+                        painter = painterResource(id = R.drawable.ic_kemenkes_rs_kariadi),
                         contentDescription = "Logo RSDK",
                         modifier = Modifier
                             .size(38.dp)
@@ -160,28 +263,12 @@ fun ChannelBrowserScreen(
                     }
                 }
 
-                // Right side — settings shortcut
-                var isSettingsFocused by remember { mutableStateOf(false) }
-                OutlinedButton(
-                    onClick = { onNavigateToSettings(5) },
-                    colors = ButtonDefaults.outlinedButtonColors(
-                        contentColor = Color.White
-                    ),
-                    border = BorderStroke(
-                        1.dp,
-                        if (isSettingsFocused) Color(0xFF6366F1) else Color(0xFF475569)
-                    ),
-                    shape = RoundedCornerShape(8.dp),
-                    modifier = Modifier
-                        .focusable()
-                        .onFocusChanged { isSettingsFocused = it.isFocused }
-                ) {
-                    Text("⚙ Pengaturan", fontSize = 12.sp)
-                }
+                Spacer(modifier = Modifier.width(1.dp))
             }
 
             // ─── Category Filter Bar ───
             LazyRow(
+                state = categoryListState,
                 modifier = Modifier
                     .fillMaxWidth()
                     .background(Color(0xFF0F172A).copy(alpha = 0.8f))
@@ -193,18 +280,26 @@ fun ChannelBrowserScreen(
                     CategoryChip(
                         label = "Semua (${channels.size})",
                         isSelected = selectedCategory == "ALL",
+                        isExplicitlyFocused = focusSection == 1 && focusedCategoryIndex == 0,
                         accentColor = Color(0xFF6366F1),
-                        onClick = { selectedCategory = "ALL" }
+                        onClick = {
+                            focusedCategoryIndex = 0
+                            selectedCategory = "ALL"
+                        }
                     )
                 }
                 // Per-category tabs
-                itemsIndexed(categories) { _, cat ->
+                itemsIndexed(categories) { index, cat ->
                     val count = channels.count { it.groupName == cat }
                     CategoryChip(
                         label = "$cat ($count)",
                         isSelected = selectedCategory == cat,
+                        isExplicitlyFocused = focusSection == 1 && focusedCategoryIndex == index + 1,
                         accentColor = Color(0xFF6366F1),
-                        onClick = { selectedCategory = cat }
+                        onClick = {
+                            focusedCategoryIndex = index + 1
+                            selectedCategory = cat
+                        }
                     )
                 }
             }
@@ -284,17 +379,19 @@ fun ChannelBrowserScreen(
                 }
             } else {
                 LazyVerticalGrid(
+                    state = channelGridState,
                     columns = GridCells.Fixed(gridColumns),
                     modifier = Modifier
                         .fillMaxSize()
                         .weight(1f)
-                        .padding(horizontal = 20.dp, vertical = 12.dp),
+                        .padding(horizontal = 28.dp, vertical = 18.dp),
                     horizontalArrangement = Arrangement.spacedBy(12.dp),
-                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                    verticalArrangement = Arrangement.spacedBy(14.dp)
                 ) {
-                    itemsIndexed(filteredChannels) { _, channel ->
+                    itemsIndexed(filteredChannels) { index, channel ->
                         ChannelGridCard(
                             channel = channel,
+                            isExplicitlyFocused = focusSection == 2 && focusedChannelIndex == index,
                             onClick = { onChannelSelected(channel.id) }
                         )
                     }
@@ -308,14 +405,16 @@ fun ChannelBrowserScreen(
 fun CategoryChip(
     label: String,
     isSelected: Boolean,
+    isExplicitlyFocused: Boolean = false,
     accentColor: Color,
     onClick: () -> Unit
 ) {
-    var isFocused by remember { mutableStateOf(false) }
+    var hasRealFocus by remember { mutableStateOf(false) }
+    val isFocused = isExplicitlyFocused || hasRealFocus
     val bgColor by animateColorAsState(
         targetValue = when {
             isSelected -> accentColor
-            isFocused -> accentColor.copy(alpha = 0.25f)
+            isFocused -> Color(0xFF7DD3FC).copy(alpha = 0.30f)
             else -> Color(0xFF1E293B)
         },
         animationSpec = tween(200),
@@ -324,7 +423,7 @@ fun CategoryChip(
     val borderColor by animateColorAsState(
         targetValue = when {
             isSelected -> accentColor
-            isFocused -> accentColor.copy(alpha = 0.6f)
+            isFocused -> Color.White
             else -> Color(0xFF334155)
         },
         animationSpec = tween(200),
@@ -333,12 +432,18 @@ fun CategoryChip(
 
     Box(
         modifier = Modifier
+            .shadow(
+                elevation = if (isFocused) 18.dp else 0.dp,
+                shape = RoundedCornerShape(20.dp),
+                ambientColor = Color.White.copy(alpha = if (isFocused) 0.88f else 0f),
+                spotColor = Color.White.copy(alpha = if (isFocused) 0.88f else 0f)
+            )
             .clip(RoundedCornerShape(20.dp))
             .background(bgColor)
-            .border(1.dp, borderColor, RoundedCornerShape(20.dp))
-            .clickable { onClick() }
+            .border(if (isFocused) 3.dp else 1.dp, borderColor, RoundedCornerShape(20.dp))
             .focusable()
-            .onFocusChanged { isFocused = it.isFocused }
+            .onFocusChanged { hasRealFocus = it.isFocused }
+            .clickable { onClick() }
             .padding(horizontal = 16.dp, vertical = 8.dp)
     ) {
         Text(
@@ -353,21 +458,23 @@ fun CategoryChip(
 @Composable
 fun ChannelGridCard(
     channel: ChannelEntity,
+    isExplicitlyFocused: Boolean = false,
     onClick: () -> Unit
 ) {
-    var isFocused by remember { mutableStateOf(false) }
+    var hasRealFocus by remember { mutableStateOf(false) }
+    val isFocused = isExplicitlyFocused || hasRealFocus
     val scale by animateFloatAsState(
         targetValue = if (isFocused) 1.05f else 1f,
         animationSpec = tween(150),
         label = "card_scale"
     )
     val borderColor by animateColorAsState(
-        targetValue = if (isFocused) Color(0xFF6366F1) else Color(0xFF334155),
+        targetValue = if (isFocused) Color.White else Color(0xFF334155),
         animationSpec = tween(200),
         label = "card_border"
     )
     val bgColor by animateColorAsState(
-        targetValue = if (isFocused) Color(0xFF1E293B) else Color(0xFF0F172A).copy(alpha = 0.9f),
+        targetValue = if (isFocused) Color(0xFF7DD3FC).copy(alpha = 0.18f) else Color(0xFF0F172A).copy(alpha = 0.9f),
         animationSpec = tween(200),
         label = "card_bg"
     )
@@ -376,20 +483,21 @@ fun ChannelGridCard(
         modifier = Modifier
             .fillMaxWidth()
             .aspectRatio(1.3f)
+            .padding(4.dp)
             .scale(scale)
             .shadow(
-                elevation = if (isFocused) 12.dp else 2.dp,
+                elevation = if (isFocused) 24.dp else 2.dp,
                 shape = RoundedCornerShape(14.dp),
-                ambientColor = Color(0xFF6366F1).copy(alpha = if (isFocused) 0.4f else 0f),
-                spotColor = Color(0xFF6366F1).copy(alpha = if (isFocused) 0.6f else 0f)
+                ambientColor = Color.White.copy(alpha = if (isFocused) 0.9f else 0f),
+                spotColor = Color.White.copy(alpha = if (isFocused) 0.9f else 0f)
             )
             .focusable()
-            .onFocusChanged { isFocused = it.isFocused }
+            .onFocusChanged { hasRealFocus = it.isFocused }
             .clickable { onClick() },
         colors = CardDefaults.cardColors(containerColor = bgColor),
         shape = RoundedCornerShape(14.dp),
         border = BorderStroke(
-            width = if (isFocused) 2.dp else 1.dp,
+            width = if (isFocused) 3.dp else 1.dp,
             color = borderColor
         )
     ) {

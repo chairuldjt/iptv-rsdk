@@ -18,10 +18,20 @@ android {
         buildConfigField("String", "DEFAULT_API_BASE_URL", "\"http://10.55.1.5:9000\"")
     }
 
+    signingConfigs {
+        create("release") {
+            storeFile = file("keystore/rsdk-release.jks")
+            storePassword = "rsdkiptv2024"
+            keyAlias = "rsdk-iptv"
+            keyPassword = "rsdkiptv2024"
+        }
+    }
+
     buildTypes {
         release {
             isMinifyEnabled = false
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
+            signingConfig = signingConfigs.getByName("release")
         }
     }
     compileOptions {

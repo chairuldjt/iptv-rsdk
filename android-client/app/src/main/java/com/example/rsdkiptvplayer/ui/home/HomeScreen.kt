@@ -264,7 +264,7 @@ private fun HospitalityMenuBar(
     val carouselFocusRequester = remember { FocusRequester() }
     val menuItems = listOf(
         HospitalityCarouselItem(
-            icon = "▶",
+            icon = "EDU",
             title = "EDUKASI",
             subtitle = if (educationPath.isBlank()) "Set path" else "Video RS",
             accent = Color(0xFF86EFAC),
@@ -285,10 +285,10 @@ private fun HospitalityMenuBar(
             action = onTvClick
         ),
         HospitalityCarouselItem(
-            icon = "▶",
+            icon = "YT",
             title = "YOUTUBE",
             subtitle = "Dikunci",
-            accent = Color(0xFF94A3B8),
+            accent = Color(0xFFFF4444),
             action = onYoutubeClick
         ),
         HospitalityCarouselItem(
@@ -313,7 +313,7 @@ private fun HospitalityMenuBar(
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(172.dp)
+                .height(190.dp)
                 .focusRequester(carouselFocusRequester)
                 .focusable()
                 .onPreviewKeyEvent { keyEvent ->
@@ -357,7 +357,7 @@ private fun HospitalityMenuBar(
                         }
                     }
                 }
-                .padding(horizontal = 24.dp, vertical = 8.dp),
+                .padding(horizontal = 24.dp, vertical = 4.dp),
             contentAlignment = Alignment.Center
         ) {
             Row(
@@ -384,7 +384,7 @@ private fun HospitalityMenuBar(
             }
         }
 
-        Spacer(modifier = Modifier.height(4.dp))
+        Spacer(modifier = Modifier.height(0.dp))
         Row(
             horizontalArrangement = Arrangement.spacedBy(7.dp),
             verticalAlignment = Alignment.CenterVertically
@@ -460,6 +460,7 @@ private fun HospitalityCarouselCard(
     Column(
         modifier = Modifier
             .width(cardWidth)
+            .offset(y = if (isActive) (-18).dp else 14.dp)
             .scale(scale)
             .clickable(
                 interactionSource = interactionSource,
@@ -523,7 +524,12 @@ private fun HospitalityCarouselCard(
                 Text(
                     text = item.icon,
                     color = Color.White.copy(alpha = if (isActive) 1f else 0.72f),
-                    fontSize = iconSize,
+                    fontSize = when {
+                        item.icon.length >= 3 -> when (distance) { 0 -> 20.sp; 1 -> 14.sp; else -> 10.sp }
+                        item.icon.length == 2 -> when (distance) { 0 -> 26.sp; 1 -> 18.sp; else -> 13.sp }
+                        else -> iconSize
+                    },
+                    letterSpacing = if (item.icon.length >= 2) (-0.5).sp else 0.sp,
                     fontWeight = FontWeight.ExtraBold,
                     textAlign = TextAlign.Center,
                     style = TextStyle(
@@ -536,18 +542,18 @@ private fun HospitalityCarouselCard(
                 )
             }
         }
-        Spacer(modifier = Modifier.height(if (isActive) 10.dp else 6.dp))
+        Spacer(modifier = Modifier.height(if (isActive) 14.dp else 6.dp))
         if (distance <= 1) {
             Box(
                 modifier = Modifier
                     .clip(RoundedCornerShape(10.dp))
-                    .background(Color.Black.copy(alpha = if (isActive) 0.43f else 0.20f))
-                    .padding(horizontal = 8.dp, vertical = 2.5.dp)
+                    .background(Color.Black.copy(alpha = if (isActive) 0.58f else 0.20f))
+                    .padding(horizontal = if (isActive) 12.dp else 8.dp, vertical = if (isActive) 4.dp else 2.5.dp)
             ) {
                 Text(
                     text = item.title,
                     color = if (isActive) item.accent else Color.White.copy(alpha = 0.76f),
-                    fontSize = if (isActive) 15.sp else 10.sp,
+                    fontSize = if (isActive) 16.sp else 10.sp,
                     fontWeight = FontWeight.ExtraBold,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
@@ -563,8 +569,8 @@ private fun HospitalityCarouselCard(
             Text(
                 text = item.subtitle,
                 color = Color.White.copy(alpha = if (isActive) 0.86f else 0.54f),
-                fontSize = if (isActive) 8.5.sp else 7.5.sp,
-                fontWeight = FontWeight.Medium,
+                fontSize = if (isActive) 10.sp else 7.5.sp,
+                fontWeight = if (isActive) FontWeight.SemiBold else FontWeight.Medium,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
                 style = TextStyle(
