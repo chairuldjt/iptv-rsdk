@@ -7,6 +7,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.focusable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -102,7 +103,7 @@ fun HomeScreen(
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(horizontal = 34.dp, vertical = 26.dp)
+                .padding(horizontal = 34.dp, vertical = 18.dp)
         ) {
             HospitalityHeader(
                 deviceId = resolvedDeviceId,
@@ -183,8 +184,8 @@ private fun HospitalityHeader(
                 painter = painterResource(id = R.drawable.ic_kariadi_hospitality_logo),
                 contentDescription = "Kariadi IPTV",
                 modifier = Modifier
-                    .size(96.dp)
-                    .shadow(18.dp, RoundedCornerShape(22.dp))
+                    .size(72.dp)
+                    .shadow(12.dp, RoundedCornerShape(16.dp))
             )
             Spacer(modifier = Modifier.height(8.dp))
             Text(
@@ -293,8 +294,8 @@ private fun HospitalityMenuBar(
                         }
                     }
                 }
-                .padding(horizontal = 24.dp, vertical = 18.dp),
-            horizontalArrangement = Arrangement.spacedBy(28.dp, Alignment.CenterHorizontally),
+                .padding(horizontal = 24.dp, vertical = 10.dp),
+            horizontalArrangement = Arrangement.spacedBy(20.dp, Alignment.CenterHorizontally),
             verticalAlignment = Alignment.Bottom
         ) {
             HospitalityMenuButton(
@@ -347,7 +348,7 @@ private fun HospitalityMenuBar(
             HospitalityMenuButton(
                 icon = "⚙",
                 title = "SETTING",
-                subtitle = serverUrl.substringAfter("://").take(18),
+                subtitle = "Sistem",
                 accent = Color(0xFF7DD3FC),
                 compact = true,
                 selected = selectedIndex == 4,
@@ -358,7 +359,7 @@ private fun HospitalityMenuBar(
             )
         }
 
-        Spacer(modifier = Modifier.height(18.dp))
+        Spacer(modifier = Modifier.height(8.dp))
         Text(
             text = "Geser menu atau gunakan tombol arah remote STB untuk memilih",
             color = Color.White.copy(alpha = 0.62f),
@@ -384,46 +385,43 @@ private fun HospitalityMenuButton(
         label = "hospitality_menu_scale"
     )
     val isActive = isFocused || selected
-    val size = if (compact) 82.dp else 112.dp
-    val iconSize = if (compact) 26.sp else 34.sp
+    val size = if (compact) 70.dp else 96.dp
+    val iconSize = if (compact) 22.sp else 30.sp
+    val interactionSource = remember { MutableInteractionSource() }
 
     Column(
         modifier = Modifier
-            .width(if (compact) 112.dp else 150.dp)
+            .width(if (compact) 96.dp else 130.dp)
             .scale(scale)
             .focusable()
             .onFocusChanged { isFocused = it.isFocused }
-            .clickable { onClick() },
+            .clickable(
+                interactionSource = interactionSource,
+                indication = null
+            ) { onClick() },
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         Box(contentAlignment = Alignment.Center) {
             if (isActive) {
                 Box(
                     modifier = Modifier
-                        .size(size + 34.dp)
-                        .clip(RoundedCornerShape(if (compact) 34.dp else 40.dp))
+                        .size(size + 36.dp)
                         .background(
                             Brush.radialGradient(
                                 colors = listOf(
-                                    accent.copy(alpha = 0.55f),
-                                    accent.copy(alpha = 0.18f),
+                                    accent.copy(alpha = 0.48f),
+                                    accent.copy(alpha = 0.15f),
                                     Color.Transparent
                                 )
                             )
                         )
-                )
-                Box(
-                    modifier = Modifier
-                        .size(size + 12.dp)
-                        .clip(RoundedCornerShape(if (compact) 30.dp else 34.dp))
-                        .background(Color.Black.copy(alpha = 0.46f))
                 )
             }
 
             Box(
                 modifier = Modifier
                     .size(size)
-                    .clip(RoundedCornerShape(if (compact) 26.dp else 28.dp))
+                    .clip(RoundedCornerShape(if (compact) 18.dp else 22.dp))
                     .background(
                         if (isActive) {
                             Brush.verticalGradient(
@@ -443,14 +441,14 @@ private fun HospitalityMenuButton(
                     )
                     .border(
                         BorderStroke(
-                            width = if (isActive) 5.dp else 3.dp,
+                            width = if (isActive) 4.dp else 2.5.dp,
                             color = if (isActive) accent else Color.White.copy(alpha = 0.88f)
                         ),
-                        RoundedCornerShape(if (compact) 26.dp else 28.dp)
+                        RoundedCornerShape(if (compact) 18.dp else 22.dp)
                     )
                     .shadow(
-                        elevation = if (isActive) 34.dp else 9.dp,
-                        shape = RoundedCornerShape(if (compact) 26.dp else 28.dp),
+                        elevation = if (isActive) 24.dp else 7.dp,
+                        shape = RoundedCornerShape(if (compact) 18.dp else 22.dp),
                         ambientColor = accent.copy(alpha = if (isActive) 0.80f else 0.22f),
                         spotColor = accent.copy(alpha = if (isActive) 0.95f else 0.24f)
                     ),
@@ -465,32 +463,32 @@ private fun HospitalityMenuButton(
                     style = TextStyle(
                         shadow = Shadow(
                             color = Color.Black.copy(alpha = 0.85f),
-                            offset = TextOffset(0f, 2.5f),
-                            blurRadius = 8f
+                            offset = TextOffset(0f, 2f),
+                            blurRadius = 6f
                         )
                     )
                 )
             }
         }
-        Spacer(modifier = Modifier.height(13.dp))
+        Spacer(modifier = Modifier.height(8.dp))
         Box(
             modifier = Modifier
-                .clip(RoundedCornerShape(12.dp))
+                .clip(RoundedCornerShape(10.dp))
                 .background(Color.Black.copy(alpha = if (isActive) 0.40f else 0.18f))
-                .padding(horizontal = 10.dp, vertical = 3.dp)
+                .padding(horizontal = 8.dp, vertical = 2.5.dp)
         ) {
             Text(
                 text = title,
                 color = if (isActive) accent else Color.White,
-                fontSize = if (compact) 12.sp else 17.sp,
+                fontSize = if (compact) 11.sp else 15.sp,
                 fontWeight = FontWeight.ExtraBold,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
                 style = TextStyle(
                     shadow = Shadow(
                         color = Color.Black.copy(alpha = 0.95f),
-                        offset = TextOffset(0f, 2f),
-                        blurRadius = 8f
+                        offset = TextOffset(0f, 1.5f),
+                        blurRadius = 6f
                     )
                 )
             )
@@ -498,15 +496,15 @@ private fun HospitalityMenuButton(
         Text(
             text = subtitle,
             color = Color.White.copy(alpha = if (isActive) 0.86f else 0.68f),
-            fontSize = 9.sp,
+            fontSize = 8.5.sp,
             fontWeight = FontWeight.Medium,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
             style = TextStyle(
                 shadow = Shadow(
                     color = Color.Black.copy(alpha = 0.90f),
-                    offset = TextOffset(0f, 1.5f),
-                    blurRadius = 6f
+                    offset = TextOffset(0f, 1.2f),
+                    blurRadius = 4f
                 )
             )
         )
