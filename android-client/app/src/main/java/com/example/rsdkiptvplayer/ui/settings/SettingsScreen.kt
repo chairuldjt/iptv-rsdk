@@ -19,6 +19,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
@@ -183,20 +184,26 @@ fun SettingsScreen(
                             Row(
                                 modifier = Modifier
                                     .fillMaxWidth()
+                                    .shadow(
+                                        elevation = if (isFocused) 18.dp else 0.dp,
+                                        shape = RoundedCornerShape(12.dp),
+                                        ambientColor = Color(0xFF818CF8).copy(alpha = if (isFocused) 0.95f else 0f),
+                                        spotColor = Color(0xFF6366F1).copy(alpha = if (isFocused) 0.95f else 0f)
+                                    )
                                     .clip(RoundedCornerShape(10.dp))
                                     .background(
-                                        if (isFocused) Color(0xFF6366F1).copy(alpha = 0.2f)
+                                        if (isFocused) Color(0xFF6366F1).copy(alpha = 0.42f)
                                         else if (isSelected) Color(0xFF312E81)
                                         else Color.Transparent
                                     )
                                     .border(
                                         BorderStroke(
-                                            1.dp,
-                                            if (isFocused) Color(0xFF6366F1) else Color.Transparent
+                                            if (isFocused) 2.dp else 1.dp,
+                                            if (isFocused) Color(0xFFC4B5FD) else Color.Transparent
                                         ),
                                         shape = RoundedCornerShape(10.dp)
                                     )
-                                    .scale(if (isFocused) 1.02f else 1.0f)
+                                    .scale(if (isFocused) 1.035f else 1.0f)
                                     .focusRequester(menuFocusRequesters[index])
                                     .clickable {
                                         activeMenuIdx = index
