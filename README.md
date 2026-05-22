@@ -49,19 +49,22 @@ sequenceDiagram
 
 Untuk mempermudah pengembangan backend (Web Admin & API) serta frontend (Android TV Client), seluruh detail teknis dibagi menjadi beberapa dokumen spesifik:
 
-1. **[Spesifikasi API & Endpoint](docs/API_SPECIFICATION.md)**  
+1. **[Panduan Memulai (Getting Started Guide)](docs/GETTING_STARTED.md)**  
+   Langkah-langkah lengkap dari kloning repo, setup database, hingga aplikasi berjalan di STB.
+
+2. **[Spesifikasi API & Endpoint](docs/API_SPECIFICATION.md)**  
    Mendokumentasikan seluruh kontrak endpoint REST API yang digunakan untuk interaksi antara Android TV Client dan backend server, lengkap dengan contoh request dan response JSON.
    
-2. **[Arsitektur Client Android TV](docs/ANDROID_ARCHITECTURE.md)**  
+3. **[Arsitektur Client Android TV](docs/ANDROID_ARCHITECTURE.md)**  
    Menjelaskan struktur aplikasi Android, pustaka yang digunakan (Jetpack Room, DataStore, Media3 ExoPlayer), mekanisme *fallback offline*, integrasi *auto-start on boot*, serta konfigurasi cleartext HTTP.
    
-3. **[Skema Database & Spesifikasi Web Admin](docs/BACKEND_DATABASE.md)**  
+4. **[Skema Database & Spesifikasi Web Admin](docs/BACKEND_DATABASE.md)**  
    Membahas rancangan database relasional (tabel `devices`, `channels`, `categories`, `playlists`, dll) serta fitur-fitur wajib yang harus dimiliki oleh Web Admin Panel untuk mengelola perangkat dan konten.
    
-4. **[Panduan Mode Teknisi (Technician Mode)](docs/TECHNICIAN_MODE.md)**  
+5. **[Panduan Mode Teknisi (Technician Mode)](docs/TECHNICIAN_MODE.md)**  
    Menjelaskan fitur tersembunyi untuk teknisi lokal di lapangan, termasuk skema bypass PIN, tombol remote trigger, override URL server, uji koneksi, dan manajemen log lokal.
 
-5. **[Panduan Konfigurasi Default & Build](docs/CONFIGURATION_AND_BUILD.md)**  
+6. **[Panduan Konfigurasi Default & Build](docs/CONFIGURATION_AND_BUILD.md)**  
    Mendokumentasikan lokasi variabel default dalam kode sumber untuk kustomisasi APK massal serta langkah-langkah build dan instalasi via ADB.
 
 ---
