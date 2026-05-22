@@ -50,28 +50,42 @@ export async function GET(
       })
     }
 
-    // If forceSync is true, we should reset it to false after sending so it only fires once on client
-    if (config.forceSync) {
+    // If forceSync or clearCacheTrigger is true, we should reset it to false after sending so it only fires once on client
+    const currentForceSync = config.forceSync
+    const currentClearCache = config.clearCacheTrigger || false
+
+    if (currentForceSync || currentClearCache) {
       await prisma.deviceConfig.update({
         where: { id: config.id },
-        data: { forceSync: false },
+        data: { 
+          forceSync: false,
+          clearCacheTrigger: false
+        },
       })
     }
+
+    // Get global playlist if it exists
+    const globalPlaylist = await prisma.playlist.findFirst({
+      where: { isGlobal: true }
+    })
 
     return NextResponse.json({
       status: true,
       message: 'Config loaded',
       data: {
         device_id: device.deviceId,
-        active: device.isActive,
-        playlist_id: device.playlistId,
+        active: true,
+        playlist_id: config.syncMode === 'custom' ? null : (globalPlaylist?.id || null),
+        sync_mode: config.syncMode || 'api',
+        custom_m3u_url: config.customM3uUrl || '',
         default_category: config.defaultCategory,
         default_channel_id: config.defaultChannelId,
         aspect_ratio: config.aspectRatio,
         sync_interval: config.syncInterval,
         start_screen: config.startScreen,
         lock_settings: config.lockSettings,
-        force_sync: config.forceSync, // Send the true flag this one time
+        force_sync: currentForceSync,
+        clear_cache_trigger: currentClearCache,
         auto_start_on_boot: config.autoStartOnBoot,
         technician_pin_enabled: true,
         technician_pin: config.technicianPin,

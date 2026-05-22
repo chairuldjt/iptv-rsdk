@@ -288,6 +288,8 @@ fun SettingsScreen(
             .padding(horizontal = 22.dp, vertical = 14.dp)
     ) {
         if (lockSettings && !isUnlockedSession) {
+            var showPinKeypad by remember { mutableStateOf(false) }
+
             Column(
                 modifier = Modifier
                     .fillMaxSize()
@@ -297,126 +299,172 @@ fun SettingsScreen(
             ) {
                 Card(
                     modifier = Modifier
-                        .width(380.dp)
+                        .width(420.dp)
                         .wrapContentHeight()
-                        .border(1.dp, Color(0xFF334155), RoundedCornerShape(24.dp)),
-                    shape = RoundedCornerShape(24.dp),
+                        .border(1.dp, Color(0xFF334155), RoundedCornerShape(28.dp)),
+                    shape = RoundedCornerShape(28.dp),
                     colors = CardDefaults.cardColors(containerColor = Color(0xEC1E293B))
                 ) {
                     Column(
                         modifier = Modifier
-                            .padding(24.dp)
+                            .padding(32.dp)
                             .fillMaxWidth(),
                         horizontalAlignment = Alignment.CenterHorizontally
                     ) {
-                        Text(
-                            text = "🔒 PENGATURAN TERKUNCI",
-                            fontSize = 18.sp,
-                            fontWeight = FontWeight.ExtraBold,
-                            color = Color.White
-                        )
-                        Text(
-                            text = "Pengaturan dikunci secara remote. Masukkan PIN Teknisi 4-digit untuk membuka.",
-                            fontSize = 12.sp,
-                            color = Color(0xFF94A3B8),
-                            textAlign = TextAlign.Center,
-                            modifier = Modifier.padding(top = 6.dp, bottom = 18.dp)
-                        )
+                        if (!showPinKeypad) {
+                            // Padlock Overlay UI
+                            Text(
+                                text = "🔒",
+                                fontSize = 80.sp,
+                                modifier = Modifier.padding(bottom = 16.dp)
+                            )
+                            Text(
+                                text = "PENGATURAN TERKUNCI",
+                                fontSize = 22.sp,
+                                fontWeight = FontWeight.ExtraBold,
+                                color = Color.White
+                            )
+                            Text(
+                                text = "Setting hanya bisa dibuka oleh SIMRS",
+                                fontSize = 14.sp,
+                                color = Color(0xFF94A3B8),
+                                textAlign = TextAlign.Center,
+                                modifier = Modifier.padding(top = 8.dp, bottom = 28.dp)
+                            )
 
-                        // PIN indicator dots
-                        Row(
-                            horizontalArrangement = Arrangement.spacedBy(16.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                            modifier = Modifier.padding(bottom = 20.dp)
-                        ) {
-                            for (i in 0 until 4) {
-                                val isFilled = i < enteredPin.length
-                                Box(
-                                    modifier = Modifier
-                                        .size(16.dp)
-                                        .clip(CircleShape)
-                                        .background(
-                                            if (pinError) Color(0xFFEF4444)
-                                            else if (isFilled) Color(0xFF6366F1)
-                                            else Color(0xFF334155)
-                                        )
-                                        .border(1.dp, Color(0xFF475569), CircleShape)
+                            Button(
+                                onClick = { showPinKeypad = true },
+                                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF6366F1)),
+                                shape = RoundedCornerShape(12.dp),
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(54.dp)
+                                    .settingsFocusGlow(RoundedCornerShape(12.dp))
+                                    .focusRequester(firstButtonFocusRequester)
+                            ) {
+                                Text("🔓 BUKA KUNCI", fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                            }
+
+                            Spacer(modifier = Modifier.height(12.dp))
+
+                            OutlinedButton(
+                                onClick = onBack,
+                                colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.White),
+                                border = BorderStroke(1.dp, Color(0xFF475569)),
+                                shape = RoundedCornerShape(12.dp),
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(54.dp)
+                                    .settingsFocusGlow(RoundedCornerShape(12.dp))
+                            ) {
+                                Text("← Kembali ke Player")
+                            }
+                        } else {
+                            // PIN Input UI
+                            Text(
+                                text = "MASUKKAN PIN TEKNISI",
+                                fontSize = 18.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = Color.White
+                            )
+                            Text(
+                                text = "Masukkan 4-digit PIN untuk akses penuh",
+                                fontSize = 12.sp,
+                                color = Color(0xFF94A3B8),
+                                modifier = Modifier.padding(top = 4.dp, bottom = 20.dp)
+                            )
+
+                            // PIN indicator dots
+                            Row(
+                                horizontalArrangement = Arrangement.spacedBy(16.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                modifier = Modifier.padding(bottom = 20.dp)
+                            ) {
+                                for (i in 0 until 4) {
+                                    val isFilled = i < enteredPin.length
+                                    Box(
+                                        modifier = Modifier
+                                            .size(16.dp)
+                                            .clip(CircleShape)
+                                            .background(
+                                                if (pinError) Color(0xFFEF4444)
+                                                else if (isFilled) Color(0xFF6366F1)
+                                                else Color(0xFF334155)
+                                            )
+                                            .border(1.dp, Color(0xFF475569), CircleShape)
+                                    )
+                                }
+                            }
+
+                            if (pinError) {
+                                Text(
+                                    text = "PIN salah! Silakan coba lagi.",
+                                    color = Color(0xFFEF4444),
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.SemiBold,
+                                    modifier = Modifier.padding(bottom = 12.dp)
                                 )
                             }
-                        }
 
-                        if (pinError) {
-                            Text(
-                                text = "PIN salah! Silakan coba lagi.",
-                                color = Color(0xFFEF4444),
-                                fontSize = 12.sp,
-                                fontWeight = FontWeight.SemiBold,
-                                modifier = Modifier.padding(bottom = 12.dp)
-                            )
-                        }
+                            // Grid 0-9
+                            val buttons = listOf("1", "2", "3", "4", "5", "6", "7", "8", "9", "C", "0", "⌫")
 
-                        // Grid 0-9
-                        val buttons = listOf("1", "2", "3", "4", "5", "6", "7", "8", "9", "C", "0", "⌫")
-                        
-                        Box(modifier = Modifier.height(260.dp).width(300.dp)) {
-                            LazyVerticalGrid(
-                                columns = GridCells.Fixed(3),
-                                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                                verticalArrangement = Arrangement.spacedBy(8.dp),
-                                modifier = Modifier.fillMaxSize()
-                            ) {
-                                items(buttons.size) { index ->
-                                    val text = buttons[index]
-                                    PinGridButton(
-                                        text = text,
-                                        focusRequester = if (index == 0) firstButtonFocusRequester else null,
-                                        onClick = {
-                                            pinError = false
-                                            when (text) {
-                                                "C" -> enteredPin = ""
-                                                "⌫" -> if (enteredPin.isNotEmpty()) {
-                                                    enteredPin = enteredPin.substring(0, enteredPin.length - 1)
-                                                }
-                                                else -> {
-                                                    if (enteredPin.length < 4) {
-                                                        enteredPin += text
-                                                        if (enteredPin.length == 4) {
-                                                            if (enteredPin == technicianPin) {
-                                                                isUnlockedSession = true
-                                                                Toast.makeText(context, "Akses dibuka.", Toast.LENGTH_SHORT).show()
-                                                            } else {
-                                                                pinError = true
-                                                                enteredPin = ""
+                            Box(modifier = Modifier.height(260.dp).width(300.dp)) {
+                                LazyVerticalGrid(
+                                    columns = GridCells.Fixed(3),
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                                    modifier = Modifier.fillMaxSize()
+                                ) {
+                                    items(buttons.size) { index ->
+                                        val text = buttons[index]
+                                        PinGridButton(
+                                            text = text,
+                                            focusRequester = if (index == 0) firstButtonFocusRequester else null,
+                                            onClick = {
+                                                pinError = false
+                                                when (text) {
+                                                    "C" -> enteredPin = ""
+                                                    "⌫" -> if (enteredPin.isNotEmpty()) {
+                                                        enteredPin = enteredPin.substring(0, enteredPin.length - 1)
+                                                    }
+                                                    else -> {
+                                                        if (enteredPin.length < 4) {
+                                                            enteredPin += text
+                                                            if (enteredPin.length == 4) {
+                                                                if (enteredPin == technicianPin) {
+                                                                    isUnlockedSession = true
+                                                                    Toast.makeText(context, "Akses dibuka.", Toast.LENGTH_SHORT).show()
+                                                                } else {
+                                                                    pinError = true
+                                                                    enteredPin = ""
+                                                                }
                                                             }
                                                         }
                                                     }
                                                 }
                                             }
-                                        }
-                                    )
+                                        )
+                                    }
                                 }
                             }
-                        }
 
-                        Spacer(modifier = Modifier.height(16.dp))
+                            Spacer(modifier = Modifier.height(16.dp))
 
-                        OutlinedButton(
-                            onClick = onBack,
-                            colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.White),
-                            border = BorderStroke(1.dp, Color(0xFF475569)),
-                            shape = RoundedCornerShape(8.dp),
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(44.dp)
-                                .settingsFocusGlow(RoundedCornerShape(8.dp))
-                        ) {
-                            Text("← Kembali ke Player")
+                            TextButton(
+                                onClick = { showPinKeypad = false },
+                                colors = ButtonDefaults.textButtonColors(contentColor = Color(0xFF94A3B8)),
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .settingsFocusGlow(RoundedCornerShape(8.dp))
+                            ) {
+                                Text("Batal")
+                            }
                         }
                     }
                 }
             }
-        } else {
-            Column(modifier = Modifier.fillMaxSize()) {
+        } else {            Column(modifier = Modifier.fillMaxSize()) {
                 // Header Bar
                 Row(
                     modifier = Modifier
@@ -721,38 +769,6 @@ fun ConnectionServerPane(
             .verticalScroll(rememberScrollState()),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
-        if (lockSettings) {
-            Card(
-                colors = CardDefaults.cardColors(containerColor = Color(0xFFEF4444).copy(alpha = 0.12f)),
-                border = BorderStroke(1.dp, Color(0xFFEF4444).copy(alpha = 0.8f)),
-                shape = RoundedCornerShape(10.dp),
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Row(
-                    modifier = Modifier.padding(14.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(12.dp)
-                ) {
-                    Text("🔒", fontSize = 22.sp)
-                    Column {
-                        Text(
-                            text = "Pengaturan URL Terkunci oleh Administrator",
-                            color = Color.White,
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 14.sp
-                        )
-                        Spacer(modifier = Modifier.height(2.dp))
-                        Text(
-                            text = "Konfigurasi koneksi server API telah dikunci secara remote dari Web Portal. Silakan hubungi admin Anda.",
-                            color = Color(0xFFFCA5A5),
-                            fontSize = 11.sp,
-                            lineHeight = 15.sp
-                        )
-                    }
-                }
-            }
-        }
-
         Text("Konfigurasi Koneksi & Server API", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = Color.White)
         
         Row(
@@ -778,14 +794,13 @@ fun ConnectionServerPane(
             Switch(
                 checked = serverApiEnabled,
                 onCheckedChange = onServerApiEnabledChange,
-                enabled = !lockSettings,
                 modifier = Modifier
                     .settingsFocusGlow(RoundedCornerShape(16.dp))
                     .onFocusChanged { isFocused = it.isFocused }
                     .border(
                         BorderStroke(
                             1.dp,
-                            if (isFocused && !lockSettings) Color(0xFF6366F1) else Color.Transparent
+                            if (isFocused) Color(0xFF6366F1) else Color.Transparent
                         ),
                         shape = RoundedCornerShape(16.dp)
                     )
@@ -803,7 +818,6 @@ fun ConnectionServerPane(
                 value = inputUrl,
                 onValueChange = onUrlChange,
                 label = "Server API Base URL",
-                enabled = !lockSettings,
                 modifier = Modifier.fillMaxWidth(),
                 onFocusChanged = onInputFocusChanged
             )
@@ -813,10 +827,8 @@ fun ConnectionServerPane(
             ) {
                 Button(
                     onClick = onSave,
-                    enabled = !lockSettings,
                     colors = ButtonDefaults.buttonColors(
-                        containerColor = Color(0xFF6366F1),
-                        disabledContainerColor = Color(0xFF334155).copy(alpha = 0.5f)
+                        containerColor = Color(0xFF6366F1)
                     ),
                     modifier = Modifier.settingsFocusGlow()
                 ) {
@@ -825,12 +837,10 @@ fun ConnectionServerPane(
 
                 OutlinedButton(
                     onClick = onRestore,
-                    enabled = !lockSettings,
                     colors = ButtonDefaults.outlinedButtonColors(
-                        contentColor = Color.White,
-                        disabledContentColor = Color.Gray
+                        contentColor = Color.White
                     ),
-                    border = BorderStroke(1.dp, if (!lockSettings) Color(0xFF334155) else Color(0xFF1E293B)),
+                    border = BorderStroke(1.dp, Color(0xFF334155)),
                     modifier = Modifier.settingsFocusGlow()
                 ) {
                     Text("Restore Default")
@@ -838,10 +848,8 @@ fun ConnectionServerPane(
                 
                 Button(
                     onClick = onTest,
-                    enabled = !lockSettings,
                     colors = ButtonDefaults.buttonColors(
-                        containerColor = Color(0xFF10B981),
-                        disabledContainerColor = Color(0xFF1E293B)
+                        containerColor = Color(0xFF10B981)
                     ),
                     modifier = Modifier.settingsFocusGlow()
                 ) {
@@ -1243,7 +1251,7 @@ fun CustomM3uPane(
         Row(
             horizontalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            val modes = listOf("server" to "API Server (Terpusat)", "custom_m3u" to "Playlist M3U Kustom")
+            val modes = listOf("api" to "API Server (Terpusat)", "custom" to "Playlist M3U Kustom")
             modes.forEach { (modeKey, modeLabel) ->
                 val isSelected = syncMode == modeKey
                 var isFocused by remember { mutableStateOf(false) }
@@ -1266,7 +1274,7 @@ fun CustomM3uPane(
         HorizontalDivider(color = Color(0xFF334155), modifier = Modifier.padding(vertical = 4.dp))
 
         // Custom M3U URL Input
-        if (syncMode == "custom_m3u") {
+        if (syncMode == "custom") {
             Text("URL Playlist M3U / M3U8", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 14.sp)
 
             SettingsOutlinedTextField(

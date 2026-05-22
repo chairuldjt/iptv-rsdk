@@ -70,6 +70,32 @@ async function deletePlaylistAction(formData: FormData) {
   }
 }
 
+// Server Action to set a playlist as the global active one
+async function setGlobalPlaylistAction(formData: FormData) {
+  'use server'
+  const id = parseInt(formData.get('playlistId') as string)
+  if (!id) return
+
+  try {
+    // 1. Unset any existing global playlist
+    await prisma.playlist.updateMany({
+      where: { isGlobal: true },
+      data: { isGlobal: false },
+    })
+
+    // 2. Set the new global playlist
+    await prisma.playlist.update({
+      where: { id },
+      data: { isGlobal: true },
+    })
+
+    revalidatePath('/dashboard/playlists')
+    revalidatePath('/dashboard')
+  } catch (error) {
+    console.error('Set global playlist error:', error)
+  }
+}
+
 export default async function PlaylistsPage() {
   // Fetch existing playlists
   const playlists = await prisma.playlist.findMany({
@@ -151,7 +177,14 @@ export default async function PlaylistsPage() {
               playlists.map((p) => (
                 <div key={p.id} className="p-6 flex flex-col md:flex-row md:items-center justify-between gap-4 hover:bg-slate-800/10 transition-all">
                   <div className="space-y-1">
-                    <h4 className="font-extrabold text-white text-base">{p.name}</h4>
+                    <div className="flex items-center gap-2">
+                      <h4 className="font-extrabold text-white text-base">{p.name}</h4>
+                      {p.isGlobal && (
+                        <span className="px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 text-[10px] font-bold uppercase tracking-wider shadow-[0_0_10px_rgba(16,185,129,0.1)]">
+                          Global Active
+                        </span>
+                      )}
+                    </div>
                     <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-slate-400">
                       <span>Channels: <strong className="text-violet-400">{p.totalChannels} channels</strong></span>
                       <span>•</span>
@@ -163,6 +196,18 @@ export default async function PlaylistsPage() {
                   </div>
 
                   <div className="flex items-center gap-3 self-end md:self-center">
+                    {!p.isGlobal && (
+                      <form action={setGlobalPlaylistAction}>
+                        <input type="hidden" name="playlistId" value={p.id} />
+                        <button
+                          type="submit"
+                          className="px-4 py-2 text-xs font-bold text-emerald-400 hover:text-white border border-emerald-500/20 hover:bg-emerald-500/15 rounded-xl transition-all cursor-pointer"
+                        >
+                          Set as Global
+                        </button>
+                      </form>
+                    )}
+
                     {/* Delete Form */}
                     <ConfirmForm
                       action={deletePlaylistAction}

@@ -16,6 +16,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 
@@ -83,34 +84,41 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
 
         // Observe Channels & Categories from Cache
         viewModelScope.launch {
-            repository.allChannelsFlow.collectLatest { list ->
-                _channels.value = list.filter { it.isActive }
-                // Do not automatically select and play the first channel on screen launch.
-                // This allows the user to browse and select a channel manually first.
-            }
+            repository.allChannelsFlow
+                .distinctUntilChanged()
+                .collectLatest { list ->
+                    _channels.value = list.filter { it.isActive }
+                }
         }
 
         viewModelScope.launch {
-            repository.allCategoriesFlow.collectLatest { list ->
-                _categories.value = list
-                if (_selectedCategory.value.isEmpty() && list.isNotEmpty()) {
-                    _selectedCategory.value = list.first()
+            repository.allCategoriesFlow
+                .distinctUntilChanged()
+                .collectLatest { list ->
+                    _categories.value = list
+                    // Only pick first if current is not in the new list
+                    if (!list.contains(_selectedCategory.value) && list.isNotEmpty()) {
+                        _selectedCategory.value = list.first()
+                    }
                 }
-            }
         }
 
         // Observe Aspect Ratio
         viewModelScope.launch {
-            repository.aspectRatioFlow.collectLatest { ratio ->
-                _aspectRatio.value = ratio
-            }
+            repository.aspectRatioFlow
+                .distinctUntilChanged()
+                .collectLatest { ratio ->
+                    _aspectRatio.value = ratio
+                }
         }
 
         // Observe settings lock
         viewModelScope.launch {
-            repository.lockSettingsFlow.collectLatest { locked ->
-                _lockSettings.value = locked
-            }
+            repository.lockSettingsFlow
+                .distinctUntilChanged()
+                .collectLatest { locked ->
+                    _lockSettings.value = locked
+                }
         }
 
         // Observe Technician PIN

@@ -610,7 +610,10 @@ fun PlayerScreen(
                                     verticalArrangement = Arrangement.spacedBy(6.dp),
                                     modifier = Modifier.fillMaxSize()
                                 ) {
-                                    itemsIndexed(categories) { index, cat ->
+                                    itemsIndexed(
+                                        items = categories,
+                                        key = { _, cat -> cat }
+                                    ) { index, cat ->
                                         val isCatSelected = cat == selectedCategory
                                         var hasRealCatFocus by remember { mutableStateOf(false) }
                                         val isCatFocused = hasRealCatFocus || (drawerFocusPane == 0 && drawerFocusedCategoryIndex == index)
@@ -679,14 +682,22 @@ fun PlayerScreen(
                                     color = Color(0xFF94A3B8),
                                     modifier = Modifier.padding(bottom = 12.dp)
                                 )
-                                
+
+                                val activeCategoryChannels = remember(channels, selectedCategory) {
+                                    channels.filter { it.groupName == selectedCategory }
+                                }
+
                                 LazyColumn(
                                     state = drawerChannelListState,
                                     verticalArrangement = Arrangement.spacedBy(6.dp),
                                     modifier = Modifier.fillMaxSize()
                                 ) {
-                                    itemsIndexed(activeCategoryChannels) { itemIndex, ch ->
+                                    itemsIndexed(
+                                        items = activeCategoryChannels,
+                                        key = { _, ch -> ch.id }
+                                    ) { itemIndex, ch ->
                                         val isChSelected = ch.id == selectedChannel?.id
+
                                         var hasRealChFocus by remember { mutableStateOf(false) }
                                         val isChFocused = hasRealChFocus || (drawerFocusPane == 1 && drawerFocusedChannelIndex == itemIndex)
 

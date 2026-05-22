@@ -6,6 +6,8 @@ import androidx.room.OnConflictStrategy
 import androidx.room.Query
 import kotlinx.coroutines.flow.Flow
 
+import androidx.room.Transaction
+
 @Dao
 interface ChannelDao {
     @Query("SELECT * FROM channels ORDER BY sortOrder ASC, name ASC")
@@ -22,4 +24,10 @@ interface ChannelDao {
 
     @Query("DELETE FROM channels")
     suspend fun clearAll()
+
+    @Transaction
+    suspend fun replaceAllChannels(channels: List<ChannelEntity>) {
+        clearAll()
+        insertAll(channels)
+    }
 }

@@ -103,18 +103,6 @@ export async function POST(request: Request) {
         include: { config: true },
       })
 
-      if (!updatedDevice.isActive) {
-        return NextResponse.json({
-          status: false,
-          message: 'Device has been deactivated by administrator',
-          data: {
-            device_id: updatedDevice.deviceId,
-            active: false,
-            sync_interval: updatedDevice.config?.syncInterval ?? 1800,
-          },
-        })
-      }
-
       return NextResponse.json({
         status: true,
         message: 'Device registered and active',

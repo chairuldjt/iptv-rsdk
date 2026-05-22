@@ -64,17 +64,20 @@ class DataStoreManager(private val context: Context) {
     }
 
     suspend fun setServerUrlOverride(url: String) {
-        context.dataStore.edit { prefs ->
-            prefs[SERVER_URL_OVERRIDE] = url
+        val current = getServerUrl()
+        if (current != url) {
+            context.dataStore.edit { prefs ->
+                prefs[SERVER_URL_OVERRIDE] = url
+            }
+            addLog("Server URL override set to: $url")
         }
-        addLog("Server URL override set to: $url")
     }
 
     suspend fun clearServerUrlOverride() {
         context.dataStore.edit { prefs ->
             prefs.remove(SERVER_URL_OVERRIDE)
         }
-        addLog("Server URL override cleared. Fallback to: ${BuildConfig.DEFAULT_API_BASE_URL}")
+        addLog("Server URL override cleared.")
     }
 
     val serverApiEnabledFlow: Flow<Boolean> = context.dataStore.data.map { prefs ->
@@ -82,32 +85,39 @@ class DataStoreManager(private val context: Context) {
     }
 
     suspend fun setServerApiEnabled(enabled: Boolean) {
-        context.dataStore.edit { prefs ->
-            prefs[SERVER_API_ENABLED] = enabled
+        val current = serverApiEnabledFlow.first()
+        if (current != enabled) {
+            context.dataStore.edit { prefs ->
+                prefs[SERVER_API_ENABLED] = enabled
+            }
+            addLog("API Server connection changed to: ${if (enabled) "Enabled" else "Disabled"}")
         }
-        addLog("API Server connection changed to: ${if (enabled) "Enabled" else "Disabled"}")
     }
 
-    // Sync Mode: "server" or "custom_m3u"
+    // Sync Mode: "api" (centralized) or "custom" (M3U URL)
     val syncModeFlow: Flow<String> = context.dataStore.data.map { prefs ->
-        prefs[SYNC_MODE] ?: "custom_m3u"
+        prefs[SYNC_MODE] ?: "api"
     }
 
     suspend fun getSyncMode(): String {
         val prefs = context.dataStore.data.first()
-        return prefs[SYNC_MODE] ?: "server"
+        return prefs[SYNC_MODE] ?: "api"
     }
 
     suspend fun setSyncMode(mode: String) {
-        context.dataStore.edit { prefs ->
-            prefs[SYNC_MODE] = mode
+        val normalizedMode = if (mode == "server") "api" else if (mode == "custom_m3u") "custom" else mode
+        val current = getSyncMode()
+        if (current != normalizedMode) {
+            context.dataStore.edit { prefs ->
+                prefs[SYNC_MODE] = normalizedMode
+            }
+            addLog("Sync mode changed to: $normalizedMode")
         }
-        addLog("Sync mode changed to: $mode")
     }
 
     // Custom M3U URL
     val customM3uUrlFlow: Flow<String> = context.dataStore.data.map { prefs ->
-        prefs[CUSTOM_M3U_URL] ?: "http://10.0.0.1/iptv/iptv_rsdk.m3u"
+        prefs[CUSTOM_M3U_URL] ?: ""
     }
 
     suspend fun getCustomM3uUrl(): String {
@@ -116,10 +126,13 @@ class DataStoreManager(private val context: Context) {
     }
 
     suspend fun setCustomM3uUrl(url: String) {
-        context.dataStore.edit { prefs ->
-            prefs[CUSTOM_M3U_URL] = url
+        val current = getCustomM3uUrl()
+        if (current != url) {
+            context.dataStore.edit { prefs ->
+                prefs[CUSTOM_M3U_URL] = url
+            }
+            addLog("Custom M3U URL updated.")
         }
-        addLog("Custom M3U URL changed to: $url")
     }
 
     // Education video SMB folder path, for example: \\10.45.128.129\edukasi
@@ -127,11 +140,19 @@ class DataStoreManager(private val context: Context) {
         prefs[EDUCATION_VIDEO_PATH] ?: ""
     }
 
+    suspend fun getEducationVideoPath(): String {
+        val prefs = context.dataStore.data.first()
+        return prefs[EDUCATION_VIDEO_PATH] ?: ""
+    }
+
     suspend fun setEducationVideoPath(path: String) {
-        context.dataStore.edit { prefs ->
-            prefs[EDUCATION_VIDEO_PATH] = path.trim()
+        val current = getEducationVideoPath()
+        if (current != path.trim()) {
+            context.dataStore.edit { prefs ->
+                prefs[EDUCATION_VIDEO_PATH] = path.trim()
+            }
+            addLog("Education video path updated.")
         }
-        addLog("Education video path changed to: ${path.trim()}")
     }
 
     val educationSmbUsernameFlow: Flow<String> = context.dataStore.data.map { prefs ->
@@ -147,18 +168,18 @@ class DataStoreManager(private val context: Context) {
     }
 
     suspend fun setEducationSmbCredentials(username: String, password: String, domain: String) {
-        context.dataStore.edit { prefs ->
-            prefs[EDUCATION_SMB_USERNAME] = username.trim()
-            prefs[EDUCATION_SMB_PASSWORD] = password
-            prefs[EDUCATION_SMB_DOMAIN] = domain.trim()
-        }
-        addLog(
-            if (username.isBlank()) {
-                "Education SMB credentials cleared; using guest access."
-            } else {
-                "Education SMB credentials changed for user: ${username.trim()}"
+        val prefs = context.dataStore.data.first()
+        if (prefs[EDUCATION_SMB_USERNAME] != username || 
+            prefs[EDUCATION_SMB_PASSWORD] != password || 
+            prefs[EDUCATION_SMB_DOMAIN] != domain) {
+            
+            context.dataStore.edit { p ->
+                p[EDUCATION_SMB_USERNAME] = username.trim()
+                p[EDUCATION_SMB_PASSWORD] = password
+                p[EDUCATION_SMB_DOMAIN] = domain.trim()
             }
-        )
+            addLog("Education SMB credentials updated.")
+        }
     }
 
     // Aspect Ratio: "fit", "stretch", "zoom", "16_9", "4_3"
@@ -167,10 +188,13 @@ class DataStoreManager(private val context: Context) {
     }
 
     suspend fun setAspectRatio(ratio: String) {
-        context.dataStore.edit { prefs ->
-            prefs[ASPECT_RATIO] = ratio
+        val current = aspectRatioFlow.first()
+        if (current != ratio) {
+            context.dataStore.edit { prefs ->
+                prefs[ASPECT_RATIO] = ratio
+            }
+            addLog("Aspect ratio changed to: $ratio")
         }
-        addLog("Aspect ratio changed to: $ratio")
     }
 
     // Sync Interval
@@ -179,10 +203,13 @@ class DataStoreManager(private val context: Context) {
     }
 
     suspend fun setSyncInterval(seconds: Int) {
-        context.dataStore.edit { prefs ->
-            prefs[SYNC_INTERVAL] = seconds
+        val current = syncIntervalFlow.first()
+        if (current != seconds) {
+            context.dataStore.edit { prefs ->
+                prefs[SYNC_INTERVAL] = seconds
+            }
+            addLog("Sync interval changed to: ${seconds}s")
         }
-        addLog("Sync interval changed to: ${seconds}s")
     }
 
     // Lock settings
@@ -190,11 +217,19 @@ class DataStoreManager(private val context: Context) {
         prefs[LOCK_SETTINGS] ?: true
     }
 
+    suspend fun getLockSettings(): Boolean {
+        val prefs = context.dataStore.data.first()
+        return prefs[LOCK_SETTINGS] ?: true
+    }
+
     suspend fun setLockSettings(locked: Boolean) {
-        context.dataStore.edit { prefs ->
-            prefs[LOCK_SETTINGS] = locked
+        val current = getLockSettings()
+        if (current != locked) {
+            context.dataStore.edit { prefs ->
+                prefs[LOCK_SETTINGS] = locked
+            }
+            addLog("Settings locked status changed to: $locked")
         }
-        addLog("Settings locked status changed to: $locked")
     }
 
     // Technician PIN sync
@@ -202,11 +237,19 @@ class DataStoreManager(private val context: Context) {
         prefs[TECHNICIAN_PIN] ?: "2468"
     }
 
+    suspend fun getTechnicianPin(): String {
+        val prefs = context.dataStore.data.first()
+        return prefs[TECHNICIAN_PIN] ?: "2468"
+    }
+
     suspend fun setTechnicianPin(pin: String) {
-        context.dataStore.edit { prefs ->
-            prefs[TECHNICIAN_PIN] = pin
+        val current = getTechnicianPin()
+        if (current != pin) {
+            context.dataStore.edit { prefs ->
+                prefs[TECHNICIAN_PIN] = pin
+            }
+            addLog("Technician PIN updated.")
         }
-        addLog("Technician PIN updated to: $pin")
     }
 
     // Auto start on boot
@@ -224,13 +267,14 @@ class DataStoreManager(private val context: Context) {
     }
 
     suspend fun setAutoStartOnBoot(enabled: Boolean, localOverride: Boolean = false) {
-        context.dataStore.edit { prefs ->
-            prefs[AUTO_START_ON_BOOT] = enabled
+        val prefs = context.dataStore.data.first()
+        if (prefs[AUTO_START_ON_BOOT] != enabled) {
+            context.dataStore.edit { it[AUTO_START_ON_BOOT] = enabled }
             if (localOverride) {
-                prefs[AUTO_START_LOCAL_OVERRIDE] = true
+                context.dataStore.edit { it[AUTO_START_LOCAL_OVERRIDE] = true }
             }
+            addLog("Auto start on boot changed to: $enabled")
         }
-        addLog("Auto start on boot changed to: $enabled")
     }
 
     // Last sync timestamp
@@ -262,7 +306,7 @@ class DataStoreManager(private val context: Context) {
     }
 
     suspend fun addLog(message: String) {
-        val timestamp = java.text.SimpleDateFormat("yyyy-MM-dd HH:mm:ss", java.util.Locale.getDefault()).format(java.util.Date())
+        val timestamp = java.text.SimpleDateFormat("yyyy-MM-dd HH:ss", java.util.Locale.getDefault()).format(java.util.Date())
         val entry = "[$timestamp] $message"
         context.dataStore.edit { prefs ->
             val logString = prefs[LOCAL_DIAGNOSTIC_LOGS] ?: ""

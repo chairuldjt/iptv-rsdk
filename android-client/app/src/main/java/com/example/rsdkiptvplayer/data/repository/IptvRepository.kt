@@ -62,21 +62,18 @@ class IptvRepository(
                 dataStoreManager.addLog("Registration result: ${resBody.message}")
                 if (resBody.status && resBody.data != null) {
                     dataStoreManager.setSyncInterval(resBody.data.sync_interval)
-                    resBody.data.active
+                    true // Always active
                 } else {
-                    // Registered but deactivated by admin
-                    dataStoreManager.addLog("Device has been DEACTIVATED by admin")
-                    false
+                    dataStoreManager.addLog("Registration successful (default active)")
+                    true
                 }
             } else {
-                dataStoreManager.addLog("Registration failed: HTTP ${response.code()}. Auto-unlocking settings.")
-                dataStoreManager.setLockSettings(false)
+                dataStoreManager.addLog("Registration failed: HTTP ${response.code()}")
                 // Fallback to locally stored active preference if server fails, default true
                 true
             }
         } catch (e: Exception) {
-            dataStoreManager.addLog("Registration connection error: ${e.message}. Auto-unlocking settings.")
-            dataStoreManager.setLockSettings(false)
+            dataStoreManager.addLog("Registration connection error: ${e.message}")
             true // Allow offline mode
         }
     }
@@ -89,7 +86,8 @@ class IptvRepository(
         }
 
         val syncMode = dataStoreManager.getSyncMode()
-        if (syncMode == "custom_m3u") {
+        if (syncMode == "custom") {
+            dataStoreManager.addLog("Config sync skipped: Device is in Custom M3U mode.")
             return true
         }
 
@@ -104,9 +102,12 @@ class IptvRepository(
                 val body = response.body()!!
                 if (body.status && body.data != null) {
                     val config = body.data
+                    dataStoreManager.addLog("Config Sync: Server returned lock_settings=${config.lock_settings}, mode=${config.sync_mode}")
                     dataStoreManager.setLockSettings(config.lock_settings ?: true)
                     dataStoreManager.setSyncInterval(config.sync_interval ?: 1800)
                     dataStoreManager.setAspectRatio(config.aspect_ratio ?: "fit")
+                    config.sync_mode?.let { dataStoreManager.setSyncMode(it) }
+                    config.custom_m3u_url?.let { dataStoreManager.setCustomM3uUrl(it) }
                     config.technician_pin?.let { pin ->
                         dataStoreManager.setTechnicianPin(pin)
                     }
@@ -122,16 +123,20 @@ class IptvRepository(
                         dataStoreManager.addLog("Remote trigger: FORCE SYNC enabled!")
                         syncChannels()
                     }
+
+                    if (config.clear_cache_trigger == true) {
+                        dataStoreManager.addLog("Remote trigger: CLEAR CACHE triggered from Web!")
+                        clearChannelCache()
+                    }
+
                     dataStoreManager.addLog("Server config sync successful!")
-                    return config.active
+                    return true // Always active
                 }
             } else {
-                dataStoreManager.addLog("Config sync failed: HTTP ${response.code()}. Auto-unlocking settings.")
-                dataStoreManager.setLockSettings(false)
+                dataStoreManager.addLog("Config sync failed: HTTP ${response.code()}")
             }
         } catch (e: Exception) {
-            dataStoreManager.addLog("Config sync network error: ${e.message}. Auto-unlocking settings.")
-            dataStoreManager.setLockSettings(false)
+            dataStoreManager.addLog("Config sync network error: ${e.message}")
         }
         return true
     }
@@ -147,7 +152,7 @@ class IptvRepository(
         return withContext(Dispatchers.IO) {
             try {
                 dataStoreManager.setCustomM3uUrl(normalizedUrl)
-                dataStoreManager.setSyncMode("custom_m3u")
+                dataStoreManager.setSyncMode("custom")
                 dataStoreManager.addLog("Mengunduh playlist M3U dari: $normalizedUrl...")
 
                 val connection = java.net.URL(normalizedUrl).openConnection() as java.net.HttpURLConnection
@@ -160,8 +165,7 @@ class IptvRepository(
                     val content = connection.inputStream.bufferedReader().use { it.readText() }
                     val channels = M3uParser.parse(content)
                     if (channels.isNotEmpty()) {
-                        channelDao.clearAll()
-                        channelDao.insertAll(channels)
+                        channelDao.replaceAllChannels(channels)
                         dataStoreManager.setLastSyncTimestamp(System.currentTimeMillis())
                         dataStoreManager.addLog("Sukses sinkronisasi M3U! Berhasil memuat ${channels.size} saluran.")
                         Pair(true, "Sukses: Berhasil memuat ${channels.size} saluran dari M3U.")
@@ -182,16 +186,17 @@ class IptvRepository(
 
     // Sync remote channel list to Room DB Cache
     suspend fun syncChannels(): Boolean {
+        val syncMode = dataStoreManager.getSyncMode()
+        if (syncMode == "custom") {
+            val customUrl = dataStoreManager.getCustomM3uUrl()
+            if (customUrl.isNotEmpty()) {
+                val res = syncLocalM3u(customUrl)
+                return res.first
+            }
+        }
+
         val serverApiEnabled = dataStoreManager.serverApiEnabledFlow.first()
         if (!serverApiEnabled) {
-            val syncMode = dataStoreManager.getSyncMode()
-            if (syncMode == "custom_m3u") {
-                val customUrl = dataStoreManager.getCustomM3uUrl()
-                if (customUrl.isNotEmpty()) {
-                    val res = syncLocalM3u(customUrl)
-                    return res.first
-                }
-            }
             return false
         }
 
@@ -218,9 +223,8 @@ class IptvRepository(
                         )
                     }
 
-                    // Save cache to Room
-                    channelDao.clearAll()
-                    channelDao.insertAll(entities)
+                    // Save cache to Room atomically
+                    channelDao.replaceAllChannels(entities)
                     
                     dataStoreManager.setLastSyncTimestamp(System.currentTimeMillis())
                     dataStoreManager.addLog("Playlist synced successfully. Received ${entities.size} channels.")
@@ -261,21 +265,21 @@ class IptvRepository(
                 val body = response.body()!!
                 if (body.status && body.data != null) {
                     val status = body.data
+                    dataStoreManager.addLog("Heartbeat: Server returned lock_settings=${status.lock_settings}, active=${status.active}")
                     dataStoreManager.setLockSettings(status.lock_settings)
                     if (status.force_sync) {
-                        dataStoreManager.addLog("Heartbeat response trigger: Syncing channels now.")
+                        dataStoreManager.addLog("Heartbeat response trigger: Syncing config & channels now.")
+                        syncConfig() // Fetch latest syncMode, customUrl, etc.
                         syncChannels()
                     }
                     return status
                 }
             } else {
-                dataStoreManager.addLog("Heartbeat response failed: HTTP ${response.code()}. Auto-unlocking settings.")
-                dataStoreManager.setLockSettings(false)
+                dataStoreManager.addLog("Heartbeat response failed: HTTP ${response.code()}")
             }
         } catch (e: Exception) {
             // Heartbeat failed (Offline / No Server Connection)
-            dataStoreManager.addLog("Heartbeat network error: ${e.message}. Auto-unlocking settings.")
-            dataStoreManager.setLockSettings(false)
+            dataStoreManager.addLog("Heartbeat network error: ${e.message}")
         }
         return null
     }

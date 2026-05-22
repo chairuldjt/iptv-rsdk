@@ -44,7 +44,7 @@ export async function POST(request: Request) {
       data: {
         force_sync: config?.forceSync ?? false,
         lock_settings: config?.lockSettings ?? true,
-        active: updatedDevice.isActive,
+        active: true,
       },
     })
   } catch (error: any) {

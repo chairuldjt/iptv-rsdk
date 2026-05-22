@@ -46,7 +46,7 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
     private val _isTestingConnection = MutableStateFlow(false)
     val isTestingConnection: StateFlow<Boolean> = _isTestingConnection.asStateFlow()
 
-    private val _syncMode = MutableStateFlow("server")
+    private val _syncMode = MutableStateFlow("api")
     val syncMode: StateFlow<String> = _syncMode.asStateFlow()
 
     private val _customM3uUrl = MutableStateFlow("")
@@ -158,7 +158,7 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
     fun updateSyncMode(mode: String) {
         viewModelScope.launch {
             dataStoreManager.setSyncMode(mode)
-            if (mode == "server") {
+            if (mode == "api") {
                 _m3uSyncResult.value = "Mengganti ke API Server, membersihkan cache lama..."
                 repository.clearChannelCache()
                 repository.syncConfig()
@@ -189,7 +189,7 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
                 return@launch
             }
             dataStoreManager.setCustomM3uUrl(url)
-            dataStoreManager.setSyncMode("custom_m3u")
+            dataStoreManager.setSyncMode("custom")
             val res = repository.syncLocalM3u(url)
             _m3uSyncResult.value = if (res.first) {
                 "🟢 ${res.second}"
@@ -204,7 +204,7 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
         viewModelScope.launch {
             val normalizedUrl = url.trim().trimEnd('/')
             dataStoreManager.setServerUrlOverride(normalizedUrl)
-            dataStoreManager.setSyncMode("server")
+            dataStoreManager.setSyncMode("api")
             repository.clearChannelCache()
             repository.registerDevice()
             repository.syncConfig()
@@ -220,7 +220,7 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
     fun restoreDefaultUrl() {
         viewModelScope.launch {
             dataStoreManager.clearServerUrlOverride()
-            dataStoreManager.setSyncMode("server")
+            dataStoreManager.setSyncMode("api")
             repository.clearChannelCache()
             repository.registerDevice()
             repository.syncConfig()

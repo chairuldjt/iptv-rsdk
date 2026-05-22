@@ -27,31 +27,37 @@ export async function GET(
       )
     }
 
-    if (!device.isActive) {
-      return NextResponse.json({
-        status: false,
-        message: 'Device has been deactivated',
-        data: [],
-      })
+    // Determine the playlist ID from device config
+    const config = await prisma.deviceConfig.findUnique({
+      where: { deviceId }
+    })
+
+    if (config?.syncMode === 'custom') {
+        return NextResponse.json({
+            status: true,
+            message: 'Device is in Custom M3U mode. Use the custom URL provided in config.',
+            data: [],
+        })
     }
 
-    // Determine the playlist ID
-    let playlistId = device.playlistId
-
-    if (!playlistId) {
-      // Use the global default playlist (e.g. the first one or latest one in the database)
-      const defaultPlaylist = await prisma.playlist.findFirst({
-        orderBy: { updatedAt: 'desc' },
-      })
-      if (defaultPlaylist) {
-        playlistId = defaultPlaylist.id
-      }
+    // Use the globally active playlist
+    let globalPlaylist = await prisma.playlist.findFirst({
+      where: { isGlobal: true },
+    })
+    
+    // Fallback: If no playlist is marked as global, use the most recently updated one
+    if (!globalPlaylist) {
+        globalPlaylist = await prisma.playlist.findFirst({
+            orderBy: { updatedAt: 'desc' }
+        })
     }
+
+    const playlistId = globalPlaylist?.id
 
     if (!playlistId) {
       return NextResponse.json({
         status: true,
-        message: 'No active playlists available on server',
+        message: 'No global active playlists available on server',
         data: [],
       })
     }
