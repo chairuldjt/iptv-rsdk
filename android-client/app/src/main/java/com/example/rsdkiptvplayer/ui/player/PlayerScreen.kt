@@ -69,6 +69,11 @@ fun PlayerScreen(
     var showMenu by remember { mutableStateOf(selectedChannel == null) }
     var showPinDialog by remember { mutableStateOf(false) }
     var showZapOverlay by remember { mutableStateOf(false) }
+    val rootFocusRequester = remember { FocusRequester() }
+
+    LaunchedEffect(Unit) {
+        rootFocusRequester.requestFocus()
+    }
 
     // Auto-play channel when initialChannelId is provided
     var hasAutoPlayed by remember { mutableStateOf(false) }
@@ -106,6 +111,7 @@ fun PlayerScreen(
         modifier = Modifier
             .fillMaxSize()
             .background(Color.Black)
+            .focusRequester(rootFocusRequester)
             .focusable()
             .onPreviewKeyEvent { keyEvent ->
                 if (keyEvent.type == KeyEventType.KeyDown) {

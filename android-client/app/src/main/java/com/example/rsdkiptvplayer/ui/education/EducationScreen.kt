@@ -11,6 +11,8 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -32,6 +34,7 @@ fun EducationScreen(
     val currentTitle by viewModel.currentTitle.collectAsState()
     val isLoading by viewModel.isLoading.collectAsState()
     val errorMessage by viewModel.errorMessage.collectAsState()
+    val settingsFocusRequester = remember { FocusRequester() }
 
     LaunchedEffect(folderPath) {
         viewModel.loadAndPlay()
@@ -42,6 +45,12 @@ fun EducationScreen(
     }
 
     BackHandler { onBack() }
+
+    LaunchedEffect(errorMessage) {
+        if (errorMessage != null) {
+            settingsFocusRequester.requestFocus()
+        }
+    }
 
     Box(
         modifier = Modifier
@@ -116,7 +125,9 @@ fun EducationScreen(
                             Button(
                                 onClick = onOpenSettings,
                                 colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF10B981)),
-                                modifier = Modifier.focusable()
+                                modifier = Modifier
+                                    .focusRequester(settingsFocusRequester)
+                                    .focusable()
                             ) {
                                 Text("Set Path Edukasi", fontWeight = FontWeight.Bold)
                             }

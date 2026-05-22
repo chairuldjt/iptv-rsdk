@@ -20,10 +20,17 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shadow
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.ui.input.key.type
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
@@ -257,6 +264,7 @@ private fun HospitalityMenuBar(
 ) {
     var selectedIndex by remember { mutableIntStateOf(2) }
     var dragAmount by remember { mutableFloatStateOf(0f) }
+    val menuFocusRequesters = remember { List(5) { FocusRequester() } }
     val menuActions = listOf(
         onEducationClick,
         onServiceClick,
@@ -265,10 +273,40 @@ private fun HospitalityMenuBar(
         onSettingsClick
     )
 
+    LaunchedEffect(Unit) {
+        menuFocusRequesters[selectedIndex].requestFocus()
+    }
+
+    fun moveSelection(delta: Int) {
+        selectedIndex = (selectedIndex + delta).coerceIn(0, menuActions.lastIndex)
+        menuFocusRequesters[selectedIndex].requestFocus()
+    }
+
     Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.fillMaxWidth()) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
+                .onPreviewKeyEvent { keyEvent ->
+                    if (keyEvent.type != KeyEventType.KeyDown) {
+                        return@onPreviewKeyEvent false
+                    }
+
+                    when (keyEvent.key) {
+                        Key.DirectionLeft -> {
+                            moveSelection(-1)
+                            true
+                        }
+                        Key.DirectionRight -> {
+                            moveSelection(1)
+                            true
+                        }
+                        Key.DirectionCenter, Key.Enter, Key.NumPadEnter -> {
+                            menuActions[selectedIndex].invoke()
+                            true
+                        }
+                        else -> false
+                    }
+                }
                 .horizontalScroll(rememberScrollState())
                 .pointerInput(Unit) {
                     awaitPointerEventScope {
@@ -287,6 +325,7 @@ private fun HospitalityMenuBar(
                                     } else {
                                         (selectedIndex - 1).coerceAtLeast(0)
                                     }
+                                    menuFocusRequesters[selectedIndex].requestFocus()
                                     dragAmount = 0f
                                     change.consume()
                                 }
@@ -305,6 +344,8 @@ private fun HospitalityMenuBar(
                 accent = Color(0xFF86EFAC),
                 compact = true,
                 selected = selectedIndex == 0,
+                focusRequester = menuFocusRequesters[0],
+                onFocused = { selectedIndex = 0 },
                 onClick = {
                     selectedIndex = 0
                     onEducationClick()
@@ -317,6 +358,8 @@ private fun HospitalityMenuBar(
                 accent = Color(0xFFE7D8A0),
                 compact = true,
                 selected = selectedIndex == 1,
+                focusRequester = menuFocusRequesters[1],
+                onFocused = { selectedIndex = 1 },
                 onClick = {
                     selectedIndex = 1
                     onServiceClick()
@@ -328,6 +371,8 @@ private fun HospitalityMenuBar(
                 subtitle = "$channelsCount saluran",
                 accent = Color(0xFFFFE9A6),
                 selected = selectedIndex == 2,
+                focusRequester = menuFocusRequesters[2],
+                onFocused = { selectedIndex = 2 },
                 onClick = {
                     selectedIndex = 2
                     onTvClick()
@@ -340,6 +385,8 @@ private fun HospitalityMenuBar(
                 accent = Color(0xFF94A3B8),
                 compact = true,
                 selected = selectedIndex == 3,
+                focusRequester = menuFocusRequesters[3],
+                onFocused = { selectedIndex = 3 },
                 onClick = {
                     selectedIndex = 3
                     onYoutubeClick()
@@ -352,6 +399,8 @@ private fun HospitalityMenuBar(
                 accent = Color(0xFF7DD3FC),
                 compact = true,
                 selected = selectedIndex == 4,
+                focusRequester = menuFocusRequesters[4],
+                onFocused = { selectedIndex = 4 },
                 onClick = {
                     selectedIndex = 4
                     onSettingsClick()
@@ -377,6 +426,8 @@ private fun HospitalityMenuButton(
     accent: Color,
     compact: Boolean = false,
     selected: Boolean = false,
+    focusRequester: FocusRequester,
+    onFocused: () -> Unit,
     onClick: () -> Unit
 ) {
     var isFocused by remember { mutableStateOf(false) }
@@ -393,8 +444,14 @@ private fun HospitalityMenuButton(
         modifier = Modifier
             .width(if (compact) 96.dp else 130.dp)
             .scale(scale)
+            .focusRequester(focusRequester)
             .focusable()
-            .onFocusChanged { isFocused = it.isFocused }
+            .onFocusChanged {
+                isFocused = it.isFocused
+                if (it.isFocused) {
+                    onFocused()
+                }
+            }
             .clickable(
                 interactionSource = interactionSource,
                 indication = null

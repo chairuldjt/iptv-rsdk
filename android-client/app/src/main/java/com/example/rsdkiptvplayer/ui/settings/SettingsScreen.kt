@@ -19,6 +19,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
@@ -100,6 +102,11 @@ fun SettingsScreen(
         "Konten Edukasi",
         "Playlist M3U Kustom"
     )
+    val menuFocusRequesters = remember { List(menus.size) { FocusRequester() } }
+
+    LaunchedEffect(initialTabIdx) {
+        menuFocusRequesters[activeMenuIdx.coerceIn(menus.indices)].requestFocus()
+    }
 
     Box(
         modifier = Modifier
@@ -190,7 +197,11 @@ fun SettingsScreen(
                                         shape = RoundedCornerShape(10.dp)
                                     )
                                     .scale(if (isFocused) 1.02f else 1.0f)
-                                    .clickable { activeMenuIdx = index }
+                                    .focusRequester(menuFocusRequesters[index])
+                                    .clickable {
+                                        activeMenuIdx = index
+                                        menuFocusRequesters[index].requestFocus()
+                                    }
                                     .focusable()
                                     .onFocusChanged { isFocused = it.isFocused }
                                     .padding(horizontal = 14.dp, vertical = 10.dp),

@@ -14,6 +14,8 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
@@ -30,6 +32,11 @@ fun PinGridDialog(
 ) {
     var enteredPin by remember { mutableStateOf("") }
     var pinError by remember { mutableStateOf(false) }
+    val firstButtonFocusRequester = remember { FocusRequester() }
+
+    LaunchedEffect(Unit) {
+        firstButtonFocusRequester.requestFocus()
+    }
 
     Dialog(onDismissRequest = onDismiss) {
         Card(
@@ -105,6 +112,7 @@ fun PinGridDialog(
                         val text = buttons[index]
                         PinGridButton(
                             text = text,
+                            focusRequester = if (index == 0) firstButtonFocusRequester else null,
                             onClick = {
                                 pinError = false
                                 when (text) {
@@ -133,7 +141,9 @@ fun PinGridDialog(
 
                 TextButton(
                     onClick = onDismiss,
-                    modifier = Modifier.padding(top = 16.dp)
+                    modifier = Modifier
+                        .padding(top = 16.dp)
+                        .focusable()
                 ) {
                     Text("Batal", color = Color(0xFF94A3B8))
                 }
@@ -145,6 +155,7 @@ fun PinGridDialog(
 @Composable
 fun PinGridButton(
     text: String,
+    focusRequester: FocusRequester? = null,
     onClick: () -> Unit
 ) {
     var isFocused by remember { mutableStateOf(false) }
@@ -153,6 +164,7 @@ fun PinGridButton(
         onClick = onClick,
         modifier = Modifier
             .aspectRatio(1.2f)
+            .then(if (focusRequester != null) Modifier.focusRequester(focusRequester) else Modifier)
             .focusable()
             .onFocusChanged { isFocused = it.isFocused },
         shape = RoundedCornerShape(12.dp),

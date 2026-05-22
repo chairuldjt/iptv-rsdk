@@ -24,6 +24,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -54,6 +56,11 @@ fun ChannelBrowserScreen(
     val isLoading by playerViewModel.isLoading.collectAsState()
 
     var selectedCategory by remember { mutableStateOf("ALL") }
+    val backFocusRequester = remember { FocusRequester() }
+
+    LaunchedEffect(Unit) {
+        backFocusRequester.requestFocus()
+    }
 
     // Responsive grid column count based on screen width
     val configuration = LocalConfiguration.current
@@ -111,6 +118,7 @@ fun ChannelBrowserScreen(
                         onClick = onBack,
                         modifier = Modifier
                             .size(40.dp)
+                            .focusRequester(backFocusRequester)
                             .clip(CircleShape)
                             .background(
                                 if (isBackFocused) Color(0xFF6366F1).copy(alpha = 0.3f)
