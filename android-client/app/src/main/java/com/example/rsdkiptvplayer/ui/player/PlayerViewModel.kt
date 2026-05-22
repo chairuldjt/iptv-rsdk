@@ -51,6 +51,9 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
     private val _isDeviceActive = MutableStateFlow(true)
     val isDeviceActive: StateFlow<Boolean> = _isDeviceActive.asStateFlow()
 
+    private val _deviceId = MutableStateFlow("")
+    val deviceId: StateFlow<String> = _deviceId.asStateFlow()
+
     private val _aspectRatio = MutableStateFlow("fit")
     val aspectRatio: StateFlow<String> = _aspectRatio.asStateFlow()
 
@@ -64,6 +67,20 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
     private var syncJob: Job? = null
 
     init {
+        // Fetch device ID
+        viewModelScope.launch {
+            _deviceId.value = dataStoreManager.getDeviceId()
+        }
+
+        // Stop playback reactively when device is blocked
+        viewModelScope.launch {
+            isDeviceActive.collectLatest { active ->
+                if (!active) {
+                    stopPlayback()
+                }
+            }
+        }
+
         // Observe Channels & Categories from Cache
         viewModelScope.launch {
             repository.allChannelsFlow.collectLatest { list ->

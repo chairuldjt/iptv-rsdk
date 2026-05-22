@@ -70,7 +70,6 @@ fun PlayerScreen(
     }
 
     var showMenu by remember { mutableStateOf(selectedChannel == null) }
-    var showPinDialog by remember { mutableStateOf(false) }
     var showZapOverlay by remember { mutableStateOf(false) }
     var drawerFocusPane by remember { mutableIntStateOf(0) }
     var drawerFocusedCategoryIndex by remember { mutableIntStateOf(0) }
@@ -227,7 +226,7 @@ fun PlayerScreen(
                         }
                         if (inputHistory.toList() == konamiCode) {
                             inputHistory.clear()
-                            showPinDialog = true
+                            onOpenSettings()
                             return@onPreviewKeyEvent true
                         }
                     } else {
@@ -281,9 +280,10 @@ fun PlayerScreen(
     ) {
         if (!isDeviceActive) {
             // Blocked screen
+            val deviceId by viewModel.deviceId.collectAsState()
             DeviceBlockedScreen(
-                deviceId = viewModel.channels.value.firstOrNull()?.let { "" } ?: "DEVICE-ID",
-                onOpenTechnician = { showPinDialog = true }
+                deviceId = deviceId,
+                onOpenTechnician = { onOpenSettings() }
             )
         } else {
             // Fullscreen Live Player or Welcome Placeholder
@@ -780,18 +780,7 @@ fun PlayerScreen(
             }
         }
 
-        // Authentication PIN Dialog Triggered
-        if (showPinDialog) {
-            PinGridDialog(
-                correctPin = technicianPin,
-                onSuccess = {
-                    showPinDialog = false
-                    showMenu = false
-                    onOpenSettings()
-                },
-                onDismiss = { showPinDialog = false }
-            )
-        }
+
     }
 }
 

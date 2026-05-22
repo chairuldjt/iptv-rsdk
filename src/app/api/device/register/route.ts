@@ -18,9 +18,35 @@ export async function POST(request: Request) {
       where: { deviceId: device_id },
       include: { config: true },
     })
-
+ 
     if (!device) {
-      // Device does not exist -> Register it as Active by default
+      // If UUID doesn't match, check if we have a match by MAC address to preserve device data (e.g. after reinstall)
+      if (mac_address) {
+        const existingDeviceByMac = await prisma.device.findFirst({
+          where: { macAddress: mac_address },
+          include: { config: true },
+        })
+ 
+        if (existingDeviceByMac) {
+          // Hardware match found! Update deviceId (which cascades automatically to DeviceConfig)
+          device = await prisma.device.update({
+            where: { id: existingDeviceByMac.id },
+            data: {
+              deviceId: device_id,
+              deviceName: device_name || existingDeviceByMac.deviceName,
+              appVersion: app_version || existingDeviceByMac.appVersion,
+              androidVersion: android_version || existingDeviceByMac.androidVersion,
+              lastIp: local_ip || existingDeviceByMac.lastIp,
+              lastOnline: new Date(),
+            },
+            include: { config: true },
+          })
+        }
+      }
+    }
+ 
+    if (!device) {
+      // Device does not exist (fully new device) -> Register it as Active by default
       device = await prisma.$transaction(async (tx) => {
         const newDevice = await tx.device.create({
           data: {
@@ -34,7 +60,7 @@ export async function POST(request: Request) {
             lastOnline: new Date(),
           },
         })
-
+ 
         // Create default config for this new device
         const newConfig = await tx.deviceConfig.create({
           data: {
@@ -49,10 +75,10 @@ export async function POST(request: Request) {
             technicianPin: '2468',
           },
         })
-
+ 
         return { ...newDevice, config: newConfig }
       })
-
+ 
       return NextResponse.json({
         status: true,
         message: 'Device registered and active',

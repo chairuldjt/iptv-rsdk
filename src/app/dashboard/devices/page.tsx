@@ -1,6 +1,7 @@
 import prisma from '@/lib/db'
 import { revalidatePath } from 'next/cache'
 import ConfirmForm from '@/components/ConfirmForm'
+import { redirect } from 'next/navigation'
 
 export const revalidate = 0 // Disable cache for live devices
 
@@ -93,15 +94,17 @@ async function saveDeviceConfigAction(formData: FormData) {
   } catch (error) {
     console.error('Save config error:', error)
   }
+  redirect(`/dashboard/devices?edit=${deviceId}&success=1`)
 }
 
 export default async function DevicesPage({
   searchParams,
 }: {
-  searchParams: Promise<{ edit?: string }>
+  searchParams: Promise<{ edit?: string; success?: string }>
 }) {
   const resolvedSearchParams = await searchParams
   const editDeviceId = resolvedSearchParams.edit
+  const showSuccess = resolvedSearchParams.success === '1'
 
   // Fetch all devices
   const devices = await prisma.device.findMany({
@@ -187,6 +190,9 @@ export default async function DevicesPage({
                         <td className="p-4">
                           <div className="text-slate-300 text-xs">App v{d.appVersion || '1.0.0'} (Android {d.androidVersion || '10'})</div>
                           <div className="text-slate-500 text-xs mt-0.5 font-mono">IP: {d.lastIp || '127.0.0.1'}</div>
+                          {d.macAddress && (
+                            <div className="text-indigo-400/90 text-xs mt-0.5 font-mono">MAC: {d.macAddress}</div>
+                          )}
                         </td>
                         <td className="p-4 px-6 text-right">
                           <div className="flex items-center justify-end gap-3">
@@ -248,6 +254,15 @@ export default async function DevicesPage({
               <h3 className="font-bold text-white text-lg">Remote Configuration</h3>
               <a href="/dashboard/devices" className="text-xs font-bold text-slate-400 hover:text-white">✕ Close</a>
             </div>
+
+            {showSuccess && (
+              <div className="mb-4 p-3 bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 rounded-xl text-xs font-bold flex items-center gap-2 animate-fade-in">
+                <svg className="w-4 h-4 text-emerald-400 animate-bounce" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                </svg>
+                <span>Configuration successfully saved & synced!</span>
+              </div>
+            )}
 
             <form action={saveDeviceConfigAction} className="space-y-4">
               <input type="hidden" name="deviceId" value={editingDevice.deviceId} />

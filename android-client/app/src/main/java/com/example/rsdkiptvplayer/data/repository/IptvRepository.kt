@@ -43,7 +43,6 @@ class IptvRepository(
 
         val deviceId = dataStoreManager.getDeviceId()
         val serverUrl = dataStoreManager.getServerUrl()
-        val apiService = RetrofitClient.getService(serverUrl)
 
         val request = RegisterRequest(
             device_id = deviceId,
@@ -56,6 +55,7 @@ class IptvRepository(
 
         dataStoreManager.addLog("Registering device on endpoint $serverUrl...")
         return try {
+            val apiService = RetrofitClient.getService(serverUrl)
             val response = apiService.registerDevice(request)
             if (response.isSuccessful && response.body() != null) {
                 val resBody = response.body()!!
@@ -69,12 +69,14 @@ class IptvRepository(
                     false
                 }
             } else {
-                dataStoreManager.addLog("Registration failed: HTTP ${response.code()}")
+                dataStoreManager.addLog("Registration failed: HTTP ${response.code()}. Auto-unlocking settings.")
+                dataStoreManager.setLockSettings(false)
                 // Fallback to locally stored active preference if server fails, default true
                 true
             }
         } catch (e: Exception) {
-            dataStoreManager.addLog("Registration connection error: ${e.message}")
+            dataStoreManager.addLog("Registration connection error: ${e.message}. Auto-unlocking settings.")
+            dataStoreManager.setLockSettings(false)
             true // Allow offline mode
         }
     }
@@ -93,10 +95,10 @@ class IptvRepository(
 
         val deviceId = dataStoreManager.getDeviceId()
         val serverUrl = dataStoreManager.getServerUrl()
-        val apiService = RetrofitClient.getService(serverUrl)
 
         dataStoreManager.addLog("Syncing configuration from server...")
         try {
+            val apiService = RetrofitClient.getService(serverUrl)
             val response = apiService.getDeviceConfig(deviceId)
             if (response.isSuccessful && response.body() != null) {
                 val body = response.body()!!
@@ -114,11 +116,7 @@ class IptvRepository(
                         config.education_smb_password ?: "",
                         config.education_smb_domain ?: ""
                     )
-                    if (!dataStoreManager.hasAutoStartLocalOverride()) {
-                        dataStoreManager.setAutoStartOnBoot(config.auto_start_on_boot ?: false)
-                    } else {
-                        dataStoreManager.addLog("Auto-start local setting preserved from technician mode.")
-                    }
+                    dataStoreManager.setAutoStartOnBoot(config.auto_start_on_boot ?: false)
 
                     if (config.force_sync == true) {
                         dataStoreManager.addLog("Remote trigger: FORCE SYNC enabled!")
@@ -127,9 +125,13 @@ class IptvRepository(
                     dataStoreManager.addLog("Server config sync successful!")
                     return config.active
                 }
+            } else {
+                dataStoreManager.addLog("Config sync failed: HTTP ${response.code()}. Auto-unlocking settings.")
+                dataStoreManager.setLockSettings(false)
             }
         } catch (e: Exception) {
-            dataStoreManager.addLog("Config sync network error: ${e.message}")
+            dataStoreManager.addLog("Config sync network error: ${e.message}. Auto-unlocking settings.")
+            dataStoreManager.setLockSettings(false)
         }
         return true
     }
@@ -195,10 +197,10 @@ class IptvRepository(
 
         val deviceId = dataStoreManager.getDeviceId()
         val serverUrl = dataStoreManager.getServerUrl()
-        val apiService = RetrofitClient.getService(serverUrl)
 
         dataStoreManager.addLog("Syncing channel playlist from server...")
         try {
+            val apiService = RetrofitClient.getService(serverUrl)
             val response = apiService.getDeviceChannels(deviceId)
             if (response.isSuccessful && response.body() != null) {
                 val body = response.body()!!
@@ -242,7 +244,6 @@ class IptvRepository(
 
         val deviceId = dataStoreManager.getDeviceId()
         val serverUrl = dataStoreManager.getServerUrl()
-        val apiService = RetrofitClient.getService(serverUrl)
 
         val request = StatusRequest(
             device_id = deviceId,
@@ -254,6 +255,7 @@ class IptvRepository(
         )
 
         try {
+            val apiService = RetrofitClient.getService(serverUrl)
             val response = apiService.sendHeartbeat(request)
             if (response.isSuccessful && response.body() != null) {
                 val body = response.body()!!
@@ -266,9 +268,14 @@ class IptvRepository(
                     }
                     return status
                 }
+            } else {
+                dataStoreManager.addLog("Heartbeat response failed: HTTP ${response.code()}. Auto-unlocking settings.")
+                dataStoreManager.setLockSettings(false)
             }
         } catch (e: Exception) {
             // Heartbeat failed (Offline / No Server Connection)
+            dataStoreManager.addLog("Heartbeat network error: ${e.message}. Auto-unlocking settings.")
+            dataStoreManager.setLockSettings(false)
         }
         return null
     }
@@ -284,7 +291,6 @@ class IptvRepository(
 
         val deviceId = dataStoreManager.getDeviceId()
         val serverUrl = dataStoreManager.getServerUrl()
-        val apiService = RetrofitClient.getService(serverUrl)
 
         val timestamp = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ssXXX", Locale.getDefault()).format(Date())
         val request = LogRequest(
@@ -298,6 +304,7 @@ class IptvRepository(
         )
 
         try {
+            val apiService = RetrofitClient.getService(serverUrl)
             apiService.sendErrorLog(request)
         } catch (e: Exception) {
             // Safe ignore if endpoint is down, already saved locally

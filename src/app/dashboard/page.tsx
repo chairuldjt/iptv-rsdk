@@ -125,8 +125,14 @@ export default async function DashboardPage() {
                       <div className={`w-2.5 h-2.5 rounded-full ${isOnline ? 'bg-emerald-500 glow-green' : 'bg-slate-600'}`}></div>
                       <div>
                         <span className="font-semibold text-sm text-white">{d.deviceName}</span>
-                        <div className="flex gap-2 text-xs text-slate-400 mt-0.5">
+                        <div className="flex flex-wrap gap-x-2 gap-y-0.5 text-xs text-slate-400 mt-0.5">
                           <span>IP: {d.lastIp || 'Unknown'}</span>
+                          {d.macAddress && (
+                            <>
+                              <span>•</span>
+                              <span className="text-indigo-400">MAC: {d.macAddress}</span>
+                            </>
+                          )}
                           <span>•</span>
                           <span>ID: {d.deviceId.substring(0, 12)}...</span>
                         </div>

@@ -31,6 +31,9 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
     private val _lockSettings = MutableStateFlow(true)
     val lockSettings: StateFlow<Boolean> = _lockSettings.asStateFlow()
 
+    private val _technicianPin = MutableStateFlow("2468")
+    val technicianPin: StateFlow<String> = _technicianPin.asStateFlow()
+
     private val _autoStart = MutableStateFlow(false)
     val autoStart: StateFlow<Boolean> = _autoStart.asStateFlow()
 
@@ -94,6 +97,12 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
         viewModelScope.launch {
             repository.lockSettingsFlow.collectLatest { locked ->
                 _lockSettings.value = locked
+            }
+        }
+
+        viewModelScope.launch {
+            repository.technicianPinFlow.collectLatest { pin ->
+                _technicianPin.value = pin
             }
         }
 
