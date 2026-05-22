@@ -22,10 +22,7 @@ Jika aplikasi digunakan dalam mode M3U (bukan mode API Server), Anda bisa menyet
 - **Lokasi File**: `android-client/app/src/main/java/com/example/rsdkiptvplayer/data/datastore/DataStoreManager.kt`
 - **Kode**:
   ```kotlin
-  // Flow UI default masih kosong agar field Settings tidak otomatis terisi:
-  prefs[CUSTOM_M3U_URL] ?: ""
-
-  // Fallback repository saat mode custom belum punya URL tersimpan:
+  // Default yang tampil di Settings dan dipakai repository saat belum ada URL tersimpan:
   prefs[CUSTOM_M3U_URL] ?: "http://10.0.0.1/iptv/iptv_rsdk.m3u"
   ```
 - **Catatan**: Default source APK saat ini adalah **Custom M3U**. URL M3U fallback ini akan dipakai jika belum ada URL M3U tersimpan di DataStore.

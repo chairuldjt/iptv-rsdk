@@ -117,7 +117,7 @@ class DataStoreManager(private val context: Context) {
 
     // Custom M3U URL
     val customM3uUrlFlow: Flow<String> = context.dataStore.data.map { prefs ->
-        prefs[CUSTOM_M3U_URL] ?: "http://10.0.0.1/iptv/iptv_rsdk"
+        prefs[CUSTOM_M3U_URL] ?: "http://10.0.0.1/iptv/iptv_rsdk.m3u"
     }
 
     suspend fun getCustomM3uUrl(): String {
