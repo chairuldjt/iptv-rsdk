@@ -4,8 +4,10 @@ import ConfirmForm from '@/components/ConfirmForm'
 import DeviceConfigForm from '@/components/DeviceConfigForm'
 import { redirect } from 'next/navigation'
 import { getOnlineThreshold } from '@/lib/time'
+import { cleanupOfflineDevices, getOfflineAutoDeleteDays, setOfflineAutoDeleteDays } from '@/lib/settings'
 
 export const revalidate = 0 // Disable cache for live devices
+type DeviceStatusFilter = 'all' | 'online' | 'offline' | 'disabled'
 
 // Server Action to delete a device
 async function deleteDeviceAction(formData: FormData) {
@@ -54,6 +56,24 @@ async function toggleDeviceActiveAction(formData: FormData) {
   } catch (error) {
     console.error('Toggle device active error:', error)
   }
+}
+
+// Server Action to save automatic offline cleanup threshold
+async function saveOfflineCleanupSettingAction(formData: FormData) {
+  'use server'
+  const days = parseInt(formData.get('offlineAutoDeleteDays') as string, 10)
+
+  try {
+    const safeDays = Number.isFinite(days) ? days : 0
+    await setOfflineAutoDeleteDays(safeDays)
+    await cleanupOfflineDevices(Math.max(0, safeDays))
+    revalidatePath('/dashboard/devices')
+    revalidatePath('/dashboard')
+  } catch (error) {
+    console.error('Save offline cleanup setting error:', error)
+  }
+
+  redirect('/dashboard/devices?cleanupSaved=1')
 }
 
 // Server Action to trigger a remote cache clear
@@ -130,11 +150,17 @@ async function saveDeviceConfigAction(formData: FormData) {
 export default async function DevicesPage({
   searchParams,
 }: {
-  searchParams: Promise<{ edit?: string; success?: string }>
+  searchParams: Promise<{ edit?: string; success?: string; status?: string; cleanupSaved?: string }>
 }) {
   const resolvedSearchParams = await searchParams
   const editDeviceId = resolvedSearchParams.edit
   const showSuccess = resolvedSearchParams.success === '1'
+  const showCleanupSaved = resolvedSearchParams.cleanupSaved === '1'
+  const statusFilter = (['all', 'online', 'offline', 'disabled'].includes(resolvedSearchParams.status || '')
+    ? resolvedSearchParams.status
+    : 'all') as DeviceStatusFilter
+  const offlineAutoDeleteDays = await getOfflineAutoDeleteDays()
+  const cleanedDeviceCount = await cleanupOfflineDevices(offlineAutoDeleteDays)
 
   // Fetch all devices
   const devices = await prisma.device.findMany({
@@ -151,6 +177,29 @@ export default async function DevicesPage({
     : null
 
   const tenMinutesAgo = getOnlineThreshold(10)
+  const deviceStats = devices.reduce(
+    (acc, d) => {
+      const isOnline = d.isActive && d.lastOnline && d.lastOnline.getTime() >= tenMinutesAgo.getTime()
+      if (!d.isActive) acc.disabled += 1
+      else if (isOnline) acc.online += 1
+      else acc.offline += 1
+      return acc
+    },
+    { online: 0, offline: 0, disabled: 0 }
+  )
+  const filteredDevices = devices.filter((d) => {
+    const isOnline = d.isActive && d.lastOnline && d.lastOnline.getTime() >= tenMinutesAgo.getTime()
+    if (statusFilter === 'online') return Boolean(isOnline)
+    if (statusFilter === 'offline') return d.isActive && !isOnline
+    if (statusFilter === 'disabled') return !d.isActive
+    return true
+  })
+  const filterItems: Array<{ label: string; value: DeviceStatusFilter; count: number }> = [
+    { label: 'All', value: 'all', count: devices.length },
+    { label: 'Online', value: 'online', count: deviceStats.online },
+    { label: 'Offline', value: 'offline', count: deviceStats.offline },
+    { label: 'Disabled', value: 'disabled', count: deviceStats.disabled },
+  ]
 
   return (
     <div className="space-y-8 animate-fade-in">
@@ -161,10 +210,61 @@ export default async function DevicesPage({
       </div>
 
       <div className="space-y-8 animate-fade-in">
+        {showCleanupSaved && (
+          <div className="p-3 bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 rounded-xl text-xs font-bold">
+            Offline cleanup setting saved. {cleanedDeviceCount > 0 ? `${cleanedDeviceCount} old offline device(s) were deleted.` : 'No old offline devices matched the threshold.'}
+          </div>
+        )}
+
+        <div className="glass-panel p-4 rounded-2xl border border-border flex flex-col lg:flex-row gap-4 lg:items-end lg:justify-between">
+          <div>
+            <span className="block text-[10px] font-bold text-slate-500 uppercase mb-2">Filter Devices</span>
+            <div className="flex flex-wrap gap-2">
+              {filterItems.map((item) => (
+                <a
+                  key={item.value}
+                  href={`/dashboard/devices?status=${item.value}`}
+                  className={`px-3 py-2 rounded-xl text-xs font-bold border transition-all ${
+                    statusFilter === item.value
+                      ? 'bg-indigo-500/20 text-white border-indigo-500/40'
+                      : 'text-slate-400 border-slate-700 hover:text-white hover:bg-slate-800/60'
+                  }`}
+                >
+                  {item.label} ({item.count})
+                </a>
+              ))}
+            </div>
+          </div>
+
+          <form action={saveOfflineCleanupSettingAction} className="flex flex-col sm:flex-row gap-3 sm:items-end">
+            <div>
+              <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Auto-delete Offline After</label>
+              <div className="flex items-center gap-2">
+                <input
+                  type="number"
+                  name="offlineAutoDeleteDays"
+                  defaultValue={offlineAutoDeleteDays}
+                  min={0}
+                  max={3650}
+                  className="w-28 px-3 py-2 bg-slate-900 border border-slate-800 rounded-xl text-white text-sm focus:outline-none focus:border-primary"
+                />
+                <span className="text-xs text-slate-400">days</span>
+              </div>
+              <p className="text-[10px] text-slate-500 mt-1">0 disables auto-delete. Disabled API devices are kept.</p>
+            </div>
+            <button
+              type="submit"
+              className="px-4 py-2.5 rounded-xl bg-primary hover:bg-indigo-500 text-white text-xs font-bold transition-all cursor-pointer"
+            >
+              Save Cleanup
+            </button>
+          </form>
+        </div>
+
         {/* Device List Table Card - Always Full Width */}
         <div className="glass-card rounded-2xl border border-border overflow-hidden">
           <div className="px-6 py-5 border-b border-border">
-            <h3 className="font-bold text-white text-lg">Registered Devices ({devices.length})</h3>
+            <h3 className="font-bold text-white text-lg">Registered Devices ({filteredDevices.length}/{devices.length})</h3>
           </div>
 
           <div className="overflow-x-auto">
@@ -179,14 +279,16 @@ export default async function DevicesPage({
                 </tr>
               </thead>
               <tbody className="divide-y divide-border/60">
-                {devices.length === 0 ? (
+                {filteredDevices.length === 0 ? (
                   <tr>
                     <td colSpan={5} className="p-12 text-center text-slate-500 text-sm">
-                      No STB devices registered yet. Open the RSDK IPTV Android Player app on any STB to register automatically!
+                      {devices.length === 0
+                        ? 'No STB devices registered yet. Open the RSDK IPTV Android Player app on any STB to register automatically!'
+                        : 'No devices match the selected filter.'}
                     </td>
                   </tr>
                 ) : (
-                  devices.map((d) => {
+                  filteredDevices.map((d) => {
                     const isOnline = d.isActive && d.lastOnline && d.lastOnline.getTime() >= tenMinutesAgo.getTime()
                     return (
                       <tr key={d.id} className="hover:bg-slate-800/10 transition-colors">
