@@ -24,6 +24,11 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.ui.input.key.type
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
@@ -104,9 +109,21 @@ fun SettingsScreen(
         "Playlist M3U Kustom"
     )
     val menuFocusRequesters = remember { List(menus.size) { FocusRequester() } }
+    var focusedMenuIdx by remember { mutableIntStateOf(initialTabIdx.coerceIn(menus.indices)) }
 
     LaunchedEffect(initialTabIdx) {
-        menuFocusRequesters[activeMenuIdx.coerceIn(menus.indices)].requestFocus()
+        focusedMenuIdx = activeMenuIdx.coerceIn(menus.indices)
+        menuFocusRequesters[focusedMenuIdx].requestFocus()
+    }
+
+    fun moveSidebarFocus(delta: Int) {
+        focusedMenuIdx = (focusedMenuIdx + delta).coerceIn(menus.indices)
+        menuFocusRequesters[focusedMenuIdx].requestFocus()
+    }
+
+    fun selectFocusedMenu() {
+        activeMenuIdx = focusedMenuIdx
+        menuFocusRequesters[focusedMenuIdx].requestFocus()
     }
 
     Box(
@@ -174,29 +191,51 @@ fun SettingsScreen(
                     LazyColumn(
                         modifier = Modifier
                             .fillMaxSize()
+                            .onPreviewKeyEvent { keyEvent ->
+                                if (keyEvent.type != KeyEventType.KeyDown) {
+                                    return@onPreviewKeyEvent false
+                                }
+
+                                when (keyEvent.key) {
+                                    Key.DirectionUp -> {
+                                        moveSidebarFocus(-1)
+                                        true
+                                    }
+                                    Key.DirectionDown -> {
+                                        moveSidebarFocus(1)
+                                        true
+                                    }
+                                    Key.DirectionCenter, Key.Enter, Key.NumPadEnter -> {
+                                        selectFocusedMenu()
+                                        true
+                                    }
+                                    else -> false
+                                }
+                            }
                             .padding(10.dp),
                         verticalArrangement = Arrangement.spacedBy(6.dp)
                     ) {
                         itemsIndexed(menus) { index, item ->
                             val isSelected = index == activeMenuIdx
-                            var isFocused by remember { mutableStateOf(false) }
+                            var hasRealFocus by remember { mutableStateOf(false) }
+                            val isFocused = index == focusedMenuIdx || hasRealFocus
 
                             Box(
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .padding(vertical = if (isFocused) 2.dp else 0.dp)
                                     .shadow(
-                                        elevation = if (isFocused) 30.dp else 0.dp,
+                                        elevation = if (isFocused) 34.dp else 0.dp,
                                         shape = RoundedCornerShape(14.dp),
-                                        ambientColor = Color(0xFFFFF7CC).copy(alpha = if (isFocused) 1f else 0f),
-                                        spotColor = Color(0xFFFFD54F).copy(alpha = if (isFocused) 1f else 0f)
+                                        ambientColor = Color(0xFF7DD3FC).copy(alpha = if (isFocused) 1f else 0f),
+                                        spotColor = Color(0xFF22D3EE).copy(alpha = if (isFocused) 1f else 0f)
                                     )
                                     .clip(RoundedCornerShape(14.dp))
-                                    .background(if (isFocused) Color(0xFFFFF59D).copy(alpha = 0.42f) else Color.Transparent)
+                                    .background(if (isFocused) Color(0xFF67E8F9).copy(alpha = 0.34f) else Color.Transparent)
                                     .border(
                                         BorderStroke(
-                                            if (isFocused) 3.dp else 0.dp,
-                                            if (isFocused) Color(0xFFFFFFFF) else Color.Transparent
+                                            if (isFocused) 4.dp else 0.dp,
+                                            if (isFocused) Color(0xFFE0F2FE) else Color.Transparent
                                         ),
                                         shape = RoundedCornerShape(14.dp)
                                     )
@@ -207,31 +246,37 @@ fun SettingsScreen(
                                         .fillMaxWidth()
                                         .clip(RoundedCornerShape(10.dp))
                                         .background(
-                                            if (isFocused) Color(0xFFFFCA28)
+                                            if (isFocused) Color(0xFF0EA5E9)
                                             else if (isSelected) Color(0xFF312E81)
                                             else Color.Transparent
                                         )
                                         .border(
                                             BorderStroke(
                                                 if (isFocused) 2.dp else 1.dp,
-                                                if (isFocused) Color.White else Color.Transparent
+                                                if (isFocused) Color(0xFFE0F2FE) else Color.Transparent
                                             ),
                                             shape = RoundedCornerShape(10.dp)
                                         )
                                         .scale(if (isFocused) 1.035f else 1.0f)
                                         .focusRequester(menuFocusRequesters[index])
                                         .clickable {
+                                            focusedMenuIdx = index
                                             activeMenuIdx = index
                                             menuFocusRequesters[index].requestFocus()
                                         }
                                         .focusable()
-                                        .onFocusChanged { isFocused = it.isFocused }
+                                        .onFocusChanged {
+                                            hasRealFocus = it.isFocused
+                                            if (it.isFocused) {
+                                                focusedMenuIdx = index
+                                            }
+                                        }
                                         .padding(horizontal = 14.dp, vertical = 10.dp),
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
                                     Text(
                                         text = item,
-                                        color = if (isFocused) Color(0xFF111827)
+                                        color = if (isFocused) Color.White
                                         else if (isSelected) Color.White
                                         else Color(0xFF94A3B8),
                                         fontWeight = if (isSelected || isFocused) FontWeight.ExtraBold else FontWeight.Medium,
