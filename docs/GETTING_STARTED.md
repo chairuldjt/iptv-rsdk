@@ -37,6 +37,7 @@ Backend dibangun menggunakan Next.js dan Prisma.
    Secara default proyek ini menggunakan MySQL (lihat `prisma/schema.prisma`). Pastikan server database Anda aktif, lalu buat file `.env` di root folder:
    ```env
    DATABASE_URL="mysql://username:password@localhost:3306/iptv_rsdk"
+   SESSION_SECRET="isi-random-panjang-minimal-32-karakter"
    ```
 3. **Setup Database (Prisma)**:
    ```bash
@@ -48,7 +49,16 @@ Backend dibangun menggunakan Next.js dan Prisma.
    ```bash
    npm run dev
    ```
-   Akses Web Admin di: `http://localhost:3000`
+   Akses Web Admin di: `http://localhost:9000`
+
+### Deploy production dengan PM2
+Di server production, gunakan script bawaan:
+```bash
+git pull origin master
+./deploy.sh
+```
+
+Script akan menjalankan install dependency, Prisma migration, build Next.js, reload PM2, dan health check. Aplikasi production berjalan di port `9000`.
 
 ---
 
@@ -57,9 +67,9 @@ Backend dibangun menggunakan Next.js dan Prisma.
 1. **Konfigurasi Server URL**:
    Buka file `android-client/app/build.gradle.kts` dan sesuaikan `DEFAULT_API_BASE_URL` dengan IP komputer/server Anda:
    ```kotlin
-   buildConfigField("String", "DEFAULT_API_BASE_URL", "\"http://192.168.1.5:3000\"")
+   buildConfigField("String", "DEFAULT_API_BASE_URL", "\"https://iptv.teknisirsdk.my.id\"")
    ```
-   *Catatan: Gunakan IP lokal asli, jangan `localhost` karena Android menganggap `localhost` adalah dirinya sendiri.*
+   *Catatan: Gunakan domain/IP yang bisa dijangkau STB. Untuk server lokal, contoh: `http://10.55.1.5:9000`. Jangan gunakan `localhost` karena Android menganggap `localhost` adalah dirinya sendiri.*
 
 2. **Build APK**:
    ```bash
@@ -67,6 +77,12 @@ Backend dibangun menggunakan Next.js dan Prisma.
    ./gradlew assembleDebug
    ```
    Hasil build ada di: `android-client/app/build/outputs/apk/debug/app-debug.apk`
+
+   Untuk APK production:
+   ```bash
+   ./gradlew assembleRelease
+   ```
+   Hasil build ada di: `android-client/app/build/outputs/apk/release/app-release.apk`
 
 ---
 
@@ -86,5 +102,6 @@ Backend dibangun menggunakan Next.js dan Prisma.
 
 ## 🛠️ Troubleshooting Ringkas
 - **Gagal Build Android**: Pastikan variabel lingkungan `JAVA_HOME` mengarah ke JDK 17.
-- **API Tidak Terhubung**: Pastikan Firewall di komputer Anda mengizinkan akses ke port 3000 atau matikan sementara untuk testing.
+- **API Tidak Terhubung**: Pastikan Firewall/reverse proxy mengizinkan akses ke port 9000 atau domain production.
 - **Prisma Error**: Pastikan MySQL sudah berjalan dan kredensial di `.env` sudah benar.
+- **Build Next gagal karena SESSION_SECRET**: Tambahkan `SESSION_SECRET` ke `.env`.

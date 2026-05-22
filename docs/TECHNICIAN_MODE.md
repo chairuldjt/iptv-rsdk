@@ -56,7 +56,7 @@ override fun onKeyDown(keyCode: Int, event: KeyEvent?): Boolean {
 Di halaman Settings utama, arahkan fokus ke informasi "App Version" lalu tekan tombol **OK** pada remote sebanyak **5 kali secara berurutan** dengan jeda maksimal antar klik 500ms.
 
 ### Metode 3: Menu Pintasan PIN
-Pilih menu visual berlabel **"Technician Mode"** yang terletak di bagian bawah menu Settings, kemudian masukkan PIN 4-digit.
+Pilih menu visual berlabel **"Technician Mode"** yang terletak di bagian bawah menu Settings, kemudian masukkan PIN teknisi.
 
 ---
 
@@ -65,9 +65,10 @@ Pilih menu visual berlabel **"Technician Mode"** yang terletak di bagian bawah m
 Karena STB TV tidak memiliki keyboard fisik dan keyboard virtual bawaan Android TV sering mengganggu visual layar, aplikasi menyediakan **Custom Grid PIN Dialog**:
 
 *   Tampilan berupa pop-up modal dengan latar belakang blur (glassmorphism).
-*   Menampilkan 4 bulatan kosong (`○ ○ ○ ○`) yang akan terisi bintang (`● ● ● ●`) saat tombol angka ditekan.
+*   Menampilkan indikator bulatan sesuai panjang PIN yang dikonfigurasi.
 *   Menyediakan grid angka 0-9 yang ramah navigasi D-pad remote (3 kolom x 4 baris, termasuk tombol *Clear* dan *Backspace*).
-*   Jika PIN yang dimasukkan cocok dengan konfigurasi (default `2468`), kunci pengaturan langsung terbuka dan masuk ke antarmuka **Advanced Technician Panel**.
+*   Mendukung input tombol angka `0-9` langsung dari remote, tanpa harus memindahkan fokus satu per satu.
+*   Jika PIN yang dimasukkan cocok dengan konfigurasi (default `2468`, panjang 4-8 digit), kunci pengaturan langsung terbuka dan masuk ke antarmuka **Advanced Technician Panel**.
 
 ---
 
@@ -77,12 +78,12 @@ Setelah sukses masuk ke Mode Teknisi, menu-menu berikut akan diaktifkan untuk op
 
 ### 4.1. Server URL Override & Restore
 *   **Override Server URL**: Teknisi dapat mengubah URL API default ke alamat server lokal baru di lapangan menggunakan keyboard virtual. Alamat baru disimpan langsung di DataStore lokal.
-*   **Tombol "Restore Default URL"**: Menghapus data override di DataStore secara instan dan mengembalikan rujukan URL ke setelan bawaan APK (`BuildConfig.DEFAULT_API_BASE_URL`).
+*   **Tombol "Restore Default URL"**: Menghapus data override di DataStore secara instan dan mengembalikan rujukan URL ke setelan bawaan APK (`BuildConfig.DEFAULT_API_BASE_URL`, default production: `https://iptv.teknisirsdk.my.id`).
 
 ### 4.2. Uji Koneksi Server (Test Connection)
 *   Mengirimkan request ping / handshake HTTP cepat ke Server URL aktif.
 *   Menampilkan dialog indikator langsung:
-    *   🟢 **Sukses**: "Terhubung ke server! IP Server: 10.55.1.5, Status Device: Aktif".
+    *   🟢 **Sukses**: "Terhubung ke server! HTTP 200".
     *   🔴 **Gagal**: "Koneksi Gagal! HTTP Status 404 / Connection Timeout. Periksa kabel LAN / Wi-Fi".
 
 ### 4.3. Manajemen Device ID (UUID)

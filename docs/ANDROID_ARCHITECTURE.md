@@ -44,7 +44,7 @@ Untuk menyimpan status dan konfigurasi yang persisten, aplikasi menggunakan **Je
 1. **Device ID (UUID)**: Di-generate sekali saat aplikasi dibuka pertama kali.
 2. **Server URL Override**: Menyimpan URL baru jika teknisi mengubah server URL secara manual.
 3. **Last Selected Channel ID**: Mengingat channel terakhir yang ditonton untuk diputar langsung saat startup.
-4. **App Settings Cache**: Menyimpan nilai offline untuk `aspect_ratio`, `sync_interval`, `lock_settings`, dan `auto_start_on_boot`.
+4. **App Settings Cache**: Menyimpan nilai offline untuk `aspect_ratio`, `sync_interval`, `lock_settings`, `technician_pin`, `sync_mode`, `custom_m3u_url`, konfigurasi SMB edukasi, dan `auto_start_on_boot`.
 5. **Last Sync Timestamp**: Kapan terakhir kali sukses melakukan sinkronisasi dengan API.
 
 ### Logic Pemilihan Server URL:
@@ -58,6 +58,25 @@ suspend fun getServerUrl(): String {
     // 2. Gunakan BuildConfig jika tidak ada override
     return BuildConfig.DEFAULT_API_BASE_URL
 }
+```
+
+Default `BuildConfig.DEFAULT_API_BASE_URL` saat ini adalah:
+```kotlin
+https://iptv.teknisirsdk.my.id
+```
+
+Untuk deployment LAN, value ini dapat diganti sebelum build APK, misalnya:
+```kotlin
+http://10.55.1.5:9000
+```
+
+### Mode Sinkronisasi
+- `api`: default. Channel diambil dari Web Admin/API global playlist.
+- `custom`: channel diambil dari URL M3U custom per device.
+
+Fallback custom M3U lokal saat mode `custom` aktif dan belum ada URL tersimpan:
+```kotlin
+http://10.0.0.1/iptv/iptv_rsdk.m3u
 ```
 
 ---
@@ -81,6 +100,8 @@ data class ChannelEntity(
 ```
 
 Jika server backend offline atau tidak terjangkau, repository akan langsung membaca `List<ChannelEntity>` dari Room DB, sehingga pengguna TV tetap bisa menonton siaran menggunakan playlist yang di-cache sebelumnya.
+
+Jika device dihapus dari Web Admin, APK versi terbaru akan mencoba register ulang otomatis saat heartbeat berikutnya. Dengan heartbeat default 30 detik, device biasanya muncul lagi tanpa reinstall. APK lama mungkin membutuhkan restart aplikasi agar registrasi awal berjalan kembali.
 
 ---
 
@@ -118,7 +139,7 @@ fun applyAspectRatio(playerView: PlayerView, ratio: String) {
 
 ## 📡 5. Cleartext HTTP & Network Security Config
 
-Karena STB sering dipasang di jaringan intranet (lokal) dengan IP server non-HTTPS seperti `http://10.55.1.5/`, aplikasi wajib mengaktifkan cleartext traffic.
+Default production memakai HTTPS. Cleartext tetap diizinkan karena STB sering dipasang di jaringan intranet dengan IP server non-HTTPS seperti `http://10.55.1.5:9000`.
 
 ### File: `res/xml/network_security_config.xml`
 ```xml

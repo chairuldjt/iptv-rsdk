@@ -38,7 +38,7 @@ sequenceDiagram
 
 ### Penjelasan Flow
 1. **Deployment Backend**: Deploy backend (Web Admin Panel + API) ke server tujuan (lokal/cloud). Admin mengunggah playlist M3U melalui Web Admin Panel, dan server memprosesnya menjadi kategori serta channel.
-2. **Build & Install Client**: APK Android dibuat dengan default API URL yang tertanam pada `BuildConfig` (misalnya `http://10.55.1.5/rsdk-iptv/api`).
+2. **Build & Install Client**: APK Android dibuat dengan default API URL yang tertanam pada `BuildConfig` (default production saat ini: `https://iptv.teknisirsdk.my.id`; contoh LAN: `http://10.55.1.5:9000`).
 3. **Instalasi & Inisialisasi**: APK di-install pada perangkat STB/Android TV. Begitu aplikasi dibuka, ia secara otomatis memeriksa database lokal untuk `Device ID`. Jika belum ada, UUID baru di-generate dan disimpan secara permanen di DataStore.
 4. **Auto-Register & Auto-Activate**: Aplikasi mendaftarkan Device ID ke backend melalui endpoint `/api/device/register`. Backend mendeteksi perangkat baru dan **langsung menandainya sebagai aktif** (`active = true`) di database tanpa menunggu persetujuan admin.
 5. **Sync & Play**: Aplikasi mengunduh konfigurasi perangkat, daftar kategori, dan channel dari server, menyimpannya di cache lokal, lalu masuk ke Live TV untuk langsung memutar siaran.
@@ -79,13 +79,32 @@ Untuk mempermudah pengembangan backend (Web Admin & API) serta frontend (Android
 *   [ ] **Local SQLite Cache (Room)**: Caching seluruh channel dan kategori untuk menjamin *offline mode* yang mulus.
 *   [ ] **Media3 ExoPlayer Integration**: Dukungan HLS (`.m3u8`), MP4, DASH, dll., lengkap dengan pemilihan aspek rasio dinamis (*fit*, *stretch*, *zoom*, *16:9*, *4:3*).
 *   [ ] **Technician Mode**: Akses terproteksi PIN (`2468`) atau kombinasi D-pad remote untuk administrasi lokal.
+*   [ ] **Remote Numeric PIN Input**: PIN teknisi bisa dimasukkan langsung memakai tombol angka remote `0-9`.
 *   [ ] **Network Security Config**: Mendukung koneksi HTTP non-HTTPS untuk server lokal/intranet.
 *   [ ] **Auto-Start On Boot**: Broadcast receiver untuk menjalankan aplikasi secara otomatis setelah perangkat STB menyala.
 
 ### Sisi Web Admin Backend:
-*   [ ] **Dashboard Device**: Memantau status perangkat (*Online*, *Offline*, *Last IP*, *App Version*).
+*   [ ] **Dashboard Device**: Memantau status perangkat (*Online*, *Offline*, *Disabled*, *Last IP*, *App Version*) dengan filter status.
 *   [ ] **M3U Playlist Parser**: Parsing link/file M3U menjadi database kategori dan channel terstruktur.
 *   [ ] **Remote Management**: Mengubah aspek rasio, interval sinkronisasi, status aktif, dan reset setting dari jauh secara terpusat per perangkat atau global.
 *   [ ] **Remote Toggle Lock Settings**: Mengunci pengaturan lokal di STB agar pengguna biasa tidak bisa mengubah konfigurasi secara tidak sengaja.
 *   [ ] **Auto-Active Default Rule**: Pendaftaran perangkat baru otomatis diberi hak akses langsung aktif.
 *   [ ] **Device Blacklisting**: Kemampuan menonaktifkan perangkat dari dashboard web, yang secara instan akan memblokir akses STB dan menampilkan pesan pemblokiran.
+*   [ ] **Offline Cleanup**: Threshold auto-delete device offline lama, dengan pengecualian untuk device yang sengaja dinonaktifkan.
+
+---
+
+## 🚀 Deploy Production Cepat
+
+Server production menggunakan Next.js di port `9000` dan PM2.
+
+```bash
+git pull origin master
+./deploy.sh
+```
+
+Pastikan `.env` server berisi:
+```env
+DATABASE_URL="mysql://username:password@localhost:3306/iptv_rsdk"
+SESSION_SECRET="isi-random-panjang-minimal-32-karakter"
+```

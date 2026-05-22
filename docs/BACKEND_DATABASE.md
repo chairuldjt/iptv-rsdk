@@ -151,10 +151,13 @@ Web Admin Panel dirancang dengan antarmuka berbasis web responsif modern untuk m
     4. **Proses Penyimpanan**: Kategori baru akan otomatis dibuat jika belum ada di tabel `categories`, lalu channel akan dimasukkan ke tabel `channels` dan dihubungkan ke kategori tersebut.
 
 ### 2.2. Panel Manajemen Perangkat (Device Management)
-*   **Daftar Perangkat**: Menampilkan seluruh STB dalam bentuk tabel dengan indikator status online/offline real-time.
-    *   *Status Online*: Jika `last_online` kurang dari (waktu sekarang - 2x `sync_interval`).
-    *   *Status Offline*: Jika `last_online` melebihi batas detak jantung tersebut.
-*   **Aktivasi / Deaktivasi**: Satu klik tombol toggle untuk menonaktifkan perangkat (`is_active = 0`). STB yang dideaktivasi akan langsung menampilkan layar blokir di TV-nya saat melakukan *handshake* atau *heartbeat* berikutnya.
+*   **Daftar Perangkat**: Menampilkan seluruh STB dalam bentuk tabel dengan indikator status online/offline/disabled real-time.
+    *   *Status Online*: Jika `last_online` masih dalam threshold online dashboard.
+    *   *Status Offline*: Jika API device aktif tetapi `last_online` sudah melewati threshold online dashboard.
+    *   *Status Disabled*: Jika admin mematikan koneksi API device tanpa menghapus record/config.
+*   **Filter Status**: Admin dapat memfilter perangkat berdasarkan `All`, `Online`, `Offline`, dan `Disabled`.
+*   **Aktivasi / Deaktivasi API**: Satu klik tombol toggle untuk menonaktifkan perangkat (`is_active = 0`) tanpa menghapus konfigurasi. STB yang dideaktivasi akan menampilkan layar blokir saat *handshake* atau *heartbeat* berikutnya.
+*   **Auto-delete Offline**: Admin dapat mengatur threshold hari untuk menghapus otomatis device aktif yang offline terlalu lama. Nilai `0` berarti fitur mati. Device yang sengaja `Disabled` tidak ikut dihapus.
 *   **Custom Override Config**: Admin dapat memilih perangkat tertentu dan menimpa (override) konfigurasinya berbeda dengan setelan global (misal: memberikan aspek rasio `stretch` hanya untuk STB tipe lama, atau mengubah PIN teknisi khusus perangkat tertentu).
 
 ### 2.3. Manajemen Channel & Kategori

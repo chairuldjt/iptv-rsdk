@@ -13,32 +13,33 @@ Alamat server backend utama yang akan dihubungi aplikasi saat pertama kali dijal
 - **Lokasi File**: `android-client/app/build.gradle.kts`
 - **Kode**:
   ```kotlin
-  buildConfigField("String", "DEFAULT_API_BASE_URL", "\"http://10.0.2.2:3000\"")
+  buildConfigField("String", "DEFAULT_API_BASE_URL", "\"https://iptv.teknisirsdk.my.id\"")
   ```
-- **Catatan**: Ubah value tersebut jika ingin mengganti server default (misalnya ke IP server lokal/produksi Anda).
+- **Catatan**: Ubah value tersebut sebelum build APK jika deployment memakai server lain. Untuk server lokal, gunakan IP yang bisa dijangkau STB, misalnya `http://10.55.1.5:9000`, bukan `localhost`.
 
 ### B. Default M3U Custom URL
 Jika aplikasi digunakan dalam mode M3U (bukan mode API Server), Anda bisa menyetel URL playlist default.
 - **Lokasi File**: `android-client/app/src/main/java/com/example/rsdkiptvplayer/data/datastore/DataStoreManager.kt`
 - **Kode**:
   ```kotlin
-  // Cari baris ini:
+  // Flow UI default masih kosong agar field Settings tidak otomatis terisi:
   prefs[CUSTOM_M3U_URL] ?: ""
 
-  // Ubah menjadi misalnya:
+  // Fallback repository saat mode custom belum punya URL tersimpan:
   prefs[CUSTOM_M3U_URL] ?: "http://10.0.0.1/iptv/iptv_rsdk.m3u"
   ```
+- **Catatan**: Default source utama tetap **API Server**. URL M3U fallback hanya dipakai jika mode sinkronisasi diubah ke `custom`.
 
 ### C. Default Mode Sinkronisasi (Sync Mode)
 Menentukan apakah APK bawaan langsung mencari playlist dari Server API atau dari M3U Custom.
 - **Lokasi File**: `DataStoreManager.kt`
 - **Kode**:
   ```kotlin
-  // Cari baris ini (defaultnya "server"):
-  prefs[SYNC_MODE] ?: "server"
+  // Default saat ini:
+  prefs[SYNC_MODE] ?: "api"
 
   // Jika ingin default langsung pakai M3U custom:
-  prefs[SYNC_MODE] ?: "custom_m3u"
+  prefs[SYNC_MODE] ?: "custom"
   ```
 
 ### D. Default Status Koneksi Server API (Enabled / Disabled)
@@ -60,10 +61,40 @@ Menentukan apakah saat pertama kali aplikasi diinstal, koneksi ke backend server
   private val _serverApiEnabled = MutableStateFlow(true) // Ubah ke false
   ```
 
+### E. Default Lock Settings & PIN Teknisi
+Menu Settings Android terkunci secara default untuk deployment STB.
+- **Default lock**: `true`
+- **Default PIN**: `2468`
+- **Sumber remote**: Web Admin dapat mengubah `lockSettings` dan `technicianPin` per device.
+- **Input remote**: PIN bisa dimasukkan dengan D-pad grid maupun tombol angka `0-9` langsung pada remote.
+
+---
+
+## 🌐 2. Deploy Backend Production
+
+Backend production disiapkan untuk berjalan di port `9000` melalui PM2.
+
+### A. Environment wajib
+File `.env` di server minimal harus berisi:
+```env
+DATABASE_URL="mysql://username:password@localhost:3306/iptv_rsdk"
+SESSION_SECRET="isi-random-panjang-minimal-32-karakter"
+```
+
+`SESSION_SECRET` wajib ada. Build akan gagal jika env ini kosong.
+
+### B. Deploy otomatis
+Setelah pull repo di server, jalankan:
+```bash
+./deploy.sh
+```
+
+Script ini akan menjalankan `npm ci`, Prisma generate/migrate, `npm run build`, reload PM2, dan health check ke `http://127.0.0.1:9000/login`.
+
 ---
 
 
-## 🛠️ 2. Cara Build APK
+## 🛠️ 3. Cara Build APK
 
 Pastikan Anda sudah menginstal JDK 17+ dan Android SDK. Jalankan perintah berikut dari direktori utama proyek:
 
@@ -71,16 +102,24 @@ Pastikan Anda sudah menginstal JDK 17+ dan Android SDK. Jalankan perintah beriku
    ```powershell
    cd android-client
    ```
-2. Jalankan Build menggunakan Gradle Wrapper:
+2. Jalankan build debug untuk testing:
    ```powershell
    ./gradlew assembleDebug
    ```
-3. File APK yang dihasilkan akan berada di:
+3. Jalankan build release untuk production:
+   ```powershell
+   ./gradlew assembleRelease
+   ```
+4. File APK yang dihasilkan akan berada di:
    `android-client/app/build/outputs/apk/debug/app-debug.apk`
+   atau
+   `android-client/app/build/outputs/apk/release/app-release.apk`
+
+Build release sudah mengaktifkan minify/resource shrink dan signing dari `android-client/.env`.
 
 ---
 
-## 📲 3. Cara Instalasi ke Perangkat (via ADB)
+## 📲 4. Cara Instalasi ke Perangkat (via ADB)
 
 Setelah APK berhasil di-build, Anda dapat menginstalnya ke STB atau Android TV menggunakan ADB.
 
@@ -104,4 +143,6 @@ Setelah APK berhasil di-build, Anda dapat menginstalnya ke STB atau Android TV m
 - **Default M3U URL**: `DataStoreManager.kt`
 - **Default Playlist Source**: `DataStoreManager.kt`
 - **Default Server API Connection (Enabled/Disabled)**: `DataStoreManager.kt` & `SettingsViewModel.kt`
+- **PM2 Config**: `ecosystem.config.cjs`
+- **Deploy Script**: `deploy.sh`
 
