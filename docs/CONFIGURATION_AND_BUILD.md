@@ -28,7 +28,7 @@ Jika aplikasi digunakan dalam mode M3U (bukan mode API Server), Anda bisa menyet
   // Fallback repository saat mode custom belum punya URL tersimpan:
   prefs[CUSTOM_M3U_URL] ?: "http://10.0.0.1/iptv/iptv_rsdk.m3u"
   ```
-- **Catatan**: Default source utama tetap **API Server**. URL M3U fallback hanya dipakai jika mode sinkronisasi diubah ke `custom`.
+- **Catatan**: Default source APK saat ini adalah **Custom M3U**. URL M3U fallback ini akan dipakai jika belum ada URL M3U tersimpan di DataStore.
 
 ### C. Default Mode Sinkronisasi (Sync Mode)
 Menentukan apakah APK bawaan langsung mencari playlist dari Server API atau dari M3U Custom.
@@ -36,10 +36,10 @@ Menentukan apakah APK bawaan langsung mencari playlist dari Server API atau dari
 - **Kode**:
   ```kotlin
   // Default saat ini:
-  prefs[SYNC_MODE] ?: "api"
-
-  // Jika ingin default langsung pakai M3U custom:
   prefs[SYNC_MODE] ?: "custom"
+
+  // Jika ingin default langsung pakai API Server:
+  prefs[SYNC_MODE] ?: "api"
   ```
 
 ### D. Default Status Koneksi Server API (Enabled / Disabled)

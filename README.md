@@ -74,6 +74,7 @@ Untuk mempermudah pengembangan backend (Web Admin & API) serta frontend (Android
 ### Sisi Android TV Client:
 *   [ ] **Zero-Config Onboarding**: Buka langsung jalan, tanpa setup URL manual bagi pengguna akhir.
 *   [ ] **Static API Fallback**: Fallback ke static URL dari `BuildConfig` jika tidak ada override.
+*   [ ] **Default Custom M3U Mode**: APK saat ini default ke mode `custom` dengan fallback playlist `http://10.0.0.1/iptv/iptv_rsdk.m3u`; mode API tetap tersedia dari Settings/Web Admin.
 *   [ ] **UUID Device ID Generator**: Generate ID unik berbasis hardware-independent UUID, disimpan aman di DataStore.
 *   [ ] **Auto-Registration Client**: Mendaftarkan diri otomatis secara background.
 *   [ ] **Local SQLite Cache (Room)**: Caching seluruh channel dan kategori untuk menjamin *offline mode* yang mulus.

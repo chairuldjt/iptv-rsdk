@@ -96,12 +96,12 @@ class DataStoreManager(private val context: Context) {
 
     // Sync Mode: "api" (centralized) or "custom" (M3U URL)
     val syncModeFlow: Flow<String> = context.dataStore.data.map { prefs ->
-        prefs[SYNC_MODE] ?: "api"
+        prefs[SYNC_MODE] ?: "custom"
     }
 
     suspend fun getSyncMode(): String {
         val prefs = context.dataStore.data.first()
-        return prefs[SYNC_MODE] ?: "api"
+        return prefs[SYNC_MODE] ?: "custom"
     }
 
     suspend fun setSyncMode(mode: String) {
@@ -117,12 +117,12 @@ class DataStoreManager(private val context: Context) {
 
     // Custom M3U URL
     val customM3uUrlFlow: Flow<String> = context.dataStore.data.map { prefs ->
-        prefs[CUSTOM_M3U_URL] ?: ""
+        prefs[CUSTOM_M3U_URL] ?: "http://10.0.0.1/iptv/iptv_rsdk"
     }
 
     suspend fun getCustomM3uUrl(): String {
         val prefs = context.dataStore.data.first()
-        return prefs[CUSTOM_M3U_URL] ?: "http://10.0.0.1/iptv/iptv_rsdk.m3u"
+        return prefs[CUSTOM_M3U_URL] ?: ""
     }
 
     suspend fun setCustomM3uUrl(url: String) {

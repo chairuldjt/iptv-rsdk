@@ -71,8 +71,8 @@ http://10.55.1.5:9000
 ```
 
 ### Mode Sinkronisasi
-- `api`: default. Channel diambil dari Web Admin/API global playlist.
-- `custom`: channel diambil dari URL M3U custom per device.
+- `custom`: default APK saat ini. Channel diambil dari URL M3U custom/fallback lokal.
+- `api`: channel diambil dari Web Admin/API global playlist.
 
 Fallback custom M3U lokal saat mode `custom` aktif dan belum ada URL tersimpan:
 ```kotlin
