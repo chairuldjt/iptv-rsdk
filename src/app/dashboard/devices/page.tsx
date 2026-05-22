@@ -55,7 +55,7 @@ async function saveDeviceConfigAction(formData: FormData) {
 
   const isActive = formData.get('isActive') === 'on'
   const lockSettings = formData.get('lockSettings') === 'on'
-  const forceSync = formData.get('forceSync') === 'on'
+  const forceSync = true // Always force sync on any configuration change
   const autoStartOnBoot = formData.get('autoStartOnBoot') === 'on'
 
   const playlistId = playlistIdRaw ? parseInt(playlistIdRaw) : null
@@ -413,18 +413,16 @@ export default async function DevicesPage({
                   </div>
                 </label>
 
-                <label className="flex items-center gap-3 cursor-pointer p-1.5 hover:bg-slate-850 bg-indigo-500/5 hover:bg-indigo-500/10 rounded-lg transition-colors border border-indigo-500/15">
-                  <input
-                    type="checkbox"
-                    name="forceSync"
-                    defaultChecked={editingDevice.config?.forceSync}
-                    className="w-4 h-4 rounded text-primary focus:ring-primary accent-primary"
-                  />
-                  <div>
-                    <span className="text-xs font-bold text-indigo-400">Force Clear Cache & Sync</span>
-                    <p className="text-[10px] text-indigo-400/70">Wipes local channel cache on next connect.</p>
+                <div className="flex items-center gap-3 p-3 bg-indigo-500/5 rounded-xl border border-indigo-500/15">
+                  <div className="relative flex h-2 w-2">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                    <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
                   </div>
-                </label>
+                  <div>
+                    <span className="text-xs font-bold text-indigo-400 block">Real-Time Sync Active</span>
+                    <p className="text-[10px] text-indigo-400/70">Changes are automatically pushed to the device in 5 seconds.</p>
+                  </div>
+                </div>
               </div>
 
               <button
