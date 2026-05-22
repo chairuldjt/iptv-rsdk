@@ -180,45 +180,45 @@ fun SettingsScreen(
                         itemsIndexed(menus) { index, item ->
                             val isSelected = index == activeMenuIdx
                             var isFocused by remember { mutableStateOf(false) }
+                            val isActive = isSelected || isFocused
 
                             Box(
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .padding(vertical = if (isFocused) 2.dp else 0.dp)
+                                    .padding(vertical = if (isActive) 2.dp else 0.dp)
                                     .shadow(
-                                        elevation = if (isFocused) 28.dp else 0.dp,
+                                        elevation = if (isActive) 30.dp else 0.dp,
                                         shape = RoundedCornerShape(14.dp),
-                                        ambientColor = Color(0xFFFFF7CC).copy(alpha = if (isFocused) 1f else 0f),
-                                        spotColor = Color(0xFF38BDF8).copy(alpha = if (isFocused) 1f else 0f)
+                                        ambientColor = Color(0xFFFFF7CC).copy(alpha = if (isActive) 1f else 0f),
+                                        spotColor = Color(0xFFFFD54F).copy(alpha = if (isActive) 1f else 0f)
                                     )
                                     .clip(RoundedCornerShape(14.dp))
-                                    .background(if (isFocused) Color(0xFFFFE082).copy(alpha = 0.30f) else Color.Transparent)
+                                    .background(if (isActive) Color(0xFFFFF59D).copy(alpha = 0.42f) else Color.Transparent)
                                     .border(
                                         BorderStroke(
-                                            if (isFocused) 3.dp else 0.dp,
-                                            if (isFocused) Color(0xFFFFF7CC) else Color.Transparent
+                                            if (isActive) 3.dp else 0.dp,
+                                            if (isActive) Color(0xFFFFFFFF) else Color.Transparent
                                         ),
                                         shape = RoundedCornerShape(14.dp)
                                     )
-                                    .padding(if (isFocused) 3.dp else 0.dp)
+                                    .padding(if (isActive) 3.dp else 0.dp)
                             ) {
                                 Row(
                                     modifier = Modifier
                                         .fillMaxWidth()
                                         .clip(RoundedCornerShape(10.dp))
                                         .background(
-                                            if (isFocused) Color(0xFFFFD54F)
-                                            else if (isSelected) Color(0xFF312E81)
+                                            if (isActive) Color(0xFFFFCA28)
                                             else Color.Transparent
                                         )
                                         .border(
                                             BorderStroke(
-                                                if (isFocused) 2.dp else 1.dp,
-                                                if (isFocused) Color.White else Color.Transparent
+                                                if (isActive) 2.dp else 1.dp,
+                                                if (isActive) Color.White else Color.Transparent
                                             ),
                                             shape = RoundedCornerShape(10.dp)
                                         )
-                                        .scale(if (isFocused) 1.035f else 1.0f)
+                                        .scale(if (isActive) 1.035f else 1.0f)
                                         .focusRequester(menuFocusRequesters[index])
                                         .clickable {
                                             activeMenuIdx = index
@@ -231,10 +231,8 @@ fun SettingsScreen(
                                 ) {
                                     Text(
                                         text = item,
-                                        color = if (isFocused) Color(0xFF111827)
-                                        else if (isSelected) Color.White
-                                        else Color(0xFF94A3B8),
-                                        fontWeight = if (isSelected || isFocused) FontWeight.ExtraBold else FontWeight.Medium,
+                                        color = if (isActive) Color(0xFF111827) else Color(0xFFCBD5E1),
+                                        fontWeight = if (isActive) FontWeight.ExtraBold else FontWeight.SemiBold,
                                         fontSize = 14.sp
                                     )
                                 }
