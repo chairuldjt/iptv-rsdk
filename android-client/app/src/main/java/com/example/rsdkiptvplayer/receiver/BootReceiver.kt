@@ -33,7 +33,7 @@ class BootReceiver : BroadcastReceiver() {
                 val autoStart = dataStoreManager.autoStartFlow.first()
                 if (autoStart) {
                     dataStoreManager.addLog("Auto-start is ACTIVE. Launching application after boot delay...")
-                    delay(3500)
+                    delay(500)
                     val launchIntent = context.packageManager
                         .getLaunchIntentForPackage(context.packageName)
                         ?.apply {

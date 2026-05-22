@@ -41,7 +41,27 @@ Menentukan apakah APK bawaan langsung mencari playlist dari Server API atau dari
   prefs[SYNC_MODE] ?: "custom_m3u"
   ```
 
+### D. Default Status Koneksi Server API (Enabled / Disabled)
+Menentukan apakah saat pertama kali aplikasi diinstal, koneksi ke backend server langsung aktif atau tidak (offline).
+- **Lokasi File**: `android-client/app/src/main/java/com/example/rsdkiptvplayer/data/datastore/DataStoreManager.kt`
+- **Kode**:
+  ```kotlin
+  // Cari baris ini (default true = aktif):
+  val serverApiEnabledFlow: Flow<Boolean> = context.dataStore.data.map { prefs ->
+      prefs[SERVER_API_ENABLED] ?: true
+  }
+
+  // Ubah ke false jika ingin default nonaktif (offline mode bawaan):
+  prefs[SERVER_API_ENABLED] ?: false
+  ```
+- **Catatan Tambahan**: Ubah juga nilai inisialisasi awal di `SettingsViewModel.kt` jika diinginkan:
+  ```kotlin
+  // Lokasi: SettingsViewModel.kt
+  private val _serverApiEnabled = MutableStateFlow(true) // Ubah ke false
+  ```
+
 ---
+
 
 ## 🛠️ 2. Cara Build APK
 
@@ -80,6 +100,8 @@ Setelah APK berhasil di-build, Anda dapat menginstalnya ke STB atau Android TV m
 ---
 
 ## 📝 Ringkasan Lokasi Cepat
-- **Default API**: `android-client/app/build.gradle.kts`
+- **Default API URL**: `android-client/app/build.gradle.kts`
 - **Default M3U URL**: `DataStoreManager.kt`
 - **Default Playlist Source**: `DataStoreManager.kt`
+- **Default Server API Connection (Enabled/Disabled)**: `DataStoreManager.kt` & `SettingsViewModel.kt`
+

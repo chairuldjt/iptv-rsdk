@@ -29,6 +29,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import android.widget.Toast
+import com.example.rsdkiptvplayer.util.AutostartPermissionHelper
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -40,6 +41,7 @@ fun SettingsScreen(
     val context = LocalContext.current
     val deviceId by viewModel.deviceId.collectAsState()
     val serverUrl by viewModel.serverUrl.collectAsState()
+    val serverApiEnabled by viewModel.serverApiEnabled.collectAsState()
     val aspectRatio by viewModel.aspectRatio.collectAsState()
     val lockSettings by viewModel.lockSettings.collectAsState()
     val autoStart by viewModel.autoStart.collectAsState()
@@ -143,7 +145,7 @@ fun SettingsScreen(
             }
 
             // Separator line
-            Divider(color = Color(0xFF1E293B), modifier = Modifier.padding(bottom = 12.dp))
+            HorizontalDivider(color = Color(0xFF1E293B), modifier = Modifier.padding(bottom = 12.dp))
 
             // Body Area (Split pane)
             Row(
@@ -221,21 +223,23 @@ fun SettingsScreen(
                     ) {
                         when (activeMenuIdx) {
                             0 -> ConnectionServerPane(
-                                serverUrl = serverUrl,
-                                inputUrl = inputUrlText,
-                                onUrlChange = { inputUrlText = it },
-                                onSave = {
-                                    viewModel.updateServerUrl(inputUrlText)
-                                    Toast.makeText(context, "URL server disimpan.", Toast.LENGTH_SHORT).show()
-                                },
-                                onRestore = {
-                                    viewModel.restoreDefaultUrl()
-                                    Toast.makeText(context, "URL server dikembalikan ke default.", Toast.LENGTH_SHORT).show()
-                                },
-                                onTest = { viewModel.testConnection(inputUrlText) },
-                                testResult = connectionResult,
-                                isTesting = isTesting
-                            )
+                                 serverApiEnabled = serverApiEnabled,
+                                 onServerApiEnabledChange = { viewModel.changeServerApiEnabled(it) },
+                                 serverUrl = serverUrl,
+                                 inputUrl = inputUrlText,
+                                 onUrlChange = { inputUrlText = it },
+                                 onSave = {
+                                     viewModel.updateServerUrl(inputUrlText)
+                                     Toast.makeText(context, "URL server disimpan.", Toast.LENGTH_SHORT).show()
+                                 },
+                                 onRestore = {
+                                     viewModel.restoreDefaultUrl()
+                                     Toast.makeText(context, "URL server dikembalikan ke default.", Toast.LENGTH_SHORT).show()
+                                 },
+                                 onTest = { viewModel.testConnection(inputUrlText) },
+                                 testResult = connectionResult,
+                                 isTesting = isTesting
+                             )
                             1 -> DiagnosticLogsPane(
                                 logs = diagnosticLogs,
                                 onClear = {
@@ -273,6 +277,9 @@ fun SettingsScreen(
                                         if (it) "Auto-start diaktifkan." else "Auto-start dinonaktifkan.",
                                         Toast.LENGTH_SHORT
                                     ).show()
+                                    if (it) {
+                                        AutostartPermissionHelper.requestAutostartPermission(context)
+                                    }
                                 }
                             )
                             4 -> EducationContentPane(
@@ -325,6 +332,8 @@ fun SettingsScreen(
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ConnectionServerPane(
+    serverApiEnabled: Boolean,
+    onServerApiEnabledChange: (Boolean) -> Unit,
     serverUrl: String,
     inputUrl: String,
     onUrlChange: (String) -> Unit,
@@ -342,69 +351,121 @@ fun ConnectionServerPane(
     ) {
         Text("Konfigurasi Koneksi & Server API", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = Color.White)
         
-        Text(
-            "Ubah URL backend IPTV Player Anda. Server lokal/intranet non-HTTPS didukung secara default.",
-            fontSize = 12.sp,
-            color = Color(0xFF94A3B8)
-        )
-
-        OutlinedTextField(
-            value = inputUrl,
-            onValueChange = onUrlChange,
-            modifier = Modifier.fillMaxWidth().focusable(),
-            label = { Text("Server API Base URL") },
-            colors = OutlinedTextFieldDefaults.colors(
-                focusedTextColor = Color.White,
-                unfocusedTextColor = Color.White,
-                focusedLabelColor = Color(0xFF6366F1),
-                focusedBorderColor = Color(0xFF6366F1),
-                unfocusedBorderColor = Color(0xFF334155),
-                focusedContainerColor = Color(0xFF0F172A),
-                unfocusedContainerColor = Color(0xFF0F172A)
-            ),
-            singleLine = true
-        )
-
         Row(
-            horizontalArrangement = Arrangement.spacedBy(12.dp)
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(10.dp))
+                .background(Color(0xFF0F172A))
+                .border(BorderStroke(1.dp, Color(0xFF334155)), RoundedCornerShape(10.dp))
+                .padding(horizontal = 14.dp, vertical = 10.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            Button(
-                onClick = onSave,
-                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF6366F1)),
-                modifier = Modifier.focusable()
-            ) {
-                Text("Simpan URL")
-            }
-
-            OutlinedButton(
-                onClick = onRestore,
-                colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.White),
-                border = BorderStroke(1.dp, Color(0xFF334155)),
-                modifier = Modifier.focusable()
-            ) {
-                Text("Restore Default")
+            Column(modifier = Modifier.weight(1f)) {
+                Text("Koneksi Server API", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                Text(
+                    if (serverApiEnabled) "Koneksi ke backend server aktif." else "Koneksi ke backend server dinonaktifkan (Offline/Lokal).",
+                    color = Color.Gray,
+                    fontSize = 11.sp
+                )
             }
             
-            Button(
-                onClick = onTest,
-                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF10B981)),
-                modifier = Modifier.focusable()
-            ) {
-                Text(if (isTesting) "Menguji..." else "Uji Koneksi Server")
-            }
+            var isFocused by remember { mutableStateOf(false) }
+            Switch(
+                checked = serverApiEnabled,
+                onCheckedChange = onServerApiEnabledChange,
+                modifier = Modifier
+                    .focusable()
+                    .onFocusChanged { isFocused = it.isFocused }
+                    .border(
+                        BorderStroke(
+                            1.dp,
+                            if (isFocused) Color(0xFF6366F1) else Color.Transparent
+                        ),
+                        shape = RoundedCornerShape(16.dp)
+                    )
+            )
         }
 
-        if (testResult != null) {
+        if (serverApiEnabled) {
+            Text(
+                "Ubah URL backend IPTV Player Anda. Server lokal/intranet non-HTTPS didukung secara default.",
+                fontSize = 12.sp,
+                color = Color(0xFF94A3B8)
+            )
+
+            OutlinedTextField(
+                value = inputUrl,
+                onValueChange = onUrlChange,
+                modifier = Modifier.fillMaxWidth().focusable(),
+                label = { Text("Server API Base URL") },
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedTextColor = Color.White,
+                    unfocusedTextColor = Color.White,
+                    focusedLabelColor = Color(0xFF6366F1),
+                    focusedBorderColor = Color(0xFF6366F1),
+                    unfocusedBorderColor = Color(0xFF334155),
+                    focusedContainerColor = Color(0xFF0F172A),
+                    unfocusedContainerColor = Color(0xFF0F172A)
+                ),
+                singleLine = true
+            )
+
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                Button(
+                    onClick = onSave,
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF6366F1)),
+                    modifier = Modifier.focusable()
+                ) {
+                    Text("Simpan URL")
+                }
+
+                OutlinedButton(
+                    onClick = onRestore,
+                    colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.White),
+                    border = BorderStroke(1.dp, Color(0xFF334155)),
+                    modifier = Modifier.focusable()
+                ) {
+                    Text("Restore Default")
+                }
+                
+                Button(
+                    onClick = onTest,
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF10B981)),
+                    modifier = Modifier.focusable()
+                ) {
+                    Text(if (isTesting) "Menguji..." else "Uji Koneksi Server")
+                }
+            }
+
+            if (testResult != null) {
+                Card(
+                    colors = CardDefaults.cardColors(containerColor = Color(0xFF0F172A)),
+                    border = BorderStroke(1.dp, Color(0xFF334155)),
+                    modifier = Modifier.fillMaxWidth().padding(top = 10.dp)
+                ) {
+                    Text(
+                        text = testResult,
+                        color = Color.White,
+                        fontSize = 13.sp,
+                        modifier = Modifier.padding(14.dp)
+                    )
+                }
+            }
+        } else {
             Card(
-                colors = CardDefaults.cardColors(containerColor = Color(0xFF0F172A)),
+                colors = CardDefaults.cardColors(containerColor = Color(0xFF1E293B).copy(alpha = 0.5f)),
                 border = BorderStroke(1.dp, Color(0xFF334155)),
-                modifier = Modifier.fillMaxWidth().padding(top = 10.dp)
+                modifier = Modifier.fillMaxWidth()
             ) {
                 Text(
-                    text = testResult,
-                    color = Color.White,
-                    fontSize = 13.sp,
-                    modifier = Modifier.padding(14.dp)
+                    text = "💡 Koneksi Server API dinonaktifkan. Aplikasi berjalan dalam mode lokal penuh (Offline Mode) dan tidak akan melakukan sinkronisasi dengan portal admin terpusat. Untuk memuat saluran TV, silakan aktifkan dan atur 'Playlist M3U Kustom' pada menu sidebar.",
+                    color = Color(0xFF94A3B8),
+                    fontSize = 12.sp,
+                    lineHeight = 16.sp,
+                    modifier = Modifier.padding(16.dp)
                 )
             }
         }
@@ -520,7 +581,7 @@ fun DeviceControlPane(
             }
         }
 
-        Divider(color = Color(0xFF334155))
+        HorizontalDivider(color = Color(0xFF334155))
 
         // Item 2
         Row(
@@ -541,7 +602,7 @@ fun DeviceControlPane(
             }
         }
 
-        Divider(color = Color(0xFF334155))
+        HorizontalDivider(color = Color(0xFF334155))
 
         // Item 3
         Row(
@@ -609,7 +670,7 @@ fun DisplayBootPane(
             }
         }
 
-        Divider(color = Color(0xFF334155))
+        HorizontalDivider(color = Color(0xFF334155))
 
         // Item Auto Start
         Row(
@@ -839,7 +900,7 @@ fun CustomM3uPane(
             }
         }
 
-        Divider(color = Color(0xFF334155), modifier = Modifier.padding(vertical = 4.dp))
+        HorizontalDivider(color = Color(0xFF334155), modifier = Modifier.padding(vertical = 4.dp))
 
         // Custom M3U URL Input
         if (syncMode == "custom_m3u") {

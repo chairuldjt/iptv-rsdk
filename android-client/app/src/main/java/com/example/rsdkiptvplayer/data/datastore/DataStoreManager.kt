@@ -17,6 +17,7 @@ class DataStoreManager(private val context: Context) {
     companion object {
         val DEVICE_ID = stringPreferencesKey("device_id")
         val SERVER_URL_OVERRIDE = stringPreferencesKey("server_url_override")
+        val SERVER_API_ENABLED = booleanPreferencesKey("server_api_enabled")
         val LAST_SELECTED_CHANNEL_ID = intPreferencesKey("last_selected_channel_id")
         val ASPECT_RATIO = stringPreferencesKey("aspect_ratio")
         val SYNC_INTERVAL = intPreferencesKey("sync_interval")
@@ -73,6 +74,17 @@ class DataStoreManager(private val context: Context) {
             prefs.remove(SERVER_URL_OVERRIDE)
         }
         addLog("Server URL override cleared. Fallback to: ${BuildConfig.DEFAULT_API_BASE_URL}")
+    }
+
+    val serverApiEnabledFlow: Flow<Boolean> = context.dataStore.data.map { prefs ->
+        prefs[SERVER_API_ENABLED] ?: true
+    }
+
+    suspend fun setServerApiEnabled(enabled: Boolean) {
+        context.dataStore.edit { prefs ->
+            prefs[SERVER_API_ENABLED] = enabled
+        }
+        addLog("API Server connection changed to: ${if (enabled) "Enabled" else "Disabled"}")
     }
 
     // Sync Mode: "server" or "custom_m3u"

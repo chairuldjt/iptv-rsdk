@@ -22,6 +22,9 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
     private val _serverUrl = MutableStateFlow("")
     val serverUrl: StateFlow<String> = _serverUrl.asStateFlow()
 
+    private val _serverApiEnabled = MutableStateFlow(true)
+    val serverApiEnabled: StateFlow<Boolean> = _serverApiEnabled.asStateFlow()
+
     private val _aspectRatio = MutableStateFlow("fit")
     val aspectRatio: StateFlow<String> = _aspectRatio.asStateFlow()
 
@@ -73,6 +76,12 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
         viewModelScope.launch {
             repository.serverUrlFlow.collectLatest { url ->
                 _serverUrl.value = url
+            }
+        }
+
+        viewModelScope.launch {
+            dataStoreManager.serverApiEnabledFlow.collectLatest { enabled ->
+                _serverApiEnabled.value = enabled
             }
         }
 
@@ -235,6 +244,12 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
             dataStoreManager.clearAll()
             _deviceId.value = dataStoreManager.getDeviceId()
             repository.registerDevice()
+        }
+    }
+
+    fun changeServerApiEnabled(enabled: Boolean) {
+        viewModelScope.launch {
+            dataStoreManager.setServerApiEnabled(enabled)
         }
     }
 

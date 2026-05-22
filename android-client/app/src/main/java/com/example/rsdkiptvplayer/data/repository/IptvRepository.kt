@@ -34,6 +34,12 @@ class IptvRepository(
 
     // Handshake & Self Register on boot/startup
     suspend fun registerDevice(): Boolean {
+        val serverApiEnabled = dataStoreManager.serverApiEnabledFlow.first()
+        if (!serverApiEnabled) {
+            dataStoreManager.addLog("API Server is disabled. Skipping registration.")
+            return true // Allow offline mode
+        }
+
         val deviceId = dataStoreManager.getDeviceId()
         val serverUrl = dataStoreManager.getServerUrl()
         val apiService = RetrofitClient.getService(serverUrl)
@@ -74,6 +80,11 @@ class IptvRepository(
 
     // Sync Server configurations
     suspend fun syncConfig(): Boolean {
+        val serverApiEnabled = dataStoreManager.serverApiEnabledFlow.first()
+        if (!serverApiEnabled) {
+            return true
+        }
+
         val syncMode = dataStoreManager.getSyncMode()
         if (syncMode == "custom_m3u") {
             return true
@@ -120,10 +131,9 @@ class IptvRepository(
             return Pair(false, "URL M3U kosong.")
         }
 
-        dataStoreManager.addLog("Mode M3U custom aktif. Membersihkan cache channel lama...")
+        dataStoreManager.addLog("Mode M3U custom aktif. Mengunduh playlist M3U...")
         return withContext(Dispatchers.IO) {
             try {
-                channelDao.clearAll()
                 dataStoreManager.setCustomM3uUrl(normalizedUrl)
                 dataStoreManager.setSyncMode("custom_m3u")
                 dataStoreManager.addLog("Mengunduh playlist M3U dari: $normalizedUrl...")
@@ -138,33 +148,37 @@ class IptvRepository(
                     val content = connection.inputStream.bufferedReader().use { it.readText() }
                     val channels = M3uParser.parse(content)
                     if (channels.isNotEmpty()) {
+                        channelDao.clearAll()
                         channelDao.insertAll(channels)
                         dataStoreManager.setLastSyncTimestamp(System.currentTimeMillis())
                         dataStoreManager.addLog("Sukses sinkronisasi M3U! Berhasil memuat ${channels.size} saluran.")
                         Pair(true, "Sukses: Berhasil memuat ${channels.size} saluran dari M3U.")
                     } else {
-                        dataStoreManager.addLog("Gagal: M3U kosong atau format tidak valid. Cache channel lama sudah dikosongkan.")
-                        Pair(false, "Format playlist M3U tidak valid atau tidak ditemukan saluran. Cache lama sudah dikosongkan.")
+                        dataStoreManager.addLog("Gagal: M3U kosong atau format tidak valid.")
+                        Pair(false, "Format playlist M3U tidak valid atau tidak ditemukan saluran.")
                     }
                 } else {
                     dataStoreManager.addLog("Gagal mengunduh M3U: HTTP ${connection.responseCode}")
-                    Pair(false, "Server merespon dengan HTTP ${connection.responseCode}. Cache lama sudah dikosongkan.")
+                    Pair(false, "Server merespon dengan HTTP ${connection.responseCode}.")
                 }
             } catch (e: Exception) {
                 dataStoreManager.addLog("Error mengunduh M3U: ${e.message}")
-                Pair(false, "Koneksi gagal atau URL salah: ${e.localizedMessage}. Cache lama sudah dikosongkan.")
+                Pair(false, "Koneksi gagal atau URL salah: ${e.localizedMessage}.")
             }
         }
     }
 
     // Sync remote channel list to Room DB Cache
     suspend fun syncChannels(): Boolean {
-        val syncMode = dataStoreManager.getSyncMode()
-        if (syncMode == "custom_m3u") {
-            val customUrl = dataStoreManager.getCustomM3uUrl()
-            if (customUrl.isNotEmpty()) {
-                val res = syncLocalM3u(customUrl)
-                return res.first
+        val serverApiEnabled = dataStoreManager.serverApiEnabledFlow.first()
+        if (!serverApiEnabled) {
+            val syncMode = dataStoreManager.getSyncMode()
+            if (syncMode == "custom_m3u") {
+                val customUrl = dataStoreManager.getCustomM3uUrl()
+                if (customUrl.isNotEmpty()) {
+                    val res = syncLocalM3u(customUrl)
+                    return res.first
+                }
             }
             return false
         }
@@ -211,6 +225,11 @@ class IptvRepository(
 
     // Send Status Heartbeat to Web Admin
     suspend fun sendHeartbeat(currentChannelId: Int?): StatusData? {
+        val serverApiEnabled = dataStoreManager.serverApiEnabledFlow.first()
+        if (!serverApiEnabled) {
+            return null
+        }
+
         val deviceId = dataStoreManager.getDeviceId()
         val serverUrl = dataStoreManager.getServerUrl()
         val apiService = RetrofitClient.getService(serverUrl)
@@ -246,11 +265,16 @@ class IptvRepository(
 
     // Log error to Remote Web Admin
     suspend fun logError(errorType: String, message: String, channelId: Int?, streamUrl: String?) {
+        dataStoreManager.addLog("⚠️ ERROR ($errorType): $message")
+
+        val serverApiEnabled = dataStoreManager.serverApiEnabledFlow.first()
+        if (!serverApiEnabled) {
+            return
+        }
+
         val deviceId = dataStoreManager.getDeviceId()
         val serverUrl = dataStoreManager.getServerUrl()
         val apiService = RetrofitClient.getService(serverUrl)
-
-        dataStoreManager.addLog("⚠️ ERROR ($errorType): $message")
 
         val timestamp = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ssXXX", Locale.getDefault()).format(Date())
         val request = LogRequest(
