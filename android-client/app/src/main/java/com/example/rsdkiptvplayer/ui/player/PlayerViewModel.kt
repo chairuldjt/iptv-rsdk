@@ -192,7 +192,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         heartbeatJob?.cancel()
         heartbeatJob = viewModelScope.launch {
             while (true) {
-                delay(5000) // 5s short-polling interval for near real-time sync
+                delay(30_000) // Keep fleet heartbeat light in production.
                 val status = repository.sendHeartbeat(_selectedChannel.value?.id)
                 if (status != null) {
                     _lockSettings.value = status.lock_settings

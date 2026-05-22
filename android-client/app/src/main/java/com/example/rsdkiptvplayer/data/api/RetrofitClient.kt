@@ -1,5 +1,6 @@
 package com.example.rsdkiptvplayer.data.api
 
+import com.example.rsdkiptvplayer.BuildConfig
 import okhttp3.OkHttpClient
 import okhttp3.logging.HttpLoggingInterceptor
 import retrofit2.Retrofit
@@ -19,7 +20,11 @@ object RetrofitClient {
         }
 
         val loggingInterceptor = HttpLoggingInterceptor().apply {
-            level = HttpLoggingInterceptor.Level.BODY
+            level = if (BuildConfig.DEBUG) {
+                HttpLoggingInterceptor.Level.BODY
+            } else {
+                HttpLoggingInterceptor.Level.NONE
+            }
         }
 
         val okHttpClient = OkHttpClient.Builder()

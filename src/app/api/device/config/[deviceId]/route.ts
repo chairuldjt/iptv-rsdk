@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import prisma from '@/lib/db'
+import { getErrorMessage } from '@/lib/errors'
 
 export async function GET(
   request: Request,
@@ -21,10 +22,10 @@ export async function GET(
       include: { config: true },
     })
 
-    if (!device) {
+    if (!device || !device.isActive) {
       return NextResponse.json(
-        { status: false, message: 'Device not found', data: null },
-        { status: 404 }
+        { status: false, message: !device ? 'Device not found' : 'Device is inactive', data: null },
+        { status: !device ? 404 : 403 }
       )
     }
 
@@ -74,7 +75,7 @@ export async function GET(
       message: 'Config loaded',
       data: {
         device_id: device.deviceId,
-        active: true,
+        active: device.isActive,
         playlist_id: config.syncMode === 'custom' ? null : (globalPlaylist?.id || null),
         sync_mode: config.syncMode || 'api',
         custom_m3u_url: config.customM3uUrl || '',
@@ -95,10 +96,10 @@ export async function GET(
         education_smb_domain: config.educationSmbDomain,
       },
     })
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Config API Error:', error)
     return NextResponse.json(
-      { status: false, message: 'Server error: ' + error.message },
+      { status: false, message: 'Server error: ' + getErrorMessage(error) },
       { status: 500 }
     )
   }

@@ -3,6 +3,7 @@ import { revalidatePath } from 'next/cache'
 import ConfirmForm from '@/components/ConfirmForm'
 
 export const revalidate = 0 // Disable cache for live logs
+const PAGE_SIZE = 100
 
 // Server Action to clear all error logs
 async function clearAllLogsAction() {
@@ -19,24 +20,31 @@ async function clearAllLogsAction() {
 export default async function LogsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ deviceId?: string }>
+  searchParams: Promise<{ deviceId?: string; page?: string }>
 }) {
   const resolvedSearchParams = await searchParams
   const filterDeviceId = resolvedSearchParams.deviceId
+  const currentPage = Math.max(1, parseInt(resolvedSearchParams.page || '1', 10) || 1)
+  const logWhere = filterDeviceId
+    ? {
+        deviceId: filterDeviceId,
+      }
+    : undefined
+  const totalLogs = await prisma.deviceLog.count({ where: logWhere })
+  const totalPages = Math.max(1, Math.ceil(totalLogs / PAGE_SIZE))
+  const safePage = Math.min(currentPage, totalPages)
 
   // Fetch all logs matching search params
   const logs = await prisma.deviceLog.findMany({
-    where: filterDeviceId
-      ? {
-          deviceId: filterDeviceId,
-        }
-      : undefined,
+    where: logWhere,
     include: {
       device: true,
     },
     orderBy: {
       createdAt: 'desc',
     },
+    skip: (safePage - 1) * PAGE_SIZE,
+    take: PAGE_SIZE,
   })
 
   // Fetch devices for filter dropdown
@@ -104,7 +112,26 @@ export default async function LogsPage({
       {/* Diagnostics Logs Table Card */}
       <div className="glass-card rounded-2xl border border-border overflow-hidden">
         <div className="px-6 py-5 border-b border-border">
-          <h3 className="font-bold text-white text-lg">Diagnostics Logs ({logs.length})</h3>
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+            <h3 className="font-bold text-white text-lg">Diagnostics Logs ({totalLogs})</h3>
+            {totalLogs > PAGE_SIZE && (
+              <div className="flex items-center gap-2 text-xs text-slate-400">
+                <span>Page {safePage} of {totalPages}</span>
+                <a
+                  href={`/dashboard/logs?deviceId=${filterDeviceId || ''}&page=${Math.max(1, safePage - 1)}`}
+                  className={`px-3 py-2 rounded-lg border border-border ${safePage <= 1 ? 'pointer-events-none opacity-40' : 'hover:bg-slate-800'}`}
+                >
+                  Previous
+                </a>
+                <a
+                  href={`/dashboard/logs?deviceId=${filterDeviceId || ''}&page=${Math.min(totalPages, safePage + 1)}`}
+                  className={`px-3 py-2 rounded-lg border border-border ${safePage >= totalPages ? 'pointer-events-none opacity-40' : 'hover:bg-slate-800'}`}
+                >
+                  Next
+                </a>
+              </div>
+            )}
+          </div>
         </div>
 
         <div className="overflow-x-auto">

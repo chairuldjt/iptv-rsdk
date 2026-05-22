@@ -1,9 +1,23 @@
+import java.util.Properties
+
 plugins {
   alias(libs.plugins.android.application)
   alias(libs.plugins.compose.compiler)
   alias(libs.plugins.kotlin.serialization)
   alias(libs.plugins.legacy.kapt)
 }
+
+val releaseEnv = Properties().apply {
+    val envFile = rootProject.file(".env")
+    if (envFile.exists()) {
+        envFile.inputStream().use(::load)
+    }
+}
+
+fun releaseEnv(name: String): String =
+    releaseEnv.getProperty(name)
+        ?: providers.environmentVariable(name).orNull
+        ?: error("$name must be set in android-client/.env or environment variables")
 
 android {
     namespace = "com.example.rsdkiptvplayer"
@@ -15,21 +29,22 @@ android {
         versionCode = 1
         versionName = "1.0"
         
-        buildConfigField("String", "DEFAULT_API_BASE_URL", "\"http://10.55.1.5:9000\"")
+        buildConfigField("String", "DEFAULT_API_BASE_URL", "\"https://iptv.teknisirsdk.my.id\"")
     }
 
     signingConfigs {
         create("release") {
-            storeFile = file("keystore/rsdk-release.jks")
-            storePassword = "rsdkiptv2024"
-            keyAlias = "rsdk-iptv"
-            keyPassword = "rsdkiptv2024"
+            storeFile = rootProject.file(releaseEnv("KEYSTORE_FILE"))
+            storePassword = releaseEnv("KEYSTORE_STORE_PASSWORD")
+            keyAlias = releaseEnv("KEYSTORE_KEY_ALIAS")
+            keyPassword = releaseEnv("KEYSTORE_KEY_PASSWORD")
         }
     }
 
     buildTypes {
         release {
-            isMinifyEnabled = false
+            isMinifyEnabled = true
+            isShrinkResources = true
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
             signingConfig = signingConfigs.getByName("release")
         }

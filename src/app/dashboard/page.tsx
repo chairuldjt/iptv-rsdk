@@ -1,4 +1,5 @@
 import prisma from '@/lib/db'
+import { getOnlineThreshold } from '@/lib/time'
 import Link from 'next/link'
 
 export const revalidate = 0 // Disable cache for live stats
@@ -9,7 +10,7 @@ export default async function DashboardPage() {
   const activeDevices = await prisma.device.count({ where: { isActive: true } })
   
   // A device is considered online if it had a heartbeat in the last 10 minutes (600 seconds)
-  const tenMinutesAgo = new Date(Date.now() - 10 * 60 * 1000)
+  const tenMinutesAgo = getOnlineThreshold(10)
   const onlineDevices = await prisma.device.count({
     where: {
       lastOnline: {

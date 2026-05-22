@@ -3,6 +3,7 @@ import { revalidatePath } from 'next/cache'
 import ChannelLogo from '@/components/ChannelLogo'
 
 export const revalidate = 0 // Disable cache for live channel lists
+const PAGE_SIZE = 200
 
 // Server Action to toggle a channel's active status
 async function toggleChannelAction(formData: FormData) {
@@ -24,11 +25,12 @@ async function toggleChannelAction(formData: FormData) {
 export default async function ChannelsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ playlistId?: string; search?: string }>
+  searchParams: Promise<{ playlistId?: string; search?: string; page?: string }>
 }) {
   const resolvedSearchParams = await searchParams
   const filterPlaylistId = resolvedSearchParams.playlistId ? parseInt(resolvedSearchParams.playlistId) : undefined
   const searchQuery = resolvedSearchParams.search || ''
+  const currentPage = Math.max(1, parseInt(resolvedSearchParams.page || '1', 10) || 1)
 
   // Fetch all playlists for filter selector
   const playlists = await prisma.playlist.findMany({
@@ -38,17 +40,28 @@ export default async function ChannelsPage({
   // Determine active playlist filter ID
   const selectedPlaylistId = filterPlaylistId || playlists[0]?.id
 
+  const channelWhere = selectedPlaylistId
+    ? {
+        playlistId: selectedPlaylistId,
+        name: searchQuery
+          ? {
+              contains: searchQuery,
+            }
+          : undefined,
+      }
+    : undefined
+
+  const totalMatchingChannels = channelWhere
+    ? await prisma.channel.count({ where: channelWhere })
+    : 0
+
+  const totalPages = Math.max(1, Math.ceil(totalMatchingChannels / PAGE_SIZE))
+  const safePage = Math.min(currentPage, totalPages)
+
   // Fetch channels based on filter
   const channels = selectedPlaylistId
     ? await prisma.channel.findMany({
-        where: {
-          playlistId: selectedPlaylistId,
-          name: searchQuery
-            ? {
-                contains: searchQuery,
-              }
-            : undefined,
-        },
+        where: channelWhere,
         include: {
           category: true,
           playlist: true,
@@ -57,6 +70,8 @@ export default async function ChannelsPage({
           { category: { sortOrder: 'asc' } },
           { sortOrder: 'asc' },
         ],
+        skip: (safePage - 1) * PAGE_SIZE,
+        take: PAGE_SIZE,
       })
     : []
 
@@ -124,6 +139,28 @@ export default async function ChannelsPage({
       </div>
 
       {/* Grouped Channels Grid */}
+      {totalMatchingChannels > PAGE_SIZE && (
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 text-xs text-slate-400">
+          <span>
+            Showing {channels.length} of {totalMatchingChannels} channels, page {safePage} of {totalPages}
+          </span>
+          <div className="flex gap-2">
+            <a
+              href={`/dashboard/channels?playlistId=${selectedPlaylistId || ''}&search=${encodeURIComponent(searchQuery)}&page=${Math.max(1, safePage - 1)}`}
+              className={`px-3 py-2 rounded-lg border border-border ${safePage <= 1 ? 'pointer-events-none opacity-40' : 'hover:bg-slate-800'}`}
+            >
+              Previous
+            </a>
+            <a
+              href={`/dashboard/channels?playlistId=${selectedPlaylistId || ''}&search=${encodeURIComponent(searchQuery)}&page=${Math.min(totalPages, safePage + 1)}`}
+              className={`px-3 py-2 rounded-lg border border-border ${safePage >= totalPages ? 'pointer-events-none opacity-40' : 'hover:bg-slate-800'}`}
+            >
+              Next
+            </a>
+          </div>
+        </div>
+      )}
+
       {Object.keys(groupedChannels).length === 0 ? (
         <div className="glass-card p-12 text-center text-slate-500 rounded-2xl border border-border">
           {searchQuery ? 'No channels matched your search query.' : 'Select a playlist from the filter options or upload one in the Playlists section.'}

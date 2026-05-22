@@ -19,6 +19,9 @@ model Playlist {
   categories    Category[]
   channels      Channel[]
   devices       Device[]
+
+  @@index([isGlobal])
+  @@index([updatedAt])
 }
 
 model Category {
@@ -31,6 +34,8 @@ model Category {
   createdAt  DateTime  @default(now())
   updatedAt  DateTime  @updatedAt
   channels   Channel[]
+
+  @@index([playlistId, sortOrder])
 }
 
 model Channel {
@@ -46,6 +51,9 @@ model Channel {
   isActive   Boolean   @default(true)
   createdAt  DateTime  @default(now())
   updatedAt  DateTime  @updatedAt
+
+  @@index([playlistId, isActive, sortOrder])
+  @@index([categoryId])
 }
 
 model Device {
@@ -64,6 +72,10 @@ model Device {
   updatedAt      DateTime      @updatedAt
   config         DeviceConfig?
   logs           DeviceLog[]
+
+  @@index([isActive, lastOnline])
+  @@index([lastOnline])
+  @@index([macAddress])
 }
 
 model DeviceConfig {
@@ -100,6 +112,9 @@ model DeviceLog {
   streamUrl    String?
   androidSdk   Int?
   createdAt    DateTime @default(now())
+
+  @@index([deviceId, createdAt])
+  @@index([createdAt])
 }
 
 model User {

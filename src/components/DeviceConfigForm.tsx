@@ -1,32 +1,24 @@
 'use client'
 
-import React, { useState, useEffect } from 'react'
+import React, { useState } from 'react'
+import type { Device, DeviceConfig } from '@prisma/client'
 import ConfirmForm from './ConfirmForm'
 
 interface DeviceConfigFormProps {
-  editingDevice: any
-  saveDeviceConfigAction: (formData: FormData) => void
-  clearDeviceCacheAction: (formData: FormData) => void
-  showSuccess: boolean
+  editingDevice: Device & { config: DeviceConfig | null }
+  saveDeviceConfigAction: (formData: FormData) => void | Promise<void>
+  clearDeviceCacheAction: (formData: FormData) => void | Promise<void>
 }
 
 export default function DeviceConfigForm({
   editingDevice,
   saveDeviceConfigAction,
   clearDeviceCacheAction,
-  showSuccess,
 }: DeviceConfigFormProps) {
   // Use controlled states to ensure UI reflects database changes and user input correctly
   const [syncMode, setSyncMode] = useState(editingDevice.config?.syncMode || 'api')
   const [lockSettings, setLockSettings] = useState(editingDevice.config?.lockSettings ?? true)
   const [autoStart, setAutoStart] = useState(editingDevice.config?.autoStartOnBoot ?? false)
-
-  // Update states if editingDevice changes (e.g. after a save/refresh)
-  useEffect(() => {
-    setSyncMode(editingDevice.config?.syncMode || 'api')
-    setLockSettings(editingDevice.config?.lockSettings ?? true)
-    setAutoStart(editingDevice.config?.autoStartOnBoot ?? false)
-  }, [editingDevice])
 
   return (
     <div className="space-y-6">
@@ -206,7 +198,7 @@ export default function DeviceConfigForm({
           </div>
           <div>
             <span className="text-xs font-bold text-indigo-400 block">Real-Time Sync Active</span>
-            <p className="text-[10px] text-indigo-400/70">Changes are automatically pushed to the device in 5 seconds.</p>
+            <p className="text-[10px] text-indigo-400/70">Changes are picked up by the device on the next heartbeat.</p>
           </div>
         </div>
 

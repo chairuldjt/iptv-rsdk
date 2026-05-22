@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import prisma from '@/lib/db'
+import { getErrorMessage } from '@/lib/errors'
 
 export async function POST(request: Request) {
   try {
@@ -84,7 +85,7 @@ export async function POST(request: Request) {
         message: 'Device registered and active',
         data: {
           device_id: device.deviceId,
-          active: true,
+          active: device.isActive,
           sync_interval: device.config?.syncInterval ?? 1800,
         },
       })
@@ -105,18 +106,18 @@ export async function POST(request: Request) {
 
       return NextResponse.json({
         status: true,
-        message: 'Device registered and active',
+        message: updatedDevice.isActive ? 'Device registered and active' : 'Device registered but inactive',
         data: {
           device_id: updatedDevice.deviceId,
-          active: true,
+          active: updatedDevice.isActive,
           sync_interval: updatedDevice.config?.syncInterval ?? 1800,
         },
       })
     }
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Registration API Error:', error)
     return NextResponse.json(
-      { status: false, message: 'Server error: ' + error.message },
+      { status: false, message: 'Server error: ' + getErrorMessage(error) },
       { status: 500 }
     )
   }

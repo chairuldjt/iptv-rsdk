@@ -3,6 +3,7 @@ import { revalidatePath } from 'next/cache'
 import ConfirmForm from '@/components/ConfirmForm'
 import DeviceConfigForm from '@/components/DeviceConfigForm'
 import { redirect } from 'next/navigation'
+import { getOnlineThreshold } from '@/lib/time'
 
 export const revalidate = 0 // Disable cache for live devices
 
@@ -111,17 +112,12 @@ export default async function DevicesPage({
     },
   })
 
-  // Fetch playlists for dropdown assignment
-  const playlists = await prisma.playlist.findMany({
-    orderBy: { name: 'asc' },
-  })
-
   // Find the selected device for edit panel
   const editingDevice = editDeviceId
     ? devices.find((d) => d.deviceId === editDeviceId)
     : null
 
-  const tenMinutesAgo = new Date(Date.now() - 10 * 60 * 1000)
+  const tenMinutesAgo = getOnlineThreshold(10)
 
   return (
     <div className="space-y-8 animate-fade-in">
@@ -267,10 +263,10 @@ export default async function DevicesPage({
             )}
 
             <DeviceConfigForm 
+              key={editingDevice.deviceId}
               editingDevice={editingDevice} 
               saveDeviceConfigAction={saveDeviceConfigAction}
               clearDeviceCacheAction={clearDeviceCacheAction}
-              showSuccess={showSuccess}
             />
           </div>
         </div>

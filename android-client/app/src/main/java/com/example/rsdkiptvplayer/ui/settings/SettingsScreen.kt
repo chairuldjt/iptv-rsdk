@@ -1,5 +1,6 @@
 package com.example.rsdkiptvplayer.ui.settings
 
+import android.view.KeyEvent as AndroidKeyEvent
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
@@ -47,6 +48,20 @@ import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.ui.text.style.TextAlign
 import com.example.rsdkiptvplayer.ui.components.PinGridButton
+
+private fun remoteDigitFromKeyCode(keyCode: Int): String? = when (keyCode) {
+    AndroidKeyEvent.KEYCODE_0, AndroidKeyEvent.KEYCODE_NUMPAD_0 -> "0"
+    AndroidKeyEvent.KEYCODE_1, AndroidKeyEvent.KEYCODE_NUMPAD_1 -> "1"
+    AndroidKeyEvent.KEYCODE_2, AndroidKeyEvent.KEYCODE_NUMPAD_2 -> "2"
+    AndroidKeyEvent.KEYCODE_3, AndroidKeyEvent.KEYCODE_NUMPAD_3 -> "3"
+    AndroidKeyEvent.KEYCODE_4, AndroidKeyEvent.KEYCODE_NUMPAD_4 -> "4"
+    AndroidKeyEvent.KEYCODE_5, AndroidKeyEvent.KEYCODE_NUMPAD_5 -> "5"
+    AndroidKeyEvent.KEYCODE_6, AndroidKeyEvent.KEYCODE_NUMPAD_6 -> "6"
+    AndroidKeyEvent.KEYCODE_7, AndroidKeyEvent.KEYCODE_NUMPAD_7 -> "7"
+    AndroidKeyEvent.KEYCODE_8, AndroidKeyEvent.KEYCODE_NUMPAD_8 -> "8"
+    AndroidKeyEvent.KEYCODE_9, AndroidKeyEvent.KEYCODE_NUMPAD_9 -> "9"
+    else -> null
+}
 
 private fun Modifier.settingsFocusGlow(
     shape: RoundedCornerShape = RoundedCornerShape(10.dp)
@@ -213,6 +228,23 @@ fun SettingsScreen(
     var enteredPin by remember { mutableStateOf("") }
     var pinError by remember { mutableStateOf(false) }
     val firstButtonFocusRequester = remember { FocusRequester() }
+    val pinLength = technicianPin.length.coerceIn(4, 8)
+
+    fun appendPinDigit(digit: String) {
+        pinError = false
+        if (enteredPin.length < pinLength) {
+            enteredPin += digit
+            if (enteredPin.length == pinLength) {
+                if (enteredPin == technicianPin) {
+                    isUnlockedSession = true
+                    Toast.makeText(context, "Akses dibuka.", Toast.LENGTH_SHORT).show()
+                } else {
+                    pinError = true
+                    enteredPin = ""
+                }
+            }
+        }
+    }
     
     LaunchedEffect(serverUrl) {
         inputUrlText = serverUrl
@@ -368,7 +400,7 @@ fun SettingsScreen(
                                 color = Color.White
                             )
                             Text(
-                                text = "Masukkan 4-digit PIN untuk akses penuh",
+                                text = "Masukkan PIN untuk akses penuh",
                                 fontSize = 12.sp,
                                 color = Color(0xFF94A3B8),
                                 modifier = Modifier.padding(top = 4.dp, bottom = 20.dp)
@@ -380,7 +412,7 @@ fun SettingsScreen(
                                 verticalAlignment = Alignment.CenterVertically,
                                 modifier = Modifier.padding(bottom = 20.dp)
                             ) {
-                                for (i in 0 until 4) {
+                                for (i in 0 until pinLength) {
                                     val isFilled = i < enteredPin.length
                                     Box(
                                         modifier = Modifier
@@ -414,7 +446,42 @@ fun SettingsScreen(
                                     columns = GridCells.Fixed(3),
                                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                                     verticalArrangement = Arrangement.spacedBy(8.dp),
-                                    modifier = Modifier.fillMaxSize()
+                                    modifier = Modifier
+                                        .fillMaxSize()
+                                        .focusable()
+                                        .onPreviewKeyEvent { keyEvent ->
+                                            if (keyEvent.type != KeyEventType.KeyDown) {
+                                                return@onPreviewKeyEvent false
+                                            }
+
+                                            val keyCode = keyEvent.nativeKeyEvent.keyCode
+                                            remoteDigitFromKeyCode(keyCode)?.let { digit ->
+                                                appendPinDigit(digit)
+                                                return@onPreviewKeyEvent true
+                                            }
+
+                                            when (keyCode) {
+                                                AndroidKeyEvent.KEYCODE_DEL,
+                                                AndroidKeyEvent.KEYCODE_FORWARD_DEL -> {
+                                                    pinError = false
+                                                    if (enteredPin.isNotEmpty()) {
+                                                        enteredPin = enteredPin.dropLast(1)
+                                                    }
+                                                    true
+                                                }
+                                                AndroidKeyEvent.KEYCODE_CLEAR -> {
+                                                    pinError = false
+                                                    enteredPin = ""
+                                                    true
+                                                }
+                                                AndroidKeyEvent.KEYCODE_BACK,
+                                                AndroidKeyEvent.KEYCODE_ESCAPE -> {
+                                                    showPinKeypad = false
+                                                    true
+                                                }
+                                                else -> false
+                                            }
+                                        }
                                 ) {
                                     items(buttons.size) { index ->
                                         val text = buttons[index]
@@ -429,18 +496,7 @@ fun SettingsScreen(
                                                         enteredPin = enteredPin.substring(0, enteredPin.length - 1)
                                                     }
                                                     else -> {
-                                                        if (enteredPin.length < 4) {
-                                                            enteredPin += text
-                                                            if (enteredPin.length == 4) {
-                                                                if (enteredPin == technicianPin) {
-                                                                    isUnlockedSession = true
-                                                                    Toast.makeText(context, "Akses dibuka.", Toast.LENGTH_SHORT).show()
-                                                                } else {
-                                                                    pinError = true
-                                                                    enteredPin = ""
-                                                                }
-                                                            }
-                                                        }
+                                                        appendPinDigit(text)
                                                     }
                                                 }
                                             }

@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import prisma from '@/lib/db'
+import { getErrorMessage } from '@/lib/errors'
 
 export async function GET(
   request: Request,
@@ -20,10 +21,10 @@ export async function GET(
       where: { deviceId },
     })
 
-    if (!device) {
+    if (!device || !device.isActive) {
       return NextResponse.json(
-        { status: false, message: 'Device not registered', data: [] },
-        { status: 404 }
+        { status: false, message: !device ? 'Device not registered' : 'Device is inactive', data: [] },
+        { status: !device ? 404 : 403 }
       )
     }
 
@@ -68,8 +69,18 @@ export async function GET(
         playlistId,
         isActive: true,
       },
-      include: {
-        category: true,
+      select: {
+        id: true,
+        name: true,
+        logoUrl: true,
+        streamUrl: true,
+        sortOrder: true,
+        isActive: true,
+        category: {
+          select: {
+            name: true,
+          },
+        },
       },
       orderBy: {
         sortOrder: 'asc',
@@ -92,10 +103,10 @@ export async function GET(
       message: 'Channels loaded',
       data: mappedChannels,
     })
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Channels API Error:', error)
     return NextResponse.json(
-      { status: false, message: 'Server error: ' + error.message },
+      { status: false, message: 'Server error: ' + getErrorMessage(error) },
       { status: 500 }
     )
   }

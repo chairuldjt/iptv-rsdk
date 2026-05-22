@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import prisma from '@/lib/db'
+import { getErrorMessage } from '@/lib/errors'
 
 export async function POST(request: Request) {
   try {
@@ -41,10 +42,10 @@ export async function POST(request: Request) {
       status: true,
       message: 'Error log recorded successfully',
     })
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Remote Log API Error:', error)
     return NextResponse.json(
-      { status: false, message: 'Server error: ' + error.message },
+      { status: false, message: 'Server error: ' + getErrorMessage(error) },
       { status: 500 }
     )
   }

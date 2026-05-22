@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import prisma from '@/lib/db'
+import { getErrorMessage } from '@/lib/errors'
 
 export async function POST(request: Request) {
   try {
@@ -44,13 +45,13 @@ export async function POST(request: Request) {
       data: {
         force_sync: config?.forceSync ?? false,
         lock_settings: config?.lockSettings ?? true,
-        active: true,
+        active: updatedDevice.isActive,
       },
     })
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Heartbeat API Error:', error)
     return NextResponse.json(
-      { status: false, message: 'Server error: ' + error.message },
+      { status: false, message: 'Server error: ' + getErrorMessage(error) },
       { status: 500 }
     )
   }

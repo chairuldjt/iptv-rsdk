@@ -1,5 +1,6 @@
 package com.example.rsdkiptvplayer.ui.components
 
+import android.view.KeyEvent as AndroidKeyEvent
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -18,11 +19,28 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.ui.input.key.type
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
+
+private fun remoteDigitFromKeyCode(keyCode: Int): String? = when (keyCode) {
+    AndroidKeyEvent.KEYCODE_0, AndroidKeyEvent.KEYCODE_NUMPAD_0 -> "0"
+    AndroidKeyEvent.KEYCODE_1, AndroidKeyEvent.KEYCODE_NUMPAD_1 -> "1"
+    AndroidKeyEvent.KEYCODE_2, AndroidKeyEvent.KEYCODE_NUMPAD_2 -> "2"
+    AndroidKeyEvent.KEYCODE_3, AndroidKeyEvent.KEYCODE_NUMPAD_3 -> "3"
+    AndroidKeyEvent.KEYCODE_4, AndroidKeyEvent.KEYCODE_NUMPAD_4 -> "4"
+    AndroidKeyEvent.KEYCODE_5, AndroidKeyEvent.KEYCODE_NUMPAD_5 -> "5"
+    AndroidKeyEvent.KEYCODE_6, AndroidKeyEvent.KEYCODE_NUMPAD_6 -> "6"
+    AndroidKeyEvent.KEYCODE_7, AndroidKeyEvent.KEYCODE_NUMPAD_7 -> "7"
+    AndroidKeyEvent.KEYCODE_8, AndroidKeyEvent.KEYCODE_NUMPAD_8 -> "8"
+    AndroidKeyEvent.KEYCODE_9, AndroidKeyEvent.KEYCODE_NUMPAD_9 -> "9"
+    else -> null
+}
 
 @Composable
 fun PinGridDialog(
@@ -33,6 +51,22 @@ fun PinGridDialog(
     var enteredPin by remember { mutableStateOf("") }
     var pinError by remember { mutableStateOf(false) }
     val firstButtonFocusRequester = remember { FocusRequester() }
+    val pinLength = correctPin.length.coerceIn(4, 8)
+
+    fun appendDigit(digit: String) {
+        pinError = false
+        if (enteredPin.length < pinLength) {
+            enteredPin += digit
+            if (enteredPin.length == pinLength) {
+                if (enteredPin == correctPin) {
+                    onSuccess()
+                } else {
+                    pinError = true
+                    enteredPin = ""
+                }
+            }
+        }
+    }
 
     LaunchedEffect(Unit) {
         firstButtonFocusRequester.requestFocus()
@@ -43,6 +77,40 @@ fun PinGridDialog(
             modifier = Modifier
                 .width(360.dp)
                 .wrapContentHeight()
+                .focusable()
+                .onPreviewKeyEvent { keyEvent ->
+                    if (keyEvent.type != KeyEventType.KeyDown) {
+                        return@onPreviewKeyEvent false
+                    }
+
+                    val keyCode = keyEvent.nativeKeyEvent.keyCode
+                    remoteDigitFromKeyCode(keyCode)?.let { digit ->
+                        appendDigit(digit)
+                        return@onPreviewKeyEvent true
+                    }
+
+                    when (keyCode) {
+                        AndroidKeyEvent.KEYCODE_DEL,
+                        AndroidKeyEvent.KEYCODE_FORWARD_DEL -> {
+                            pinError = false
+                            if (enteredPin.isNotEmpty()) {
+                                enteredPin = enteredPin.dropLast(1)
+                            }
+                            true
+                        }
+                        AndroidKeyEvent.KEYCODE_CLEAR -> {
+                            pinError = false
+                            enteredPin = ""
+                            true
+                        }
+                        AndroidKeyEvent.KEYCODE_BACK,
+                        AndroidKeyEvent.KEYCODE_ESCAPE -> {
+                            onDismiss()
+                            true
+                        }
+                        else -> false
+                    }
+                }
                 .border(1.dp, Color(0xFF334155), RoundedCornerShape(24.dp)),
             shape = RoundedCornerShape(24.dp),
             colors = CardDefaults.cardColors(containerColor = Color(0xEC0F172A)) // Semi-transparent Slate Dark
@@ -60,7 +128,7 @@ fun PinGridDialog(
                     color = Color.White
                 )
                 Text(
-                    text = "Masukkan PIN 4-digit untuk membuka Pengaturan",
+                    text = "Masukkan PIN untuk membuka Pengaturan",
                     fontSize = 12.sp,
                     color = Color.Gray,
                     textAlign = TextAlign.Center,
@@ -73,7 +141,7 @@ fun PinGridDialog(
                     verticalAlignment = Alignment.CenterVertically,
                     modifier = Modifier.padding(bottom = 20.dp)
                 ) {
-                    for (i in 0 until 4) {
+                    for (i in 0 until pinLength) {
                         val isFilled = i < enteredPin.length
                         Box(
                             modifier = Modifier
@@ -121,17 +189,7 @@ fun PinGridDialog(
                                         enteredPin = enteredPin.substring(0, enteredPin.length - 1)
                                     }
                                     else -> {
-                                        if (enteredPin.length < 4) {
-                                            enteredPin += text
-                                            if (enteredPin.length == 4) {
-                                                if (enteredPin == correctPin) {
-                                                    onSuccess()
-                                                } else {
-                                                    pinError = true
-                                                    enteredPin = ""
-                                                }
-                                            }
-                                        }
+                                        appendDigit(text)
                                     }
                                 }
                             }

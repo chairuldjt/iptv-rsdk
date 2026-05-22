@@ -1,5 +1,8 @@
-// Session secret key configuration
-const SESSION_SECRET = process.env.SESSION_SECRET || 'rsdk-iptv-super-secret-key-32-chars-or-more-2026-nuger-27102022'
+const SESSION_SECRET = process.env.SESSION_SECRET
+
+if (!SESSION_SECRET) {
+  throw new Error('SESSION_SECRET must be configured.')
+}
 
 // Obtain global Web Crypto object safely (guaranteed in Node 19+ and Next.js Edge Runtime)
 const getSubtleCrypto = () => {
@@ -36,7 +39,7 @@ export async function createSessionToken(payload: { userId: number; username: st
   const header = { alg: 'HS256', typ: 'JWT' }
 
   // Base64Url encode helpers
-  const toBase64Url = (obj: any) => {
+  const toBase64Url = (obj: unknown) => {
     const str = typeof obj === 'string' ? obj : JSON.stringify(obj)
     const base64 = typeof window !== 'undefined' ? window.btoa(str) : Buffer.from(str).toString('base64')
     return base64.replace(/=/g, '').replace(/\+/g, '-').replace(/\//g, '_')

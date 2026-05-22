@@ -122,7 +122,7 @@ class DataStoreManager(private val context: Context) {
 
     suspend fun getCustomM3uUrl(): String {
         val prefs = context.dataStore.data.first()
-        return prefs[CUSTOM_M3U_URL] ?: ""
+        return prefs[CUSTOM_M3U_URL] ?: "http://10.0.0.1/iptv/iptv_rsdk.m3u"
     }
 
     suspend fun setCustomM3uUrl(url: String) {

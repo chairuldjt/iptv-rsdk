@@ -62,7 +62,7 @@ class IptvRepository(
                 dataStoreManager.addLog("Registration result: ${resBody.message}")
                 if (resBody.status && resBody.data != null) {
                     dataStoreManager.setSyncInterval(resBody.data.sync_interval)
-                    true // Always active
+                    resBody.data.active
                 } else {
                     dataStoreManager.addLog("Registration successful (default active)")
                     true
