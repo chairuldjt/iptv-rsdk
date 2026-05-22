@@ -83,7 +83,8 @@ data class StatusResponse(
 
 data class StatusData(
     val force_sync: Boolean,
-    val lock_settings: Boolean
+    val lock_settings: Boolean,
+    val active: Boolean? = true
 )
 
 data class LogRequest(

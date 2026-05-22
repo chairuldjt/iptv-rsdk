@@ -57,6 +57,9 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
     private val _lockSettings = MutableStateFlow(true)
     val lockSettings: StateFlow<Boolean> = _lockSettings.asStateFlow()
 
+    private val _technicianPin = MutableStateFlow("2468")
+    val technicianPin: StateFlow<String> = _technicianPin.asStateFlow()
+
     private var heartbeatJob: Job? = null
     private var syncJob: Job? = null
 
@@ -90,6 +93,13 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         viewModelScope.launch {
             repository.lockSettingsFlow.collectLatest { locked ->
                 _lockSettings.value = locked
+            }
+        }
+
+        // Observe Technician PIN
+        viewModelScope.launch {
+            repository.technicianPinFlow.collectLatest { pin ->
+                _technicianPin.value = pin
             }
         }
 
@@ -146,7 +156,9 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                 // Initial configurations and playlist sync
                 val activeConfig = repository.syncConfig()
                 _isDeviceActive.value = activeConfig
-                repository.syncChannels()
+                if (activeConfig) {
+                    repository.syncChannels()
+                }
             }
             _isLoading.value = false
         }
@@ -156,13 +168,10 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         heartbeatJob = viewModelScope.launch {
             while (true) {
                 delay(30000) // 30s heartbeat interval
-                if (_isDeviceActive.value) {
-                    val status = repository.sendHeartbeat(_selectedChannel.value?.id)
-                    if (status != null) {
-                        _lockSettings.value = status.lock_settings
-                    } else {
-                        // If offline, check if config is active locally
-                    }
+                val status = repository.sendHeartbeat(_selectedChannel.value?.id)
+                if (status != null) {
+                    _lockSettings.value = status.lock_settings
+                    _isDeviceActive.value = status.active ?: true
                 }
             }
         }
@@ -173,8 +182,9 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
             while (true) {
                 val intervalSeconds = dataStoreManager.syncIntervalFlow.first()
                 delay(intervalSeconds * 1000L)
-                if (_isDeviceActive.value) {
-                    repository.syncConfig()
+                val activeConfig = repository.syncConfig()
+                _isDeviceActive.value = activeConfig
+                if (activeConfig) {
                     repository.syncChannels()
                 }
             }

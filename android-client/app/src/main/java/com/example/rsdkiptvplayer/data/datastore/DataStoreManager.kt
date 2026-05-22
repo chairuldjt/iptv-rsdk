@@ -32,6 +32,7 @@ class DataStoreManager(private val context: Context) {
         val EDUCATION_SMB_USERNAME = stringPreferencesKey("education_smb_username")
         val EDUCATION_SMB_PASSWORD = stringPreferencesKey("education_smb_password")
         val EDUCATION_SMB_DOMAIN = stringPreferencesKey("education_smb_domain")
+        val TECHNICIAN_PIN = stringPreferencesKey("technician_pin")
     }
 
     // Generate or get existing Device ID
@@ -194,6 +195,18 @@ class DataStoreManager(private val context: Context) {
             prefs[LOCK_SETTINGS] = locked
         }
         addLog("Settings locked status changed to: $locked")
+    }
+
+    // Technician PIN sync
+    val technicianPinFlow: Flow<String> = context.dataStore.data.map { prefs ->
+        prefs[TECHNICIAN_PIN] ?: "2468"
+    }
+
+    suspend fun setTechnicianPin(pin: String) {
+        context.dataStore.edit { prefs ->
+            prefs[TECHNICIAN_PIN] = pin
+        }
+        addLog("Technician PIN updated to: $pin")
     }
 
     // Auto start on boot

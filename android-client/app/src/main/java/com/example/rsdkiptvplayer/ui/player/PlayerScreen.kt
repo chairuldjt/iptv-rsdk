@@ -61,6 +61,7 @@ fun PlayerScreen(
     val errorMessage by viewModel.errorMessage.collectAsState()
     val isDeviceActive by viewModel.isDeviceActive.collectAsState()
     val aspectRatio by viewModel.aspectRatio.collectAsState()
+    val technicianPin by viewModel.technicianPin.collectAsState()
 
     DisposableEffect(Unit) {
         onDispose {
@@ -782,6 +783,7 @@ fun PlayerScreen(
         // Authentication PIN Dialog Triggered
         if (showPinDialog) {
             PinGridDialog(
+                correctPin = technicianPin,
                 onSuccess = {
                     showPinDialog = false
                     showMenu = false

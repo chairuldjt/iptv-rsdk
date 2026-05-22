@@ -70,6 +70,7 @@ export async function GET(
         force_sync: config.forceSync, // Send the true flag this one time
         auto_start_on_boot: config.autoStartOnBoot,
         technician_pin_enabled: true,
+        technician_pin: config.technicianPin,
       },
     })
   } catch (error: any) {

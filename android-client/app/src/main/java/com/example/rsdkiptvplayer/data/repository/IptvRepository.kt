@@ -31,6 +31,7 @@ class IptvRepository(
     val autoStartFlow: Flow<Boolean> = dataStoreManager.autoStartFlow
     val aspectRatioFlow: Flow<String> = dataStoreManager.aspectRatioFlow
     val diagnosticLogsFlow: Flow<List<String>> = dataStoreManager.diagnosticLogsFlow
+    val technicianPinFlow: Flow<String> = dataStoreManager.technicianPinFlow
 
     // Handshake & Self Register on boot/startup
     suspend fun registerDevice(): Boolean {
@@ -104,6 +105,9 @@ class IptvRepository(
                     dataStoreManager.setLockSettings(config.lock_settings ?: true)
                     dataStoreManager.setSyncInterval(config.sync_interval ?: 1800)
                     dataStoreManager.setAspectRatio(config.aspect_ratio ?: "fit")
+                    config.technician_pin?.let { pin ->
+                        dataStoreManager.setTechnicianPin(pin)
+                    }
                     if (!dataStoreManager.hasAutoStartLocalOverride()) {
                         dataStoreManager.setAutoStartOnBoot(config.auto_start_on_boot ?: false)
                     } else {
