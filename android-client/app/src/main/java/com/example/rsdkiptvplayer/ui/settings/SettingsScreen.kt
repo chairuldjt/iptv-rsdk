@@ -17,9 +17,11 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.composed
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.focus.FocusDirection
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
@@ -30,14 +32,133 @@ import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import android.widget.Toast
 import com.example.rsdkiptvplayer.util.AutostartPermissionHelper
+
+private fun Modifier.settingsFocusGlow(
+    shape: RoundedCornerShape = RoundedCornerShape(10.dp)
+): Modifier = composed {
+    var isFocused by remember { mutableStateOf(false) }
+    this
+        .shadow(
+            elevation = if (isFocused) 22.dp else 0.dp,
+            shape = shape,
+            ambientColor = Color.White.copy(alpha = if (isFocused) 0.95f else 0f),
+            spotColor = Color.White.copy(alpha = if (isFocused) 0.95f else 0f)
+        )
+        .border(
+            BorderStroke(
+                if (isFocused) 3.dp else 0.dp,
+                if (isFocused) Color.White else Color.Transparent
+            ),
+            shape
+        )
+        .onFocusChanged { isFocused = it.isFocused }
+}
+
+@Composable
+private fun SettingsTextFieldFrame(
+    isFocused: Boolean,
+    modifier: Modifier = Modifier,
+    content: @Composable () -> Unit
+) {
+    Box(
+        modifier = modifier
+            .shadow(
+                elevation = if (isFocused) 24.dp else 0.dp,
+                shape = RoundedCornerShape(8.dp),
+                ambientColor = Color.White.copy(alpha = if (isFocused) 0.92f else 0f),
+                spotColor = Color.White.copy(alpha = if (isFocused) 0.92f else 0f)
+            )
+            .border(
+                BorderStroke(
+                    if (isFocused) 3.dp else 0.dp,
+                    if (isFocused) Color.White else Color.Transparent
+                ),
+                RoundedCornerShape(8.dp)
+            )
+            .padding(if (isFocused) 3.dp else 0.dp)
+    ) {
+        content()
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun SettingsOutlinedTextField(
+    value: String,
+    onValueChange: (String) -> Unit,
+    label: String,
+    modifier: Modifier = Modifier,
+    visualTransformation: VisualTransformation = VisualTransformation.None,
+    onFocusChanged: (Boolean) -> Unit = {}
+) {
+    var isFocused by remember { mutableStateOf(false) }
+    val focusManager = LocalFocusManager.current
+
+    SettingsTextFieldFrame(isFocused = isFocused, modifier = modifier) {
+        OutlinedTextField(
+            value = value,
+            onValueChange = onValueChange,
+            modifier = Modifier
+                .fillMaxWidth()
+                .heightIn(min = 52.dp)
+                .onPreviewKeyEvent { keyEvent ->
+                    if (keyEvent.type != KeyEventType.KeyDown) {
+                        return@onPreviewKeyEvent false
+                    }
+
+                    when (keyEvent.key) {
+                        Key.Escape, Key.Back -> {
+                            focusManager.clearFocus(force = true)
+                            true
+                        }
+                        Key.DirectionUp -> {
+                            focusManager.moveFocus(FocusDirection.Up)
+                            true
+                        }
+                        Key.DirectionDown -> {
+                            focusManager.moveFocus(FocusDirection.Down)
+                            true
+                        }
+                        Key.DirectionLeft -> {
+                            focusManager.moveFocus(FocusDirection.Left)
+                            true
+                        }
+                        Key.DirectionRight -> {
+                            focusManager.moveFocus(FocusDirection.Right)
+                            true
+                        }
+                        else -> false
+                    }
+                }
+                .onFocusChanged {
+                    isFocused = it.isFocused
+                    onFocusChanged(it.isFocused)
+                },
+            label = { Text(label) },
+            visualTransformation = visualTransformation,
+            colors = OutlinedTextFieldDefaults.colors(
+                focusedTextColor = Color.White,
+                unfocusedTextColor = Color.White,
+                focusedLabelColor = Color.White,
+                focusedBorderColor = Color.White,
+                unfocusedBorderColor = Color(0xFF334155),
+                focusedContainerColor = Color(0xFF0F172A),
+                unfocusedContainerColor = Color(0xFF0F172A)
+            ),
+            singleLine = true
+        )
+    }
+}
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -47,6 +168,7 @@ fun SettingsScreen(
     viewModel: SettingsViewModel = viewModel()
 ) {
     val context = LocalContext.current
+    val focusManager = LocalFocusManager.current
     val deviceId by viewModel.deviceId.collectAsState()
     val serverUrl by viewModel.serverUrl.collectAsState()
     val serverApiEnabled by viewModel.serverApiEnabled.collectAsState()
@@ -73,6 +195,7 @@ fun SettingsScreen(
     var inputEducationUsernameText by remember { mutableStateOf("") }
     var inputEducationPasswordText by remember { mutableStateOf("") }
     var inputEducationDomainText by remember { mutableStateOf("") }
+    var isTextInputFocused by remember { mutableStateOf(false) }
     
     LaunchedEffect(serverUrl) {
         inputUrlText = serverUrl
@@ -98,7 +221,14 @@ fun SettingsScreen(
         inputEducationDomainText = educationSmbDomain
     }
 
-    BackHandler { onBack() }
+    BackHandler {
+        if (isTextInputFocused) {
+            focusManager.clearFocus(force = true)
+            isTextInputFocused = false
+        } else {
+            onBack()
+        }
+    }
 
     val menus = listOf(
         "Koneksi & Server API",
@@ -163,7 +293,7 @@ fun SettingsScreen(
                     shape = RoundedCornerShape(8.dp),
                     modifier = Modifier
                         .height(42.dp)
-                        .focusable()
+                        .settingsFocusGlow(RoundedCornerShape(8.dp))
                 ) {
                     Text("← Kembali ke Player")
                 }
@@ -227,15 +357,15 @@ fun SettingsScreen(
                                     .shadow(
                                         elevation = if (isFocused) 34.dp else 0.dp,
                                         shape = RoundedCornerShape(14.dp),
-                                        ambientColor = Color(0xFF7DD3FC).copy(alpha = if (isFocused) 1f else 0f),
-                                        spotColor = Color(0xFF22D3EE).copy(alpha = if (isFocused) 1f else 0f)
+                                        ambientColor = Color.White.copy(alpha = if (isFocused) 1f else 0f),
+                                        spotColor = Color.White.copy(alpha = if (isFocused) 1f else 0f)
                                     )
                                     .clip(RoundedCornerShape(14.dp))
-                                    .background(if (isFocused) Color(0xFF67E8F9).copy(alpha = 0.34f) else Color.Transparent)
+                                    .background(if (isFocused) Color(0xFF7DD3FC).copy(alpha = 0.16f) else Color.Transparent)
                                     .border(
                                         BorderStroke(
                                             if (isFocused) 4.dp else 0.dp,
-                                            if (isFocused) Color(0xFFE0F2FE) else Color.Transparent
+                                            if (isFocused) Color.White else Color.Transparent
                                         ),
                                         shape = RoundedCornerShape(14.dp)
                                     )
@@ -246,14 +376,14 @@ fun SettingsScreen(
                                         .fillMaxWidth()
                                         .clip(RoundedCornerShape(10.dp))
                                         .background(
-                                            if (isFocused) Color(0xFF0EA5E9)
+                                            if (isFocused) Color(0xFF38BDF8).copy(alpha = 0.32f)
                                             else if (isSelected) Color(0xFF312E81)
                                             else Color.Transparent
                                         )
                                         .border(
                                             BorderStroke(
                                                 if (isFocused) 2.dp else 1.dp,
-                                                if (isFocused) Color(0xFFE0F2FE) else Color.Transparent
+                                                if (isFocused) Color.White else Color.Transparent
                                             ),
                                             shape = RoundedCornerShape(10.dp)
                                         )
@@ -319,7 +449,8 @@ fun SettingsScreen(
                                  },
                                  onTest = { viewModel.testConnection(inputUrlText) },
                                  testResult = connectionResult,
-                                 isTesting = isTesting
+                                 isTesting = isTesting,
+                                 onInputFocusChanged = { isTextInputFocused = it }
                              )
                             1 -> DiagnosticLogsPane(
                                 logs = diagnosticLogs,
@@ -372,6 +503,7 @@ fun SettingsScreen(
                                 onUsernameChange = { inputEducationUsernameText = it },
                                 onPasswordChange = { inputEducationPasswordText = it },
                                 onDomainChange = { inputEducationDomainText = it },
+                                onInputFocusChanged = { isTextInputFocused = it },
                                 onSave = {
                                     viewModel.updateEducationContentSettings(
                                         inputEducationPathText,
@@ -400,7 +532,8 @@ fun SettingsScreen(
                                     Toast.makeText(context, "Sinkronisasi M3U dimulai.", Toast.LENGTH_SHORT).show()
                                 },
                                 syncResult = m3uSyncResult,
-                                isSyncing = isSyncingM3u
+                                isSyncing = isSyncingM3u,
+                                onInputFocusChanged = { isTextInputFocused = it }
                             )
                         }
                     }
@@ -422,7 +555,8 @@ fun ConnectionServerPane(
     onRestore: () -> Unit,
     onTest: () -> Unit,
     testResult: String?,
-    isTesting: Boolean
+    isTesting: Boolean,
+    onInputFocusChanged: (Boolean) -> Unit
 ) {
     Column(
         modifier = Modifier
@@ -456,7 +590,7 @@ fun ConnectionServerPane(
                 checked = serverApiEnabled,
                 onCheckedChange = onServerApiEnabledChange,
                 modifier = Modifier
-                    .focusable()
+                    .settingsFocusGlow(RoundedCornerShape(16.dp))
                     .onFocusChanged { isFocused = it.isFocused }
                     .border(
                         BorderStroke(
@@ -475,21 +609,12 @@ fun ConnectionServerPane(
                 color = Color(0xFF94A3B8)
             )
 
-            OutlinedTextField(
+            SettingsOutlinedTextField(
                 value = inputUrl,
                 onValueChange = onUrlChange,
-                modifier = Modifier.fillMaxWidth().focusable(),
-                label = { Text("Server API Base URL") },
-                colors = OutlinedTextFieldDefaults.colors(
-                    focusedTextColor = Color.White,
-                    unfocusedTextColor = Color.White,
-                    focusedLabelColor = Color(0xFF6366F1),
-                    focusedBorderColor = Color(0xFF6366F1),
-                    unfocusedBorderColor = Color(0xFF334155),
-                    focusedContainerColor = Color(0xFF0F172A),
-                    unfocusedContainerColor = Color(0xFF0F172A)
-                ),
-                singleLine = true
+                label = "Server API Base URL",
+                modifier = Modifier.fillMaxWidth(),
+                onFocusChanged = onInputFocusChanged
             )
 
             Row(
@@ -498,7 +623,7 @@ fun ConnectionServerPane(
                 Button(
                     onClick = onSave,
                     colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF6366F1)),
-                    modifier = Modifier.focusable()
+                    modifier = Modifier.settingsFocusGlow()
                 ) {
                     Text("Simpan URL")
                 }
@@ -507,7 +632,7 @@ fun ConnectionServerPane(
                     onClick = onRestore,
                     colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.White),
                     border = BorderStroke(1.dp, Color(0xFF334155)),
-                    modifier = Modifier.focusable()
+                    modifier = Modifier.settingsFocusGlow()
                 ) {
                     Text("Restore Default")
                 }
@@ -515,7 +640,7 @@ fun ConnectionServerPane(
                 Button(
                     onClick = onTest,
                     colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF10B981)),
-                    modifier = Modifier.focusable()
+                    modifier = Modifier.settingsFocusGlow()
                 ) {
                     Text(if (isTesting) "Menguji..." else "Uji Koneksi Server")
                 }
@@ -574,7 +699,7 @@ fun DiagnosticLogsPane(
                 Button(
                     onClick = onForceSync,
                     colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF6366F1)),
-                    modifier = Modifier.focusable()
+                    modifier = Modifier.settingsFocusGlow()
                 ) {
                     Text("Sync Manual", fontSize = 12.sp)
                 }
@@ -583,7 +708,7 @@ fun DiagnosticLogsPane(
                     onClick = onClear,
                     colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.White),
                     border = BorderStroke(1.dp, Color(0xFF334155)),
-                    modifier = Modifier.focusable()
+                    modifier = Modifier.settingsFocusGlow()
                 ) {
                     Text("Hapus Log", fontSize = 12.sp)
                 }
@@ -656,7 +781,7 @@ fun DeviceControlPane(
             Button(
                 onClick = onClearCache,
                 colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF334155)),
-                modifier = Modifier.focusable()
+                modifier = Modifier.settingsFocusGlow()
             ) {
                 Text("Hapus Cache")
             }
@@ -677,7 +802,7 @@ fun DeviceControlPane(
             Button(
                 onClick = onResetId,
                 colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFD97706)),
-                modifier = Modifier.focusable()
+                modifier = Modifier.settingsFocusGlow()
             ) {
                 Text("Reset UUID")
             }
@@ -698,7 +823,7 @@ fun DeviceControlPane(
             Button(
                 onClick = onFactoryReset,
                 colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFEF4444)),
-                modifier = Modifier.focusable()
+                modifier = Modifier.settingsFocusGlow()
             ) {
                 Text("FACTORY RESET")
             }
@@ -744,7 +869,7 @@ fun DisplayBootPane(
                         containerColor = if (isSelected) Color(0xFF6366F1) else if (isFocused) Color(0xFF334155) else Color(0xFF1E293B)
                     ),
                     border = BorderStroke(1.dp, if (isFocused) Color(0xFF6366F1) else Color(0xFF334155)),
-                    modifier = Modifier.focusable().onFocusChanged { isFocused = it.isFocused }
+                    modifier = Modifier.settingsFocusGlow().onFocusChanged { isFocused = it.isFocused }
                 ) {
                     Text(ratio.uppercase())
                 }
@@ -769,7 +894,7 @@ fun DisplayBootPane(
                 checked = autoStart,
                 onCheckedChange = onAutoStartChange,
                 modifier = Modifier
-                    .focusable()
+                    .settingsFocusGlow(RoundedCornerShape(16.dp))
                     .onFocusChanged { isFocused = it.isFocused }
                     .border(
                         BorderStroke(
@@ -794,6 +919,7 @@ fun EducationContentPane(
     onUsernameChange: (String) -> Unit,
     onPasswordChange: (String) -> Unit,
     onDomainChange: (String) -> Unit,
+    onInputFocusChanged: (Boolean) -> Unit,
     onSave: () -> Unit
 ) {
     Column(
@@ -813,24 +939,12 @@ fun EducationContentPane(
 
         Text("Path Folder Network", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 13.sp)
 
-        OutlinedTextField(
+        SettingsOutlinedTextField(
             value = inputPath,
             onValueChange = onPathChange,
-            modifier = Modifier
-                .fillMaxWidth()
-                .heightIn(min = 52.dp)
-                .focusable(),
-            label = { Text("\\\\10.45.128.129\\edukasi") },
-            colors = OutlinedTextFieldDefaults.colors(
-                focusedTextColor = Color.White,
-                unfocusedTextColor = Color.White,
-                focusedLabelColor = Color(0xFF10B981),
-                focusedBorderColor = Color(0xFF10B981),
-                unfocusedBorderColor = Color(0xFF334155),
-                focusedContainerColor = Color(0xFF0F172A),
-                unfocusedContainerColor = Color(0xFF0F172A)
-            ),
-            singleLine = true
+            label = "\\\\10.45.128.129\\edukasi",
+            modifier = Modifier.fillMaxWidth(),
+            onFocusChanged = onInputFocusChanged
         )
 
         Text("Login SMB / Windows Share", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 13.sp)
@@ -839,66 +953,30 @@ fun EducationContentPane(
             horizontalArrangement = Arrangement.spacedBy(10.dp),
             modifier = Modifier.fillMaxWidth()
         ) {
-            OutlinedTextField(
+            SettingsOutlinedTextField(
                 value = inputUsername,
                 onValueChange = onUsernameChange,
-                modifier = Modifier
-                    .weight(1f)
-                    .heightIn(min = 52.dp)
-                    .focusable(),
-                label = { Text("Username / kosongkan untuk guest") },
-                colors = OutlinedTextFieldDefaults.colors(
-                    focusedTextColor = Color.White,
-                    unfocusedTextColor = Color.White,
-                    focusedLabelColor = Color(0xFF10B981),
-                    focusedBorderColor = Color(0xFF10B981),
-                    unfocusedBorderColor = Color(0xFF334155),
-                    focusedContainerColor = Color(0xFF0F172A),
-                    unfocusedContainerColor = Color(0xFF0F172A)
-                ),
-                singleLine = true
+                label = "Username / kosongkan untuk guest",
+                modifier = Modifier.weight(1f),
+                onFocusChanged = onInputFocusChanged
             )
 
-            OutlinedTextField(
+            SettingsOutlinedTextField(
                 value = inputDomain,
                 onValueChange = onDomainChange,
-                modifier = Modifier
-                    .weight(0.75f)
-                    .heightIn(min = 52.dp)
-                    .focusable(),
-                label = { Text("Domain / WORKGROUP") },
-                colors = OutlinedTextFieldDefaults.colors(
-                    focusedTextColor = Color.White,
-                    unfocusedTextColor = Color.White,
-                    focusedLabelColor = Color(0xFF10B981),
-                    focusedBorderColor = Color(0xFF10B981),
-                    unfocusedBorderColor = Color(0xFF334155),
-                    focusedContainerColor = Color(0xFF0F172A),
-                    unfocusedContainerColor = Color(0xFF0F172A)
-                ),
-                singleLine = true
+                label = "Domain / WORKGROUP",
+                modifier = Modifier.weight(0.75f),
+                onFocusChanged = onInputFocusChanged
             )
         }
 
-        OutlinedTextField(
+        SettingsOutlinedTextField(
             value = inputPassword,
             onValueChange = onPasswordChange,
-            modifier = Modifier
-                .fillMaxWidth()
-                .heightIn(min = 52.dp)
-                .focusable(),
-            label = { Text("Password") },
+            label = "Password",
+            modifier = Modifier.fillMaxWidth(),
             visualTransformation = PasswordVisualTransformation(),
-            colors = OutlinedTextFieldDefaults.colors(
-                focusedTextColor = Color.White,
-                unfocusedTextColor = Color.White,
-                focusedLabelColor = Color(0xFF10B981),
-                focusedBorderColor = Color(0xFF10B981),
-                unfocusedBorderColor = Color(0xFF334155),
-                focusedContainerColor = Color(0xFF0F172A),
-                unfocusedContainerColor = Color(0xFF0F172A)
-            ),
-            singleLine = true
+            onFocusChanged = onInputFocusChanged
         )
 
         Button(
@@ -908,7 +986,7 @@ fun EducationContentPane(
             modifier = Modifier
                 .widthIn(min = 280.dp)
                 .height(44.dp)
-                .focusable()
+                .settingsFocusGlow()
         ) {
             Text("Simpan Konten Edukasi", fontWeight = FontWeight.Bold)
         }
@@ -940,7 +1018,8 @@ fun CustomM3uPane(
     onSaveUrl: () -> Unit,
     onSync: () -> Unit,
     syncResult: String?,
-    isSyncing: Boolean
+    isSyncing: Boolean,
+    onInputFocusChanged: (Boolean) -> Unit
 ) {
     Column(
         modifier = Modifier
@@ -973,7 +1052,7 @@ fun CustomM3uPane(
                     ),
                     border = BorderStroke(1.dp, if (isFocused) Color(0xFF6366F1) else Color(0xFF334155)),
                     modifier = Modifier
-                        .focusable()
+                        .settingsFocusGlow()
                         .onFocusChanged { isFocused = it.isFocused }
                 ) {
                     Text(modeLabel)
@@ -987,21 +1066,12 @@ fun CustomM3uPane(
         if (syncMode == "custom_m3u") {
             Text("URL Playlist M3U / M3U8", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 14.sp)
 
-            OutlinedTextField(
+            SettingsOutlinedTextField(
                 value = inputUrl,
                 onValueChange = onUrlChange,
-                modifier = Modifier.fillMaxWidth().focusable(),
-                label = { Text("https://example.com/playlist.m3u") },
-                colors = OutlinedTextFieldDefaults.colors(
-                    focusedTextColor = Color.White,
-                    unfocusedTextColor = Color.White,
-                    focusedLabelColor = Color(0xFF10B981),
-                    focusedBorderColor = Color(0xFF10B981),
-                    unfocusedBorderColor = Color(0xFF334155),
-                    focusedContainerColor = Color(0xFF0F172A),
-                    unfocusedContainerColor = Color(0xFF0F172A)
-                ),
-                singleLine = true
+                label = "https://example.com/playlist.m3u",
+                modifier = Modifier.fillMaxWidth(),
+                onFocusChanged = onInputFocusChanged
             )
 
             Row(
@@ -1013,7 +1083,7 @@ fun CustomM3uPane(
                         onSync()
                     },
                     colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF10B981)),
-                    modifier = Modifier.focusable()
+                    modifier = Modifier.settingsFocusGlow()
                 ) {
                     Text(if (isSyncing) "Mensinkronkan..." else "Simpan & Sinkronisasi Playlist")
                 }
