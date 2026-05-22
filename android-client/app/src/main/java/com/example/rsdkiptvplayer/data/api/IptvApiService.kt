@@ -47,7 +47,11 @@ data class ConfigData(
     val lock_settings: Boolean?,
     val force_sync: Boolean?,
     val auto_start_on_boot: Boolean?,
-    val technician_pin: String?
+    val technician_pin: String?,
+    val education_video_path: String?,
+    val education_smb_username: String?,
+    val education_smb_password: String?,
+    val education_smb_domain: String?
 )
 
 data class ChannelResponse(

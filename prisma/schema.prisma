@@ -78,6 +78,10 @@ model DeviceConfig {
   forceSync         Boolean  @default(false)
   autoStartOnBoot   Boolean  @default(false)
   technicianPin     String   @default("2468")
+  educationVideoPath    String   @default("")
+  educationSmbUsername  String   @default("")
+  educationSmbPassword  String   @default("")
+  educationSmbDomain    String   @default("")
   createdAt         DateTime @default(now())
   updatedAt         DateTime @updatedAt
 }

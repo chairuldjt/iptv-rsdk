@@ -108,6 +108,12 @@ class IptvRepository(
                     config.technician_pin?.let { pin ->
                         dataStoreManager.setTechnicianPin(pin)
                     }
+                    config.education_video_path?.let { dataStoreManager.setEducationVideoPath(it) }
+                    dataStoreManager.setEducationSmbCredentials(
+                        config.education_smb_username ?: "",
+                        config.education_smb_password ?: "",
+                        config.education_smb_domain ?: ""
+                    )
                     if (!dataStoreManager.hasAutoStartLocalOverride()) {
                         dataStoreManager.setAutoStartOnBoot(config.auto_start_on_boot ?: false)
                     } else {

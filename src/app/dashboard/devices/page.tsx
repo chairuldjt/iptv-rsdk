@@ -47,6 +47,11 @@ async function saveDeviceConfigAction(formData: FormData) {
   const aspectRatio = formData.get('aspectRatio') as string
   const syncInterval = parseInt(formData.get('syncInterval') as string)
   const technicianPin = formData.get('technicianPin') as string
+  
+  const educationVideoPath = formData.get('educationVideoPath') as string
+  const educationSmbUsername = formData.get('educationSmbUsername') as string
+  const educationSmbPassword = formData.get('educationSmbPassword') as string
+  const educationSmbDomain = formData.get('educationSmbDomain') as string
 
   const isActive = formData.get('isActive') === 'on'
   const lockSettings = formData.get('lockSettings') === 'on'
@@ -76,6 +81,10 @@ async function saveDeviceConfigAction(formData: FormData) {
         lockSettings,
         forceSync,
         autoStartOnBoot,
+        educationVideoPath: educationVideoPath || '',
+        educationSmbUsername: educationSmbUsername || '',
+        educationSmbPassword: educationSmbPassword || '',
+        educationSmbDomain: educationSmbDomain || '',
       },
     })
 
@@ -304,6 +313,61 @@ export default async function DevicesPage({
                     required
                     maxLength={8}
                     className="w-full px-4 py-2 bg-slate-900 border border-slate-800 rounded-xl text-white text-sm focus:outline-none focus:border-primary font-mono text-center"
+                  />
+                </div>
+              </div>
+
+              {/* SMB Education Settings Block */}
+              <div className="pt-4 border-t border-border/60 space-y-4">
+                <div className="flex items-center gap-2 text-indigo-400">
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
+                  </svg>
+                  <span className="text-xs font-extrabold uppercase tracking-wider">Konten Edukasi (SMB Share)</span>
+                </div>
+
+                <div>
+                  <label className="block text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-1">Jalur Folder Video (SMB Share)</label>
+                  <input
+                    type="text"
+                    name="educationVideoPath"
+                    defaultValue={editingDevice.config?.educationVideoPath || ''}
+                    placeholder="Contoh: \\10.45.128.129\edukasi"
+                    className="w-full px-4 py-2 bg-slate-900 border border-slate-800 rounded-xl text-white text-sm focus:outline-none focus:border-primary font-mono"
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-1">Username SMB</label>
+                    <input
+                      type="text"
+                      name="educationSmbUsername"
+                      defaultValue={editingDevice.config?.educationSmbUsername || ''}
+                      placeholder="Guest jika kosong"
+                      className="w-full px-4 py-2 bg-slate-900 border border-slate-800 rounded-xl text-white text-sm focus:outline-none focus:border-primary"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-1">Domain SMB</label>
+                    <input
+                      type="text"
+                      name="educationSmbDomain"
+                      defaultValue={editingDevice.config?.educationSmbDomain || ''}
+                      placeholder="Opsional"
+                      className="w-full px-4 py-2 bg-slate-900 border border-slate-800 rounded-xl text-white text-sm focus:outline-none focus:border-primary"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-1">Password SMB</label>
+                  <input
+                    type="password"
+                    name="educationSmbPassword"
+                    defaultValue={editingDevice.config?.educationSmbPassword || ''}
+                    placeholder="Kosongkan jika tanpa password"
+                    className="w-full px-4 py-2 bg-slate-900 border border-slate-800 rounded-xl text-white text-sm focus:outline-none focus:border-primary"
                   />
                 </div>
               </div>

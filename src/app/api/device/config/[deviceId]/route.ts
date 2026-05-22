@@ -42,6 +42,10 @@ export async function GET(
           forceSync: false,
           autoStartOnBoot: false,
           technicianPin: '2468',
+          educationVideoPath: '',
+          educationSmbUsername: '',
+          educationSmbPassword: '',
+          educationSmbDomain: '',
         },
       })
     }
@@ -71,6 +75,10 @@ export async function GET(
         auto_start_on_boot: config.autoStartOnBoot,
         technician_pin_enabled: true,
         technician_pin: config.technicianPin,
+        education_video_path: config.educationVideoPath,
+        education_smb_username: config.educationSmbUsername,
+        education_smb_password: config.educationSmbPassword,
+        education_smb_domain: config.educationSmbDomain,
       },
     })
   } catch (error: any) {
