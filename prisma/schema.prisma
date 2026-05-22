@@ -1,0 +1,104 @@
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model Playlist {
+  id            Int        @id @default(autoincrement())
+  name          String
+  filePath      String?
+  sourceUrl     String?    @db.Text
+  totalChannels Int        @default(0)
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
+  categories    Category[]
+  channels      Channel[]
+  devices       Device[]
+}
+
+model Category {
+  id         Int       @id @default(autoincrement())
+  playlistId Int
+  playlist   Playlist  @relation(fields: [playlistId], references: [id], onDelete: Cascade)
+  name       String
+  sortOrder  Int       @default(0)
+  isActive   Boolean   @default(true)
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+  channels   Channel[]
+}
+
+model Channel {
+  id         Int       @id @default(autoincrement())
+  playlistId Int
+  playlist   Playlist  @relation(fields: [playlistId], references: [id], onDelete: Cascade)
+  categoryId Int?
+  category   Category? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  name       String
+  logoUrl    String?    @db.Text
+  streamUrl  String     @db.Text
+  sortOrder  Int       @default(0)
+  isActive   Boolean   @default(true)
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+}
+
+model Device {
+  id             Int           @id @default(autoincrement())
+  deviceId       String        @unique
+  deviceName     String        @default("Android STB")
+  isActive       Boolean       @default(true)
+  playlistId     Int?
+  playlist       Playlist?     @relation(fields: [playlistId], references: [id], onDelete: SetNull)
+  appVersion     String?
+  androidVersion String?
+  lastIp         String?
+  macAddress     String?
+  lastOnline     DateTime?
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+  config         DeviceConfig?
+  logs           DeviceLog[]
+}
+
+model DeviceConfig {
+  id                Int      @id @default(autoincrement())
+  deviceId          String?  @unique
+  device            Device?  @relation(fields: [deviceId], references: [deviceId], onDelete: Cascade)
+  defaultCategory   String   @default("National TV")
+  defaultChannelId  Int?
+  aspectRatio       String   @default("fit") // "fit", "stretch", "zoom", "16_9", "4_3"
+  syncInterval      Int      @default(1800) // seconds
+  startScreen       String   @default("live_tv") // "live_tv", "category_list", "home_screen"
+  lockSettings      Boolean  @default(true)
+  forceSync         Boolean  @default(false)
+  autoStartOnBoot   Boolean  @default(false)
+  technicianPin     String   @default("2468")
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+}
+
+model DeviceLog {
+  id           Int      @id @default(autoincrement())
+  deviceId     String
+  device       Device   @relation(fields: [deviceId], references: [deviceId], onDelete: Cascade)
+  errorType    String
+  errorMessage String
+  channelId    Int?
+  streamUrl    String?
+  androidSdk   Int?
+  createdAt    DateTime @default(now())
+}
+
+model User {
+  id        Int      @id @default(autoincrement())
+  username  String   @unique
+  password  String   // Hashed password
+  role      String   @default("admin")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}

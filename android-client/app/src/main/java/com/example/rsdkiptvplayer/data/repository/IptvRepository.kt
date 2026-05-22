@@ -1,0 +1,364 @@
+package com.example.rsdkiptvplayer.data.repository
+
+import android.app.ActivityManager
+import android.content.Context
+import android.os.Build
+import android.os.SystemClock
+import com.example.rsdkiptvplayer.data.api.*
+import com.example.rsdkiptvplayer.data.cache.ChannelDao
+import com.example.rsdkiptvplayer.data.cache.ChannelEntity
+import com.example.rsdkiptvplayer.data.datastore.DataStoreManager
+import com.example.rsdkiptvplayer.data.parser.M3uParser
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.withContext
+import java.net.Inet4Address
+import java.net.NetworkInterface
+import java.text.SimpleDateFormat
+import java.util.*
+
+class IptvRepository(
+    private val context: Context,
+    private val channelDao: ChannelDao,
+    private val dataStoreManager: DataStoreManager
+) {
+
+    val allChannelsFlow: Flow<List<ChannelEntity>> = channelDao.getAllChannelsFlow()
+    val allCategoriesFlow: Flow<List<String>> = channelDao.getAllCategoriesFlow()
+    val serverUrlFlow: Flow<String> = dataStoreManager.serverUrlFlow
+    val lockSettingsFlow: Flow<Boolean> = dataStoreManager.lockSettingsFlow
+    val autoStartFlow: Flow<Boolean> = dataStoreManager.autoStartFlow
+    val aspectRatioFlow: Flow<String> = dataStoreManager.aspectRatioFlow
+    val diagnosticLogsFlow: Flow<List<String>> = dataStoreManager.diagnosticLogsFlow
+
+    // Handshake & Self Register on boot/startup
+    suspend fun registerDevice(): Boolean {
+        val deviceId = dataStoreManager.getDeviceId()
+        val serverUrl = dataStoreManager.getServerUrl()
+        val apiService = RetrofitClient.getService(serverUrl)
+
+        val request = RegisterRequest(
+            device_id = deviceId,
+            device_name = "${Build.MANUFACTURER} ${Build.MODEL}",
+            app_version = "1.0.0",
+            android_version = Build.VERSION.RELEASE,
+            mac_address = getMacAddress(),
+            local_ip = getLocalIpAddress()
+        )
+
+        dataStoreManager.addLog("Registering device on endpoint $serverUrl...")
+        return try {
+            val response = apiService.registerDevice(request)
+            if (response.isSuccessful && response.body() != null) {
+                val resBody = response.body()!!
+                dataStoreManager.addLog("Registration result: ${resBody.message}")
+                if (resBody.status && resBody.data != null) {
+                    dataStoreManager.setSyncInterval(resBody.data.sync_interval)
+                    resBody.data.active
+                } else {
+                    // Registered but deactivated by admin
+                    dataStoreManager.addLog("Device has been DEACTIVATED by admin")
+                    false
+                }
+            } else {
+                dataStoreManager.addLog("Registration failed: HTTP ${response.code()}")
+                // Fallback to locally stored active preference if server fails, default true
+                true
+            }
+        } catch (e: Exception) {
+            dataStoreManager.addLog("Registration connection error: ${e.message}")
+            true // Allow offline mode
+        }
+    }
+
+    // Sync Server configurations
+    suspend fun syncConfig(): Boolean {
+        val syncMode = dataStoreManager.getSyncMode()
+        if (syncMode == "custom_m3u") {
+            return true
+        }
+
+        val deviceId = dataStoreManager.getDeviceId()
+        val serverUrl = dataStoreManager.getServerUrl()
+        val apiService = RetrofitClient.getService(serverUrl)
+
+        dataStoreManager.addLog("Syncing configuration from server...")
+        try {
+            val response = apiService.getDeviceConfig(deviceId)
+            if (response.isSuccessful && response.body() != null) {
+                val body = response.body()!!
+                if (body.status && body.data != null) {
+                    val config = body.data
+                    dataStoreManager.setLockSettings(config.lock_settings ?: true)
+                    dataStoreManager.setSyncInterval(config.sync_interval ?: 1800)
+                    dataStoreManager.setAspectRatio(config.aspect_ratio ?: "fit")
+                    if (!dataStoreManager.hasAutoStartLocalOverride()) {
+                        dataStoreManager.setAutoStartOnBoot(config.auto_start_on_boot ?: false)
+                    } else {
+                        dataStoreManager.addLog("Auto-start local setting preserved from technician mode.")
+                    }
+
+                    if (config.force_sync == true) {
+                        dataStoreManager.addLog("Remote trigger: FORCE SYNC enabled!")
+                        syncChannels()
+                    }
+                    dataStoreManager.addLog("Server config sync successful!")
+                    return config.active
+                }
+            }
+        } catch (e: Exception) {
+            dataStoreManager.addLog("Config sync network error: ${e.message}")
+        }
+        return true
+    }
+
+    // Sync local custom M3U playlist
+    suspend fun syncLocalM3u(url: String): Pair<Boolean, String> {
+        val normalizedUrl = url.trim()
+        if (normalizedUrl.isEmpty()) {
+            return Pair(false, "URL M3U kosong.")
+        }
+
+        dataStoreManager.addLog("Mode M3U custom aktif. Membersihkan cache channel lama...")
+        return withContext(Dispatchers.IO) {
+            try {
+                channelDao.clearAll()
+                dataStoreManager.setCustomM3uUrl(normalizedUrl)
+                dataStoreManager.setSyncMode("custom_m3u")
+                dataStoreManager.addLog("Mengunduh playlist M3U dari: $normalizedUrl...")
+
+                val connection = java.net.URL(normalizedUrl).openConnection() as java.net.HttpURLConnection
+                connection.connectTimeout = 15000
+                connection.readTimeout = 15000
+                connection.requestMethod = "GET"
+                connection.connect()
+
+                if (connection.responseCode == 200) {
+                    val content = connection.inputStream.bufferedReader().use { it.readText() }
+                    val channels = M3uParser.parse(content)
+                    if (channels.isNotEmpty()) {
+                        channelDao.insertAll(channels)
+                        dataStoreManager.setLastSyncTimestamp(System.currentTimeMillis())
+                        dataStoreManager.addLog("Sukses sinkronisasi M3U! Berhasil memuat ${channels.size} saluran.")
+                        Pair(true, "Sukses: Berhasil memuat ${channels.size} saluran dari M3U.")
+                    } else {
+                        dataStoreManager.addLog("Gagal: M3U kosong atau format tidak valid. Cache channel lama sudah dikosongkan.")
+                        Pair(false, "Format playlist M3U tidak valid atau tidak ditemukan saluran. Cache lama sudah dikosongkan.")
+                    }
+                } else {
+                    dataStoreManager.addLog("Gagal mengunduh M3U: HTTP ${connection.responseCode}")
+                    Pair(false, "Server merespon dengan HTTP ${connection.responseCode}. Cache lama sudah dikosongkan.")
+                }
+            } catch (e: Exception) {
+                dataStoreManager.addLog("Error mengunduh M3U: ${e.message}")
+                Pair(false, "Koneksi gagal atau URL salah: ${e.localizedMessage}. Cache lama sudah dikosongkan.")
+            }
+        }
+    }
+
+    // Sync remote channel list to Room DB Cache
+    suspend fun syncChannels(): Boolean {
+        val syncMode = dataStoreManager.getSyncMode()
+        if (syncMode == "custom_m3u") {
+            val customUrl = dataStoreManager.getCustomM3uUrl()
+            if (customUrl.isNotEmpty()) {
+                val res = syncLocalM3u(customUrl)
+                return res.first
+            }
+            return false
+        }
+
+        val deviceId = dataStoreManager.getDeviceId()
+        val serverUrl = dataStoreManager.getServerUrl()
+        val apiService = RetrofitClient.getService(serverUrl)
+
+        dataStoreManager.addLog("Syncing channel playlist from server...")
+        try {
+            val response = apiService.getDeviceChannels(deviceId)
+            if (response.isSuccessful && response.body() != null) {
+                val body = response.body()!!
+                if (body.status && body.data != null) {
+                    val remoteChannels = body.data
+                    val entities = remoteChannels.map {
+                        ChannelEntity(
+                            id = it.id,
+                            name = it.name,
+                            logo = it.logo,
+                            groupName = it.group,
+                            streamUrl = it.stream_url,
+                            sortOrder = it.sort_order,
+                            isActive = it.active
+                        )
+                    }
+
+                    // Save cache to Room
+                    channelDao.clearAll()
+                    channelDao.insertAll(entities)
+                    
+                    dataStoreManager.setLastSyncTimestamp(System.currentTimeMillis())
+                    dataStoreManager.addLog("Playlist synced successfully. Received ${entities.size} channels.")
+                    return true
+                }
+            } else {
+                dataStoreManager.addLog("Failed syncing channels: HTTP ${response.code()}")
+            }
+        } catch (e: Exception) {
+            dataStoreManager.addLog("Channels sync network error: ${e.message}")
+        }
+        return false
+    }
+
+    // Send Status Heartbeat to Web Admin
+    suspend fun sendHeartbeat(currentChannelId: Int?): StatusData? {
+        val deviceId = dataStoreManager.getDeviceId()
+        val serverUrl = dataStoreManager.getServerUrl()
+        val apiService = RetrofitClient.getService(serverUrl)
+
+        val request = StatusRequest(
+            device_id = deviceId,
+            current_channel_id = currentChannelId,
+            uptime_seconds = SystemClock.elapsedRealtime() / 1000,
+            memory_free_mb = getFreeMemory(),
+            cpu_usage_percent = 15.0f, // Fallback placeholder
+            local_ip = getLocalIpAddress()
+        )
+
+        try {
+            val response = apiService.sendHeartbeat(request)
+            if (response.isSuccessful && response.body() != null) {
+                val body = response.body()!!
+                if (body.status && body.data != null) {
+                    val status = body.data
+                    dataStoreManager.setLockSettings(status.lock_settings)
+                    if (status.force_sync) {
+                        dataStoreManager.addLog("Heartbeat response trigger: Syncing channels now.")
+                        syncChannels()
+                    }
+                    return status
+                }
+            }
+        } catch (e: Exception) {
+            // Heartbeat failed (Offline / No Server Connection)
+        }
+        return null
+    }
+
+    // Log error to Remote Web Admin
+    suspend fun logError(errorType: String, message: String, channelId: Int?, streamUrl: String?) {
+        val deviceId = dataStoreManager.getDeviceId()
+        val serverUrl = dataStoreManager.getServerUrl()
+        val apiService = RetrofitClient.getService(serverUrl)
+
+        dataStoreManager.addLog("⚠️ ERROR ($errorType): $message")
+
+        val timestamp = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ssXXX", Locale.getDefault()).format(Date())
+        val request = LogRequest(
+            device_id = deviceId,
+            error_type = errorType,
+            error_message = message,
+            channel_id = channelId,
+            stream_url = streamUrl,
+            android_sdk = Build.VERSION.SDK_INT,
+            timestamp = timestamp
+        )
+
+        try {
+            apiService.sendErrorLog(request)
+        } catch (e: Exception) {
+            // Safe ignore if endpoint is down, already saved locally
+        }
+    }
+
+    // Direct connection test
+    suspend fun testConnection(targetUrl: String): Pair<Boolean, String> {
+        return try {
+            val apiService = RetrofitClient.getService(targetUrl)
+            val deviceId = dataStoreManager.getDeviceId()
+            
+            // Register/handshake the device on this server first so it is present in the database
+            val request = RegisterRequest(
+                device_id = deviceId,
+                device_name = "${Build.MANUFACTURER} ${Build.MODEL}",
+                app_version = "1.0.0",
+                android_version = Build.VERSION.RELEASE,
+                mac_address = getMacAddress(),
+                local_ip = getLocalIpAddress()
+            )
+            
+            val regResponse = apiService.registerDevice(request)
+            if (!regResponse.isSuccessful) {
+                return Pair(false, "Registrasi perangkat gagal: HTTP ${regResponse.code()}")
+            }
+            
+            val response = apiService.getDeviceConfig(deviceId)
+            if (response.isSuccessful) {
+                Pair(true, "Terhubung ke server! HTTP ${response.code()}")
+            } else {
+                Pair(false, "Respon server error: HTTP ${response.code()}")
+            }
+        } catch (e: Exception) {
+            Pair(false, "Koneksi Gagal: ${e.localizedMessage}")
+        }
+    }
+
+    // Clear Room Cache
+    suspend fun clearChannelCache() {
+        channelDao.clearAll()
+        dataStoreManager.addLog("Local channel cache cleared.")
+    }
+
+    // Total Factory Reset
+    suspend fun factoryReset() {
+        channelDao.clearAll()
+        dataStoreManager.clearAll()
+    }
+
+    // Helper functions
+    fun getLocalIpAddress(): String {
+        try {
+            val interfaces = NetworkInterface.getNetworkInterfaces()
+            while (interfaces.hasMoreElements()) {
+                val networkInterface = interfaces.nextElement()
+                val addresses = networkInterface.inetAddresses
+                while (addresses.hasMoreElements()) {
+                    val address = addresses.nextElement()
+                    if (!address.isLoopbackAddress && address is Inet4Address) {
+                        return address.hostAddress ?: "127.0.0.1"
+                    }
+                }
+            }
+        } catch (ex: Exception) {
+            ex.printStackTrace()
+        }
+        return "127.0.0.1"
+    }
+
+    private fun getFreeMemory(): Long {
+        val mi = ActivityManager.MemoryInfo()
+        val activityManager = context.getSystemService(Context.ACTIVITY_SERVICE) as ActivityManager
+        activityManager.getMemoryInfo(mi)
+        return mi.availMem / 1048576L // convert to MB
+    }
+
+    private fun getMacAddress(): String? {
+        try {
+            val all = Collections.list(NetworkInterface.getNetworkInterfaces())
+            for (nif in all) {
+                if (!nif.name.equals("wlan0", ignoreCase = true) && !nif.name.equals("eth0", ignoreCase = true)) continue
+                val macBytes = nif.hardwareAddress ?: return null
+                val res1 = StringBuilder()
+                for (b in macBytes) {
+                    res1.append(String.format("%02X:", b))
+                }
+                if (res1.isNotEmpty()) {
+                    res1.deleteCharAt(res1.length - 1)
+                }
+                return res1.toString()
+            }
+        } catch (ex: Exception) {
+            ex.printStackTrace()
+        }
+        return null
+    }
+}
