@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import prisma from '@/lib/db'
 import { getErrorMessage } from '@/lib/errors'
+import { DEFAULT_CUSTOM_M3U_URL, DEFAULT_SYNC_MODE } from '@/lib/defaults'
 
 export async function GET(
   request: Request,
@@ -38,6 +39,8 @@ export async function GET(
           defaultCategory: 'National TV',
           aspectRatio: 'fit',
           syncInterval: 1800,
+          syncMode: DEFAULT_SYNC_MODE,
+          customM3uUrl: DEFAULT_CUSTOM_M3U_URL,
           startScreen: 'live_tv',
           lockSettings: true,
           forceSync: false,
@@ -76,9 +79,9 @@ export async function GET(
       data: {
         device_id: device.deviceId,
         active: device.isActive,
-        playlist_id: config.syncMode === 'custom' ? null : (globalPlaylist?.id || null),
-        sync_mode: config.syncMode || 'api',
-        custom_m3u_url: config.customM3uUrl || '',
+        playlist_id: (config.syncMode || DEFAULT_SYNC_MODE) === 'custom' ? null : (globalPlaylist?.id || null),
+        sync_mode: config.syncMode || DEFAULT_SYNC_MODE,
+        custom_m3u_url: config.customM3uUrl || DEFAULT_CUSTOM_M3U_URL,
         default_category: config.defaultCategory,
         default_channel_id: config.defaultChannelId,
         aspect_ratio: config.aspectRatio,

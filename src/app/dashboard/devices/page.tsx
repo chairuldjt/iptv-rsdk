@@ -5,6 +5,7 @@ import DeviceConfigForm from '@/components/DeviceConfigForm'
 import { redirect } from 'next/navigation'
 import { getOnlineThreshold } from '@/lib/time'
 import { cleanupOfflineDevices, getOfflineAutoDeleteDays, setOfflineAutoDeleteDays } from '@/lib/settings'
+import { DEFAULT_CUSTOM_M3U_URL, DEFAULT_SYNC_MODE } from '@/lib/defaults'
 
 export const revalidate = 0 // Disable cache for live devices
 type DeviceStatusFilter = 'all' | 'online' | 'offline' | 'disabled'
@@ -126,8 +127,8 @@ async function saveDeviceConfigAction(formData: FormData) {
       data: {
         aspectRatio,
         syncInterval: syncInterval || 1800,
-        syncMode: syncMode || 'api',
-        customM3uUrl: customM3uUrl || '',
+        syncMode: syncMode || DEFAULT_SYNC_MODE,
+        customM3uUrl: (syncMode || DEFAULT_SYNC_MODE) === 'custom' ? (customM3uUrl || DEFAULT_CUSTOM_M3U_URL) : '',
         technicianPin: technicianPin || '2468',
         lockSettings,
         forceSync,
@@ -324,12 +325,12 @@ export default async function DevicesPage({
                         </td>
                         <td className="p-4">
                           <div className="flex flex-col gap-1">
-                            <span className={`px-2 py-0.5 rounded text-[10px] font-bold w-fit uppercase ${d.config?.syncMode === 'custom' ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20' : 'bg-indigo-500/10 text-indigo-400 border border-indigo-500/20'}`}>
-                              {d.config?.syncMode === 'custom' ? 'Custom M3U' : 'API Server'}
+                            <span className={`px-2 py-0.5 rounded text-[10px] font-bold w-fit uppercase ${(d.config?.syncMode || DEFAULT_SYNC_MODE) === 'custom' ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20' : 'bg-indigo-500/10 text-indigo-400 border border-indigo-500/20'}`}>
+                              {(d.config?.syncMode || DEFAULT_SYNC_MODE) === 'custom' ? 'Custom M3U' : 'API Server'}
                             </span>
-                            {d.config?.syncMode === 'custom' ? (
-                              <div className="text-[10px] text-slate-500 truncate max-w-[150px] font-mono" title={d.config.customM3uUrl || ''}>
-                                {d.config.customM3uUrl || 'No URL'}
+                            {(d.config?.syncMode || DEFAULT_SYNC_MODE) === 'custom' ? (
+                              <div className="text-[10px] text-slate-500 truncate max-w-[150px] font-mono" title={d.config?.customM3uUrl || DEFAULT_CUSTOM_M3U_URL}>
+                                {d.config?.customM3uUrl || DEFAULT_CUSTOM_M3U_URL}
                               </div>
                             ) : (
                               <div className="text-[10px] text-slate-500 italic">Centralized</div>

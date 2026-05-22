@@ -74,6 +74,8 @@ http://10.55.1.5:9000
 - `custom`: default APK saat ini. Channel diambil dari URL M3U custom/fallback lokal.
 - `api`: channel diambil dari Web Admin/API global playlist.
 
+Android tetap mengambil remote config dari Web Admin walau sedang berada di mode `custom`, sehingga perubahan mode dari dashboard dapat diterapkan tanpa reinstall.
+
 Fallback custom M3U lokal saat mode `custom` aktif dan belum ada URL tersimpan:
 ```kotlin
 http://10.0.0.1/iptv/iptv_rsdk.m3u

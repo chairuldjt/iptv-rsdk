@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import prisma from '@/lib/db'
 import { getErrorMessage } from '@/lib/errors'
+import { DEFAULT_CUSTOM_M3U_URL, DEFAULT_SYNC_MODE } from '@/lib/defaults'
 
 export async function POST(request: Request) {
   try {
@@ -69,6 +70,8 @@ export async function POST(request: Request) {
             defaultCategory: 'National TV',
             aspectRatio: 'fit',
             syncInterval: 1800,
+            syncMode: DEFAULT_SYNC_MODE,
+            customM3uUrl: DEFAULT_CUSTOM_M3U_URL,
             startScreen: 'live_tv',
             lockSettings: true,
             forceSync: false,

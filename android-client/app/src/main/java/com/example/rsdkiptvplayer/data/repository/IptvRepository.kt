@@ -85,12 +85,6 @@ class IptvRepository(
             return true
         }
 
-        val syncMode = dataStoreManager.getSyncMode()
-        if (syncMode == "custom") {
-            dataStoreManager.addLog("Config sync skipped: Device is in Custom M3U mode.")
-            return true
-        }
-
         val deviceId = dataStoreManager.getDeviceId()
         val serverUrl = dataStoreManager.getServerUrl()
 

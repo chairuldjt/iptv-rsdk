@@ -86,7 +86,7 @@ model DeviceConfig {
   defaultChannelId  Int?
   aspectRatio       String   @default("fit") // "fit", "stretch", "zoom", "16_9", "4_3"
   syncInterval      Int      @default(1800) // seconds
-  syncMode          String?  @default("api") // "api" (centralized) or "custom" (M3U URL)
+  syncMode          String?  @default("custom") // "api" (centralized) or "custom" (M3U URL)
   customM3uUrl      String?  @db.Text
   startScreen       String   @default("live_tv") // "live_tv", "category_list", "home_screen"
   lockSettings      Boolean  @default(true)

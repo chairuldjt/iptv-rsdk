@@ -26,6 +26,7 @@ Jika aplikasi digunakan dalam mode M3U (bukan mode API Server), Anda bisa menyet
   prefs[CUSTOM_M3U_URL] ?: "http://10.0.0.1/iptv/iptv_rsdk.m3u"
   ```
 - **Catatan**: Default source APK saat ini adalah **Custom M3U**. URL M3U fallback ini akan dipakai jika belum ada URL M3U tersimpan di DataStore.
+- **Web Admin**: Default config device baru juga mengikuti mode `custom` dengan URL yang sama, agar tampilan Web dan Settings Android sinkron.
 
 ### C. Default Mode Sinkronisasi (Sync Mode)
 Menentukan apakah APK bawaan langsung mencari playlist dari Server API atau dari M3U Custom.
@@ -38,6 +39,7 @@ Menentukan apakah APK bawaan langsung mencari playlist dari Server API atau dari
   // Jika ingin default langsung pakai API Server:
   prefs[SYNC_MODE] ?: "api"
   ```
+- **Catatan**: Walaupun default-nya `custom`, Android tetap melakukan config sync ke Web Admin. Jadi admin masih bisa mengubah device ke `API Server` dari remote config.
 
 ### D. Default Status Koneksi Server API (Enabled / Disabled)
 Menentukan apakah saat pertama kali aplikasi diinstal, koneksi ke backend server langsung aktif atau tidak (offline).

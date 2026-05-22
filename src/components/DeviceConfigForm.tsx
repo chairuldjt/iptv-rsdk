@@ -3,6 +3,7 @@
 import React, { useState } from 'react'
 import type { Device, DeviceConfig } from '@prisma/client'
 import ConfirmForm from './ConfirmForm'
+import { DEFAULT_CUSTOM_M3U_URL, DEFAULT_SYNC_MODE } from '@/lib/defaults'
 
 interface DeviceConfigFormProps {
   editingDevice: Device & { config: DeviceConfig | null }
@@ -16,7 +17,7 @@ export default function DeviceConfigForm({
   clearDeviceCacheAction,
 }: DeviceConfigFormProps) {
   // Use controlled states to ensure UI reflects database changes and user input correctly
-  const [syncMode, setSyncMode] = useState(editingDevice.config?.syncMode || 'api')
+  const [syncMode, setSyncMode] = useState(editingDevice.config?.syncMode || DEFAULT_SYNC_MODE)
   const [lockSettings, setLockSettings] = useState(editingDevice.config?.lockSettings ?? true)
   const [autoStart, setAutoStart] = useState(editingDevice.config?.autoStartOnBoot ?? false)
 
@@ -56,7 +57,7 @@ export default function DeviceConfigForm({
               <input
                 type="url"
                 name="customM3uUrl"
-                defaultValue={editingDevice.config?.customM3uUrl || ''}
+                defaultValue={editingDevice.config?.customM3uUrl || DEFAULT_CUSTOM_M3U_URL}
                 required={syncMode === 'custom'}
                 placeholder="http://your-server.com/playlist.m3u"
                 className="w-full px-4 py-2 bg-slate-900 border border-slate-800 rounded-xl text-white text-sm focus:outline-none focus:border-primary font-mono"
