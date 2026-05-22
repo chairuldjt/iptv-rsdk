@@ -8,9 +8,7 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.interaction.MutableInteractionSource
-import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
@@ -22,7 +20,6 @@ import androidx.compose.ui.draw.scale
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
-import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shadow
@@ -264,28 +261,61 @@ private fun HospitalityMenuBar(
 ) {
     var selectedIndex by remember { mutableIntStateOf(2) }
     var dragAmount by remember { mutableFloatStateOf(0f) }
-    val menuFocusRequesters = remember { List(5) { FocusRequester() } }
-    val menuActions = listOf(
-        onEducationClick,
-        onServiceClick,
-        onTvClick,
-        onYoutubeClick,
-        onSettingsClick
+    val carouselFocusRequester = remember { FocusRequester() }
+    val menuItems = listOf(
+        HospitalityCarouselItem(
+            icon = "▶",
+            title = "EDUKASI",
+            subtitle = if (educationPath.isBlank()) "Set path" else "Video RS",
+            accent = Color(0xFF86EFAC),
+            action = onEducationClick
+        ),
+        HospitalityCarouselItem(
+            icon = "✚",
+            title = "LAYANAN",
+            subtitle = "Informasi RS",
+            accent = Color(0xFFE7D8A0),
+            action = onServiceClick
+        ),
+        HospitalityCarouselItem(
+            icon = "TV",
+            title = "TV CHANNEL",
+            subtitle = "$channelsCount saluran",
+            accent = Color(0xFFFFE9A6),
+            action = onTvClick
+        ),
+        HospitalityCarouselItem(
+            icon = "▶",
+            title = "YOUTUBE",
+            subtitle = "Dikunci",
+            accent = Color(0xFF94A3B8),
+            action = onYoutubeClick
+        ),
+        HospitalityCarouselItem(
+            icon = "⚙",
+            title = "SETTING",
+            subtitle = "Sistem",
+            accent = Color(0xFF7DD3FC),
+            action = onSettingsClick
+        )
     )
 
     LaunchedEffect(Unit) {
-        menuFocusRequesters[selectedIndex].requestFocus()
+        carouselFocusRequester.requestFocus()
     }
 
     fun moveSelection(delta: Int) {
-        selectedIndex = (selectedIndex + delta).coerceIn(0, menuActions.lastIndex)
-        menuFocusRequesters[selectedIndex].requestFocus()
+        selectedIndex = wrapCarouselIndex(selectedIndex + delta, menuItems.size)
+        carouselFocusRequester.requestFocus()
     }
 
     Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.fillMaxWidth()) {
-        Row(
+        Box(
             modifier = Modifier
                 .fillMaxWidth()
+                .height(172.dp)
+                .focusRequester(carouselFocusRequester)
+                .focusable()
                 .onPreviewKeyEvent { keyEvent ->
                     if (keyEvent.type != KeyEventType.KeyDown) {
                         return@onPreviewKeyEvent false
@@ -301,13 +331,12 @@ private fun HospitalityMenuBar(
                             true
                         }
                         Key.DirectionCenter, Key.Enter, Key.NumPadEnter -> {
-                            menuActions[selectedIndex].invoke()
+                            menuItems[selectedIndex].action()
                             true
                         }
                         else -> false
                     }
                 }
-                .horizontalScroll(rememberScrollState())
                 .pointerInput(Unit) {
                     awaitPointerEventScope {
                         while (true) {
@@ -320,12 +349,7 @@ private fun HospitalityMenuBar(
                                 isDragging = event.changes.any { it.pressed }
                                 dragAmount += change.position.x - change.previousPosition.x
                                 if (abs(dragAmount) > 70f) {
-                                    selectedIndex = if (dragAmount < 0f) {
-                                        (selectedIndex + 1).coerceAtMost(menuActions.lastIndex)
-                                    } else {
-                                        (selectedIndex - 1).coerceAtLeast(0)
-                                    }
-                                    menuFocusRequesters[selectedIndex].requestFocus()
+                                    moveSelection(if (dragAmount < 0f) 1 else -1)
                                     dragAmount = 0f
                                     change.consume()
                                 }
@@ -333,84 +357,54 @@ private fun HospitalityMenuBar(
                         }
                     }
                 }
-                .padding(horizontal = 24.dp, vertical = 10.dp),
-            horizontalArrangement = Arrangement.spacedBy(20.dp, Alignment.CenterHorizontally),
-            verticalAlignment = Alignment.Bottom
+                .padding(horizontal = 24.dp, vertical = 8.dp),
+            contentAlignment = Alignment.Center
         ) {
-            HospitalityMenuButton(
-                icon = "▶",
-                title = "EDUKASI",
-                subtitle = if (educationPath.isBlank()) "Set path" else "Video RS",
-                accent = Color(0xFF86EFAC),
-                compact = true,
-                selected = selectedIndex == 0,
-                focusRequester = menuFocusRequesters[0],
-                onFocused = { selectedIndex = 0 },
-                onClick = {
-                    selectedIndex = 0
-                    onEducationClick()
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(18.dp, Alignment.CenterHorizontally),
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                listOf(-2, -1, 0, 1, 2).forEach { offset ->
+                    val itemIndex = wrapCarouselIndex(selectedIndex + offset, menuItems.size)
+                    val item = menuItems[itemIndex]
+                    HospitalityCarouselCard(
+                        item = item,
+                        offset = offset,
+                        onClick = {
+                            if (offset == 0) {
+                                item.action()
+                            } else {
+                                selectedIndex = itemIndex
+                                carouselFocusRequester.requestFocus()
+                            }
+                        }
+                    )
                 }
-            )
-            HospitalityMenuButton(
-                icon = "✚",
-                title = "LAYANAN",
-                subtitle = "Informasi RS",
-                accent = Color(0xFFE7D8A0),
-                compact = true,
-                selected = selectedIndex == 1,
-                focusRequester = menuFocusRequesters[1],
-                onFocused = { selectedIndex = 1 },
-                onClick = {
-                    selectedIndex = 1
-                    onServiceClick()
-                }
-            )
-            HospitalityMenuButton(
-                icon = "TV",
-                title = "TV CHANNEL",
-                subtitle = "$channelsCount saluran",
-                accent = Color(0xFFFFE9A6),
-                selected = selectedIndex == 2,
-                focusRequester = menuFocusRequesters[2],
-                onFocused = { selectedIndex = 2 },
-                onClick = {
-                    selectedIndex = 2
-                    onTvClick()
-                }
-            )
-            HospitalityMenuButton(
-                icon = "▶",
-                title = "YOUTUBE",
-                subtitle = "Dikunci",
-                accent = Color(0xFF94A3B8),
-                compact = true,
-                selected = selectedIndex == 3,
-                focusRequester = menuFocusRequesters[3],
-                onFocused = { selectedIndex = 3 },
-                onClick = {
-                    selectedIndex = 3
-                    onYoutubeClick()
-                }
-            )
-            HospitalityMenuButton(
-                icon = "⚙",
-                title = "SETTING",
-                subtitle = "Sistem",
-                accent = Color(0xFF7DD3FC),
-                compact = true,
-                selected = selectedIndex == 4,
-                focusRequester = menuFocusRequesters[4],
-                onFocused = { selectedIndex = 4 },
-                onClick = {
-                    selectedIndex = 4
-                    onSettingsClick()
-                }
-            )
+            }
         }
 
+        Spacer(modifier = Modifier.height(4.dp))
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(7.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            menuItems.indices.forEach { index ->
+                Box(
+                    modifier = Modifier
+                        .width(if (index == selectedIndex) 22.dp else 7.dp)
+                        .height(7.dp)
+                        .clip(RoundedCornerShape(10.dp))
+                        .background(
+                            if (index == selectedIndex) menuItems[selectedIndex].accent
+                            else Color.White.copy(alpha = 0.28f)
+                        )
+                )
+            }
+        }
         Spacer(modifier = Modifier.height(8.dp))
         Text(
-            text = "Geser menu atau gunakan tombol arah remote STB untuk memilih",
+            text = "Gunakan kiri/kanan remote untuk memutar menu, OK untuk memilih",
             color = Color.White.copy(alpha = 0.62f),
             fontSize = 10.sp,
             fontWeight = FontWeight.Medium
@@ -418,40 +412,55 @@ private fun HospitalityMenuBar(
     }
 }
 
+private data class HospitalityCarouselItem(
+    val icon: String,
+    val title: String,
+    val subtitle: String,
+    val accent: Color,
+    val action: () -> Unit
+)
+
+private fun wrapCarouselIndex(index: Int, size: Int): Int {
+    return ((index % size) + size) % size
+}
+
 @Composable
-private fun HospitalityMenuButton(
-    icon: String,
-    title: String,
-    subtitle: String,
-    accent: Color,
-    compact: Boolean = false,
-    selected: Boolean = false,
-    focusRequester: FocusRequester,
-    onFocused: () -> Unit,
+private fun HospitalityCarouselCard(
+    item: HospitalityCarouselItem,
+    offset: Int,
     onClick: () -> Unit
 ) {
-    var isFocused by remember { mutableStateOf(false) }
+    val isActive = offset == 0
+    val distance = abs(offset)
     val scale by animateFloatAsState(
-        targetValue = if (isFocused || selected) 1.16f else 1f,
-        label = "hospitality_menu_scale"
+        targetValue = when (distance) {
+            0 -> 1.12f
+            1 -> 0.88f
+            else -> 0.72f
+        },
+        label = "hospitality_carousel_scale"
     )
-    val isActive = isFocused || selected
-    val size = if (compact) 70.dp else 96.dp
-    val iconSize = if (compact) 22.sp else 30.sp
+    val cardWidth = when (distance) {
+        0 -> 150.dp
+        1 -> 112.dp
+        else -> 82.dp
+    }
+    val iconBoxSize = when (distance) {
+        0 -> 102.dp
+        1 -> 72.dp
+        else -> 50.dp
+    }
+    val iconSize = when (distance) {
+        0 -> 32.sp
+        1 -> 22.sp
+        else -> 16.sp
+    }
     val interactionSource = remember { MutableInteractionSource() }
 
     Column(
         modifier = Modifier
-            .width(if (compact) 96.dp else 130.dp)
+            .width(cardWidth)
             .scale(scale)
-            .focusRequester(focusRequester)
-            .focusable()
-            .onFocusChanged {
-                isFocused = it.isFocused
-                if (it.isFocused) {
-                    onFocused()
-                }
-            }
             .clickable(
                 interactionSource = interactionSource,
                 indication = null
@@ -462,12 +471,12 @@ private fun HospitalityMenuButton(
             if (isActive) {
                 Box(
                     modifier = Modifier
-                        .size(size + 36.dp)
+                        .size(iconBoxSize + 44.dp)
                         .background(
                             Brush.radialGradient(
                                 colors = listOf(
-                                    accent.copy(alpha = 0.48f),
-                                    accent.copy(alpha = 0.15f),
+                                    item.accent.copy(alpha = 0.54f),
+                                    item.accent.copy(alpha = 0.16f),
                                     Color.Transparent
                                 )
                             )
@@ -477,13 +486,13 @@ private fun HospitalityMenuButton(
 
             Box(
                 modifier = Modifier
-                    .size(size)
-                    .clip(RoundedCornerShape(if (compact) 18.dp else 22.dp))
+                    .size(iconBoxSize)
+                    .clip(RoundedCornerShape(if (isActive) 24.dp else 18.dp))
                     .background(
                         if (isActive) {
                             Brush.verticalGradient(
                                 listOf(
-                                    accent.copy(alpha = 0.30f),
+                                    item.accent.copy(alpha = 0.34f),
                                     Color.Black.copy(alpha = 0.56f)
                                 )
                             )
@@ -499,21 +508,21 @@ private fun HospitalityMenuButton(
                     .border(
                         BorderStroke(
                             width = if (isActive) 4.dp else 2.5.dp,
-                            color = if (isActive) accent else Color.White.copy(alpha = 0.88f)
+                            color = if (isActive) item.accent else Color.White.copy(alpha = 0.45f)
                         ),
-                        RoundedCornerShape(if (compact) 18.dp else 22.dp)
+                        RoundedCornerShape(if (isActive) 24.dp else 18.dp)
                     )
                     .shadow(
                         elevation = if (isActive) 24.dp else 7.dp,
-                        shape = RoundedCornerShape(if (compact) 18.dp else 22.dp),
-                        ambientColor = accent.copy(alpha = if (isActive) 0.80f else 0.22f),
-                        spotColor = accent.copy(alpha = if (isActive) 0.95f else 0.24f)
+                        shape = RoundedCornerShape(if (isActive) 24.dp else 18.dp),
+                        ambientColor = item.accent.copy(alpha = if (isActive) 0.80f else 0.14f),
+                        spotColor = item.accent.copy(alpha = if (isActive) 0.95f else 0.18f)
                     ),
                 contentAlignment = Alignment.Center
             ) {
                 Text(
-                    text = icon,
-                    color = Color.White,
+                    text = item.icon,
+                    color = Color.White.copy(alpha = if (isActive) 1f else 0.72f),
                     fontSize = iconSize,
                     fontWeight = FontWeight.ExtraBold,
                     textAlign = TextAlign.Center,
@@ -527,44 +536,46 @@ private fun HospitalityMenuButton(
                 )
             }
         }
-        Spacer(modifier = Modifier.height(8.dp))
-        Box(
-            modifier = Modifier
-                .clip(RoundedCornerShape(10.dp))
-                .background(Color.Black.copy(alpha = if (isActive) 0.40f else 0.18f))
-                .padding(horizontal = 8.dp, vertical = 2.5.dp)
-        ) {
+        Spacer(modifier = Modifier.height(if (isActive) 10.dp else 6.dp))
+        if (distance <= 1) {
+            Box(
+                modifier = Modifier
+                    .clip(RoundedCornerShape(10.dp))
+                    .background(Color.Black.copy(alpha = if (isActive) 0.43f else 0.20f))
+                    .padding(horizontal = 8.dp, vertical = 2.5.dp)
+            ) {
+                Text(
+                    text = item.title,
+                    color = if (isActive) item.accent else Color.White.copy(alpha = 0.76f),
+                    fontSize = if (isActive) 15.sp else 10.sp,
+                    fontWeight = FontWeight.ExtraBold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    style = TextStyle(
+                        shadow = Shadow(
+                            color = Color.Black.copy(alpha = 0.95f),
+                            offset = TextOffset(0f, 1.5f),
+                            blurRadius = 6f
+                        )
+                    )
+                )
+            }
             Text(
-                text = title,
-                color = if (isActive) accent else Color.White,
-                fontSize = if (compact) 11.sp else 15.sp,
-                fontWeight = FontWeight.ExtraBold,
+                text = item.subtitle,
+                color = Color.White.copy(alpha = if (isActive) 0.86f else 0.54f),
+                fontSize = if (isActive) 8.5.sp else 7.5.sp,
+                fontWeight = FontWeight.Medium,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
                 style = TextStyle(
                     shadow = Shadow(
-                        color = Color.Black.copy(alpha = 0.95f),
-                        offset = TextOffset(0f, 1.5f),
-                        blurRadius = 6f
+                        color = Color.Black.copy(alpha = 0.90f),
+                        offset = TextOffset(0f, 1.2f),
+                        blurRadius = 4f
                     )
                 )
             )
         }
-        Text(
-            text = subtitle,
-            color = Color.White.copy(alpha = if (isActive) 0.86f else 0.68f),
-            fontSize = 8.5.sp,
-            fontWeight = FontWeight.Medium,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-            style = TextStyle(
-                shadow = Shadow(
-                    color = Color.Black.copy(alpha = 0.90f),
-                    offset = TextOffset(0f, 1.2f),
-                    blurRadius = 4f
-                )
-            )
-        )
     }
 }
 
