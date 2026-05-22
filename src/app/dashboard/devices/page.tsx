@@ -23,6 +23,39 @@ async function deleteDeviceAction(formData: FormData) {
   }
 }
 
+// Server Action to enable/disable a device without deleting its remote settings
+async function toggleDeviceActiveAction(formData: FormData) {
+  'use server'
+  const deviceId = formData.get('deviceId') as string
+  const currentStatus = formData.get('currentStatus') === 'true'
+
+  try {
+    await prisma.$transaction([
+      prisma.device.update({
+        where: { deviceId },
+        data: {
+          isActive: !currentStatus,
+        },
+      }),
+      prisma.deviceConfig.upsert({
+        where: { deviceId },
+        update: {
+          forceSync: true,
+        },
+        create: {
+          deviceId,
+          lockSettings: true,
+          forceSync: true,
+        },
+      }),
+    ])
+    revalidatePath('/dashboard/devices')
+    revalidatePath('/dashboard')
+  } catch (error) {
+    console.error('Toggle device active error:', error)
+  }
+}
+
 // Server Action to trigger a remote cache clear
 async function clearDeviceCacheAction(formData: FormData) {
   'use server'
@@ -154,14 +187,27 @@ export default async function DevicesPage({
                   </tr>
                 ) : (
                   devices.map((d) => {
-                    const isOnline = d.lastOnline && d.lastOnline.getTime() >= tenMinutesAgo.getTime()
+                    const isOnline = d.isActive && d.lastOnline && d.lastOnline.getTime() >= tenMinutesAgo.getTime()
                     return (
                       <tr key={d.id} className="hover:bg-slate-800/10 transition-colors">
                         <td className="p-4 px-6">
-                          <div className="flex items-center gap-2">
-                            <span className={`w-2.5 h-2.5 rounded-full ${isOnline ? 'bg-emerald-500 glow-green' : 'bg-slate-600'}`}></span>
-                            <span className={`font-semibold text-xs ${isOnline ? 'text-emerald-400' : 'text-slate-400'}`}>
-                              {isOnline ? 'ONLINE' : 'OFFLINE'}
+                          <div className="flex flex-col gap-2">
+                            <div className="flex items-center gap-2">
+                              <span className={`w-2.5 h-2.5 rounded-full ${
+                                !d.isActive ? 'bg-rose-500' : isOnline ? 'bg-emerald-500 glow-green' : 'bg-slate-600'
+                              }`}></span>
+                              <span className={`font-semibold text-xs ${
+                                !d.isActive ? 'text-rose-400' : isOnline ? 'text-emerald-400' : 'text-slate-400'
+                              }`}>
+                                {!d.isActive ? 'DISABLED' : isOnline ? 'ONLINE' : 'OFFLINE'}
+                              </span>
+                            </div>
+                            <span className={`px-2 py-0.5 rounded text-[10px] font-bold w-fit border ${
+                              d.isActive
+                                ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
+                                : 'bg-rose-500/10 text-rose-400 border-rose-500/20'
+                            }`}>
+                              API {d.isActive ? 'Enabled' : 'Disabled'}
                             </span>
                           </div>
                         </td>
@@ -197,6 +243,28 @@ export default async function DevicesPage({
                         </td>
                         <td className="p-4 px-6 text-right">
                           <div className="flex items-center justify-end gap-3">
+                            <ConfirmForm
+                              action={toggleDeviceActiveAction}
+                              message={
+                                d.isActive
+                                  ? `Disable API connection for ${d.deviceName}? The STB will be blocked without deleting its settings.`
+                                  : `Enable API connection for ${d.deviceName}? The STB can sync and play again.`
+                              }
+                            >
+                              <input type="hidden" name="deviceId" value={d.deviceId} />
+                              <input type="hidden" name="currentStatus" value={d.isActive ? 'true' : 'false'} />
+                              <button
+                                type="submit"
+                                className={`px-3 py-1.5 rounded-xl text-xs font-bold border transition-all cursor-pointer ${
+                                  d.isActive
+                                    ? 'text-amber-400 hover:text-white border-amber-500/20 hover:bg-amber-500/15'
+                                    : 'text-emerald-400 hover:text-white border-emerald-500/20 hover:bg-emerald-500/15'
+                                }`}
+                              >
+                                {d.isActive ? 'Disable API' : 'Enable API'}
+                              </button>
+                            </ConfirmForm>
+
                             {/* Edit Config Button */}
                             <a
                               href={`/dashboard/devices?edit=${d.deviceId}`}

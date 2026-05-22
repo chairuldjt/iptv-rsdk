@@ -130,9 +130,17 @@ class IptvRepository(
                     }
 
                     dataStoreManager.addLog("Server config sync successful!")
-                    return true // Always active
+                    return config.active
                 }
             } else {
+                if (response.code() == 403) {
+                    dataStoreManager.addLog("Config sync blocked: Device is inactive on server.")
+                    return false
+                }
+                if (response.code() == 404) {
+                    dataStoreManager.addLog("Config sync: Device missing on server. Re-registering...")
+                    return registerDevice()
+                }
                 dataStoreManager.addLog("Config sync failed: HTTP ${response.code()}")
             }
         } catch (e: Exception) {
@@ -275,6 +283,23 @@ class IptvRepository(
                     return status
                 }
             } else {
+                if (response.code() == 404) {
+                    dataStoreManager.addLog("Heartbeat: Device missing on server. Re-registering automatically...")
+                    val active = registerDevice()
+                    return StatusData(
+                        force_sync = active,
+                        lock_settings = dataStoreManager.getLockSettings(),
+                        active = active
+                    )
+                }
+                if (response.code() == 403) {
+                    dataStoreManager.addLog("Heartbeat: Device is inactive on server.")
+                    return StatusData(
+                        force_sync = false,
+                        lock_settings = dataStoreManager.getLockSettings(),
+                        active = false
+                    )
+                }
                 dataStoreManager.addLog("Heartbeat response failed: HTTP ${response.code()}")
             }
         } catch (e: Exception) {
