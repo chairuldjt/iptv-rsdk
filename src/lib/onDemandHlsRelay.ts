@@ -1,5 +1,4 @@
-import { existsSync } from 'fs'
-import { mkdir, readFile, rm } from 'fs/promises'
+import { access, mkdir, readFile, rm } from 'fs/promises'
 import { spawn, type ChildProcessWithoutNullStreams } from 'child_process'
 import { slugifyChannelName } from '@/lib/playableStreams'
 
@@ -142,11 +141,20 @@ async function waitForManifest(manifestPath: string): Promise<void> {
   const startedAt = Date.now()
 
   while (Date.now() - startedAt < 8000) {
-    if (existsSync(manifestPath)) return
+    if (await fileExists(manifestPath)) return
     await new Promise((resolve) => setTimeout(resolve, 250))
   }
 
   throw new Error('Timed out waiting for HLS manifest.')
+}
+
+async function fileExists(filePath: string): Promise<boolean> {
+  try {
+    await access(filePath)
+    return true
+  } catch {
+    return false
+  }
 }
 
 function rewriteManifestSegments(manifest: string, segmentBaseUrl: string, outputSlug: string): string {
