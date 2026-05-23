@@ -1,6 +1,5 @@
 package com.example.rsdkiptvplayer.ui.settings
 
-import android.view.KeyEvent as AndroidKeyEvent
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
@@ -36,30 +35,28 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.input.PasswordVisualTransformation
-import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Dialog
 import androidx.lifecycle.viewmodel.compose.viewModel
 import android.widget.Toast
 import com.example.rsdkiptvplayer.util.AutostartPermissionHelper
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.ui.text.style.TextAlign
 import com.example.rsdkiptvplayer.ui.components.PinGridButton
 
-private fun remoteDigitFromKeyCode(keyCode: Int): String? = when (keyCode) {
-    AndroidKeyEvent.KEYCODE_0, AndroidKeyEvent.KEYCODE_NUMPAD_0 -> "0"
-    AndroidKeyEvent.KEYCODE_1, AndroidKeyEvent.KEYCODE_NUMPAD_1 -> "1"
-    AndroidKeyEvent.KEYCODE_2, AndroidKeyEvent.KEYCODE_NUMPAD_2 -> "2"
-    AndroidKeyEvent.KEYCODE_3, AndroidKeyEvent.KEYCODE_NUMPAD_3 -> "3"
-    AndroidKeyEvent.KEYCODE_4, AndroidKeyEvent.KEYCODE_NUMPAD_4 -> "4"
-    AndroidKeyEvent.KEYCODE_5, AndroidKeyEvent.KEYCODE_NUMPAD_5 -> "5"
-    AndroidKeyEvent.KEYCODE_6, AndroidKeyEvent.KEYCODE_NUMPAD_6 -> "6"
-    AndroidKeyEvent.KEYCODE_7, AndroidKeyEvent.KEYCODE_NUMPAD_7 -> "7"
-    AndroidKeyEvent.KEYCODE_8, AndroidKeyEvent.KEYCODE_NUMPAD_8 -> "8"
-    AndroidKeyEvent.KEYCODE_9, AndroidKeyEvent.KEYCODE_NUMPAD_9 -> "9"
+private fun remoteDigitFromKey(key: Key): String? = when (key) {
+    Key.Zero -> "0"
+    Key.One -> "1"
+    Key.Two -> "2"
+    Key.Three -> "3"
+    Key.Four -> "4"
+    Key.Five -> "5"
+    Key.Six -> "6"
+    Key.Seven -> "7"
+    Key.Eight -> "8"
+    Key.Nine -> "9"
     else -> null
 }
 
@@ -119,17 +116,38 @@ private fun SettingsOutlinedTextField(
     label: String,
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
-    visualTransformation: VisualTransformation = VisualTransformation.None,
+    obscureText: Boolean = false,
     onFocusChanged: (Boolean) -> Unit = {}
 ) {
     var isFocused by remember { mutableStateOf(false) }
+    var showKeyboard by remember { mutableStateOf(false) }
     val focusManager = LocalFocusManager.current
+    val displayValue = if (obscureText && value.isNotEmpty()) "*".repeat(value.length) else value
+
+    if (showKeyboard) {
+        RemoteTextKeyboardDialog(
+            title = label,
+            initialValue = value,
+            obscureText = obscureText,
+            onCommit = {
+                onValueChange(it)
+                showKeyboard = false
+                onFocusChanged(false)
+            },
+            onDismiss = {
+                showKeyboard = false
+                onFocusChanged(false)
+            }
+        )
+    }
 
     SettingsTextFieldFrame(isFocused = isFocused && enabled, modifier = modifier) {
-        OutlinedTextField(
-            value = value,
-            onValueChange = onValueChange,
+        Surface(
             enabled = enabled,
+            onClick = {
+                showKeyboard = true
+                onFocusChanged(true)
+            },
             modifier = Modifier
                 .fillMaxWidth()
                 .heightIn(min = 52.dp)
@@ -140,7 +158,13 @@ private fun SettingsOutlinedTextField(
 
                     when (keyEvent.key) {
                         Key.Escape, Key.Back -> {
-                            focusManager.clearFocus(force = true)
+                            showKeyboard = false
+                            onFocusChanged(false)
+                            true
+                        }
+                        Key.Enter, Key.DirectionCenter -> {
+                            showKeyboard = true
+                            onFocusChanged(true)
                             true
                         }
                         Key.DirectionUp -> {
@@ -166,22 +190,208 @@ private fun SettingsOutlinedTextField(
                     isFocused = it.isFocused
                     onFocusChanged(it.isFocused)
                 },
-            label = { Text(label) },
-            visualTransformation = visualTransformation,
-            colors = OutlinedTextFieldDefaults.colors(
-                focusedTextColor = Color.White,
-                unfocusedTextColor = Color.White,
-                focusedLabelColor = Color.White,
-                focusedBorderColor = Color.White,
-                unfocusedBorderColor = Color(0xFF334155),
-                focusedContainerColor = Color(0xFF0F172A),
-                unfocusedContainerColor = Color(0xFF0F172A),
-                disabledTextColor = Color(0xFF94A3B8),
-                disabledLabelColor = Color(0xFF64748B),
-                disabledBorderColor = Color(0xFF1E293B),
-                disabledContainerColor = Color(0xFF020617)
-            ),
-            singleLine = true
+            shape = RoundedCornerShape(8.dp),
+            color = if (enabled) Color(0xFF0F172A) else Color(0xFF020617),
+            contentColor = if (enabled) Color.White else Color(0xFF94A3B8),
+            border = BorderStroke(1.dp, if (isFocused && enabled) Color.White else Color(0xFF334155))
+        ) {
+            Column(
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                verticalArrangement = Arrangement.Center
+            ) {
+                Text(
+                    text = label,
+                    color = if (isFocused && enabled) Color.White else Color(0xFF94A3B8),
+                    fontSize = 11.sp,
+                    maxLines = 1
+                )
+                Text(
+                    text = displayValue.ifBlank { "Tekan OK untuk mengetik" },
+                    color = if (displayValue.isBlank()) Color(0xFF64748B) else Color.White,
+                    fontSize = 15.sp,
+                    maxLines = 1
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun RemoteTextKeyboardDialog(
+    title: String,
+    initialValue: String,
+    obscureText: Boolean,
+    onCommit: (String) -> Unit,
+    onDismiss: () -> Unit
+) {
+    var text by remember(initialValue) { mutableStateOf(initialValue) }
+    var shift by remember { mutableStateOf(false) }
+    val firstKeyFocusRequester = remember { FocusRequester() }
+    val keys = remember(shift) {
+        val letters = listOf("qwertyuiop", "asdfghjkl", "zxcvbnm")
+            .flatMap { row -> row.map { if (shift) it.uppercaseChar().toString() else it.toString() } }
+        letters + listOf("0", "1", "2", "3", "4", "5", "6", "7", "8", "9", ".", "-", "_", "/", "\\", ":", "@")
+    }
+
+    LaunchedEffect(Unit) {
+        firstKeyFocusRequester.requestFocus()
+    }
+
+    Dialog(onDismissRequest = onDismiss) {
+        Card(
+            modifier = Modifier
+                .widthIn(min = 520.dp, max = 760.dp)
+                .wrapContentHeight()
+                .border(1.dp, Color(0xFF334155), RoundedCornerShape(20.dp))
+                .onPreviewKeyEvent { keyEvent ->
+                    if (keyEvent.type != KeyEventType.KeyDown) {
+                        return@onPreviewKeyEvent false
+                    }
+
+                    when (keyEvent.key) {
+                        Key.Backspace -> {
+                            text = text.dropLast(1)
+                            true
+                        }
+                        else -> remoteDigitFromKey(keyEvent.key)?.let {
+                            text += it
+                            true
+                        } ?: false
+                    }
+                },
+            shape = RoundedCornerShape(20.dp),
+            colors = CardDefaults.cardColors(containerColor = Color(0xF20F172A))
+        ) {
+            Column(
+                modifier = Modifier.padding(22.dp),
+                verticalArrangement = Arrangement.spacedBy(14.dp)
+            ) {
+                Text(title, color = Color.White, fontWeight = FontWeight.Bold, fontSize = 18.sp)
+
+                Surface(
+                    modifier = Modifier.fillMaxWidth().heightIn(min = 54.dp),
+                    shape = RoundedCornerShape(10.dp),
+                    color = Color(0xFF020617),
+                    border = BorderStroke(1.dp, Color(0xFF334155))
+                ) {
+                    Text(
+                        text = if (obscureText && text.isNotEmpty()) "*".repeat(text.length) else text.ifBlank { " " },
+                        color = Color.White,
+                        fontSize = 18.sp,
+                        modifier = Modifier.padding(horizontal = 14.dp, vertical = 14.dp),
+                        maxLines = 1
+                    )
+                }
+
+                LazyVerticalGrid(
+                    columns = GridCells.Fixed(10),
+                    userScrollEnabled = false,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                    modifier = Modifier.height(224.dp)
+                ) {
+                    items(keys.size) { index ->
+                        RemoteKeyboardKey(
+                            text = keys[index],
+                            modifier = if (index == 0) Modifier.focusRequester(firstKeyFocusRequester) else Modifier
+                        ) {
+                            text += keys[index]
+                        }
+                    }
+                }
+
+                Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
+                    Button(
+                        onClick = { shift = !shift },
+                        colors = ButtonDefaults.buttonColors(containerColor = if (shift) Color(0xFF6366F1) else Color(0xFF334155)),
+                        shape = RoundedCornerShape(10.dp),
+                        modifier = Modifier.weight(1f).height(48.dp).settingsFocusGlow()
+                    ) { Text("Shift") }
+
+                    Button(
+                        onClick = { text += " " },
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF334155)),
+                        shape = RoundedCornerShape(10.dp),
+                        modifier = Modifier.weight(1f).height(48.dp).settingsFocusGlow()
+                    ) { Text("Spasi") }
+
+                    Button(
+                        onClick = { text = text.dropLast(1) },
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF475569)),
+                        shape = RoundedCornerShape(10.dp),
+                        modifier = Modifier.weight(1f).height(48.dp).settingsFocusGlow()
+                    ) { Text("Hapus") }
+
+                    OutlinedButton(
+                        onClick = onDismiss,
+                        colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.White),
+                        border = BorderStroke(1.dp, Color(0xFF475569)),
+                        shape = RoundedCornerShape(10.dp),
+                        modifier = Modifier.weight(1f).height(48.dp).settingsFocusGlow()
+                    ) { Text("Batal") }
+
+                    Button(
+                        onClick = { onCommit(text) },
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF10B981)),
+                        shape = RoundedCornerShape(10.dp),
+                        modifier = Modifier.weight(1f).height(48.dp).settingsFocusGlow()
+                    ) { Text("Selesai") }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun RemoteKeyboardKey(
+    text: String,
+    modifier: Modifier = Modifier,
+    onClick: () -> Unit
+) {
+    var isFocused by remember { mutableStateOf(false) }
+
+    Box(
+        contentAlignment = Alignment.Center,
+        modifier = modifier
+            .onFocusChanged { isFocused = it.isFocused }
+            .onPreviewKeyEvent { keyEvent ->
+                if (keyEvent.type == KeyEventType.KeyDown &&
+                    (keyEvent.key == Key.DirectionCenter || keyEvent.key == Key.Enter)
+                ) {
+                    onClick()
+                    true
+                } else {
+                    false
+                }
+            }
+            .focusable()
+            .shadow(
+                elevation = if (isFocused) 30.dp else 0.dp,
+                shape = RoundedCornerShape(8.dp),
+                ambientColor = Color.White.copy(alpha = if (isFocused) 1f else 0f),
+                spotColor = Color.White.copy(alpha = if (isFocused) 1f else 0f)
+            )
+            .scale(if (isFocused) 1.06f else 1f)
+            .height(38.dp)
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(8.dp))
+            .background(if (isFocused) Color(0xFF6366F1) else Color(0xFF1E293B))
+            .border(
+                BorderStroke(
+                    width = if (isFocused) 4.dp else 1.dp,
+                    color = if (isFocused) Color.White else Color(0xFF334155)
+                ),
+                RoundedCornerShape(8.dp)
+            )
+            .clickable(onClick = onClick)
+    ) {
+        Text(
+            text = text,
+            fontSize = 16.sp,
+            fontWeight = FontWeight.Bold,
+            color = Color.White,
+            textAlign = TextAlign.Center,
+            maxLines = 1
         )
     }
 }
@@ -244,6 +454,11 @@ fun SettingsScreen(
                 }
             }
         }
+    }
+
+    fun deletePinDigit() {
+        pinError = false
+        enteredPin = enteredPin.dropLast(1)
     }
     
     LaunchedEffect(serverUrl) {
@@ -406,29 +621,86 @@ fun SettingsScreen(
                                 modifier = Modifier.padding(top = 4.dp, bottom = 20.dp)
                             )
 
-                            // PIN indicator dots
+                            LaunchedEffect(showPinKeypad) {
+                                if (showPinKeypad) {
+                                    firstButtonFocusRequester.requestFocus()
+                                }
+                            }
+
                             Row(
-                                horizontalArrangement = Arrangement.spacedBy(16.dp),
-                                verticalAlignment = Alignment.CenterVertically,
-                                modifier = Modifier.padding(bottom = 20.dp)
+                                horizontalArrangement = Arrangement.spacedBy(10.dp, Alignment.CenterHorizontally),
+                                modifier = Modifier.fillMaxWidth()
                             ) {
-                                for (i in 0 until pinLength) {
-                                    val isFilled = i < enteredPin.length
+                                repeat(pinLength) { index ->
                                     Box(
                                         modifier = Modifier
-                                            .size(16.dp)
-                                            .clip(CircleShape)
-                                            .background(
-                                                if (pinError) Color(0xFFEF4444)
-                                                else if (isFilled) Color(0xFF6366F1)
-                                                else Color(0xFF334155)
-                                            )
-                                            .border(1.dp, Color(0xFF475569), CircleShape)
-                                    )
+                                            .size(46.dp)
+                                            .clip(RoundedCornerShape(10.dp))
+                                            .background(Color(0xFF0F172A))
+                                            .border(
+                                                BorderStroke(
+                                                    2.dp,
+                                                    if (index == enteredPin.length) Color.White else Color(0xFF334155)
+                                                ),
+                                                RoundedCornerShape(10.dp)
+                                            ),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Text(
+                                            text = if (index < enteredPin.length) "*" else "",
+                                            color = Color.White,
+                                            fontSize = 22.sp,
+                                            fontWeight = FontWeight.Bold
+                                        )
+                                    }
+                                }
+                            }
+
+                            Spacer(modifier = Modifier.height(16.dp))
+
+                            LazyVerticalGrid(
+                                columns = GridCells.Fixed(3),
+                                userScrollEnabled = false,
+                                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                                verticalArrangement = Arrangement.spacedBy(10.dp),
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(260.dp)
+                                    .onPreviewKeyEvent { keyEvent ->
+                                        if (keyEvent.type != KeyEventType.KeyDown) {
+                                            return@onPreviewKeyEvent false
+                                        }
+
+                                        when (keyEvent.key) {
+                                            Key.Backspace -> {
+                                                deletePinDigit()
+                                                true
+                                            }
+                                            else -> remoteDigitFromKey(keyEvent.key)?.let {
+                                                appendPinDigit(it)
+                                                true
+                                            } ?: false
+                                        }
+                                    }
+                            ) {
+                                val keys = listOf("1", "2", "3", "4", "5", "6", "7", "8", "9", "Hapus", "0", "Batal")
+                                items(keys.size) { index ->
+                                    val key = keys[index]
+                                    PinGridButton(
+                                        text = key,
+                                        focusRequester = if (index == 0) firstButtonFocusRequester else null
+                                    ) {
+                                        when (key) {
+                                            "Hapus" -> deletePinDigit()
+                                            "Batal" -> showPinKeypad = false
+                                            else -> appendPinDigit(key)
+                                        }
+                                    }
                                 }
                             }
 
                             if (pinError) {
+                                Spacer(modifier = Modifier.height(10.dp))
                                 Text(
                                     text = "PIN salah! Silakan coba lagi.",
                                     color = Color(0xFFEF4444),
@@ -438,84 +710,6 @@ fun SettingsScreen(
                                 )
                             }
 
-                            // Grid 0-9
-                            val buttons = listOf("1", "2", "3", "4", "5", "6", "7", "8", "9", "C", "0", "⌫")
-
-                            Box(modifier = Modifier.height(260.dp).width(300.dp)) {
-                                LazyVerticalGrid(
-                                    columns = GridCells.Fixed(3),
-                                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                                    verticalArrangement = Arrangement.spacedBy(8.dp),
-                                    modifier = Modifier
-                                        .fillMaxSize()
-                                        .focusable()
-                                        .onPreviewKeyEvent { keyEvent ->
-                                            if (keyEvent.type != KeyEventType.KeyDown) {
-                                                return@onPreviewKeyEvent false
-                                            }
-
-                                            val keyCode = keyEvent.nativeKeyEvent.keyCode
-                                            remoteDigitFromKeyCode(keyCode)?.let { digit ->
-                                                appendPinDigit(digit)
-                                                return@onPreviewKeyEvent true
-                                            }
-
-                                            when (keyCode) {
-                                                AndroidKeyEvent.KEYCODE_DEL,
-                                                AndroidKeyEvent.KEYCODE_FORWARD_DEL -> {
-                                                    pinError = false
-                                                    if (enteredPin.isNotEmpty()) {
-                                                        enteredPin = enteredPin.dropLast(1)
-                                                    }
-                                                    true
-                                                }
-                                                AndroidKeyEvent.KEYCODE_CLEAR -> {
-                                                    pinError = false
-                                                    enteredPin = ""
-                                                    true
-                                                }
-                                                AndroidKeyEvent.KEYCODE_BACK,
-                                                AndroidKeyEvent.KEYCODE_ESCAPE -> {
-                                                    showPinKeypad = false
-                                                    true
-                                                }
-                                                else -> false
-                                            }
-                                        }
-                                ) {
-                                    items(buttons.size) { index ->
-                                        val text = buttons[index]
-                                        PinGridButton(
-                                            text = text,
-                                            focusRequester = if (index == 0) firstButtonFocusRequester else null,
-                                            onClick = {
-                                                pinError = false
-                                                when (text) {
-                                                    "C" -> enteredPin = ""
-                                                    "⌫" -> if (enteredPin.isNotEmpty()) {
-                                                        enteredPin = enteredPin.substring(0, enteredPin.length - 1)
-                                                    }
-                                                    else -> {
-                                                        appendPinDigit(text)
-                                                    }
-                                                }
-                                            }
-                                        )
-                                    }
-                                }
-                            }
-
-                            Spacer(modifier = Modifier.height(16.dp))
-
-                            TextButton(
-                                onClick = { showPinKeypad = false },
-                                colors = ButtonDefaults.textButtonColors(contentColor = Color(0xFF94A3B8)),
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .settingsFocusGlow(RoundedCornerShape(8.dp))
-                            ) {
-                                Text("Batal")
-                            }
                         }
                     }
                 }
@@ -1242,7 +1436,7 @@ fun EducationContentPane(
             onValueChange = onPasswordChange,
             label = "Password",
             modifier = Modifier.fillMaxWidth(),
-            visualTransformation = PasswordVisualTransformation(),
+            obscureText = true,
             onFocusChanged = onInputFocusChanged
         )
 
