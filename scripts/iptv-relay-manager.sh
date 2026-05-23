@@ -7,7 +7,7 @@ OUTPUT_ROOT="${OUTPUT_ROOT:-/var/www/html/landingpage/relay}"
 FFMPEG_BIN="${FFMPEG_BIN:-/usr/bin/ffmpeg}"
 HLS_TIME="${HLS_TIME:-2}"
 HLS_LIST_SIZE="${HLS_LIST_SIZE:-6}"
-FIFO_SIZE="${FIFO_SIZE:-10000000}"
+FIFO_SIZE="${FIFO_SIZE:-50000}"
 LOGLEVEL="${LOGLEVEL:-warning}"
 
 declare -a CHILD_PIDS=()
