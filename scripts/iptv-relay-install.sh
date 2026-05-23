@@ -36,6 +36,8 @@ HLS_TIME=2
 HLS_LIST_SIZE=6
 FIFO_SIZE=50000
 LOGLEVEL=warning
+CHANNEL_FILTER=
+CHANNEL_LIMIT=0
 EOF
 
 cat > "$SERVICE_FILE" <<EOF
@@ -74,4 +76,7 @@ Logs:
 List generated channel slugs before starting:
   set -a; source ${ENV_FILE}; set +a
   ${MANAGER_TARGET} list
+
+Run only matching channels for development:
+  CHANNEL_FILTER="TRANS TV" CHANNEL_LIMIT=1 ${MANAGER_TARGET} run
 EOF

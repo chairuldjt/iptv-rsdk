@@ -9,6 +9,8 @@ HLS_TIME="${HLS_TIME:-2}"
 HLS_LIST_SIZE="${HLS_LIST_SIZE:-6}"
 FIFO_SIZE="${FIFO_SIZE:-50000}"
 LOGLEVEL="${LOGLEVEL:-warning}"
+CHANNEL_FILTER="${CHANNEL_FILTER:-}"
+CHANNEL_LIMIT="${CHANNEL_LIMIT:-0}"
 
 declare -a CHILD_PIDS=()
 declare -A USED_SLUGS=()
@@ -21,6 +23,8 @@ Environment:
   M3U_URL      Playlist URL. Default: ${M3U_URL}
   LOCALADDR   IPTV NIC address. Default: ${LOCALADDR}
   OUTPUT_ROOT HLS output root. Default: ${OUTPUT_ROOT}
+  CHANNEL_FILTER Optional case-insensitive channel name filter.
+  CHANNEL_LIMIT  Optional max channel count. 0 means unlimited.
 EOF
 }
 
@@ -77,6 +81,11 @@ require_bins() {
     exit 1
   }
 
+  [[ "$CHANNEL_LIMIT" =~ ^[0-9]+$ ]] || {
+    echo "CHANNEL_LIMIT must be a non-negative integer." >&2
+    exit 1
+  }
+
   [ -x "$FFMPEG_BIN" ] || {
     echo "ffmpeg binary not found at ${FFMPEG_BIN}." >&2
     exit 1
@@ -86,6 +95,7 @@ require_bins() {
 load_channels() {
   local current_name=""
   local line
+  local channel_count=0
 
   while IFS= read -r line || [ -n "$line" ]; do
     line="${line%$'\r'}"
@@ -98,12 +108,35 @@ load_channels() {
     fi
 
     if [[ "$line" == udp://* && -n "$current_name" ]]; then
+      if ! channel_matches "$current_name"; then
+        current_name=""
+        continue
+      fi
+
+      if [ "$CHANNEL_LIMIT" -gt 0 ] && [ "$channel_count" -ge "$CHANNEL_LIMIT" ]; then
+        break
+      fi
+
       local slug
       slug="$(unique_slug "$(slugify "$current_name")")"
       printf '%s\t%s\t%s\n' "$current_name" "$line" "$slug"
+      channel_count=$((channel_count + 1))
       current_name=""
     fi
   done < <(curl -fsSL "$M3U_URL")
+}
+
+channel_matches() {
+  local name="$1"
+  if [ -z "$CHANNEL_FILTER" ]; then
+    return 0
+  fi
+
+  local lower_name
+  local lower_filter
+  lower_name="$(printf '%s' "$name" | tr '[:upper:]' '[:lower:]')"
+  lower_filter="$(printf '%s' "$CHANNEL_FILTER" | tr '[:upper:]' '[:lower:]')"
+  [[ "$lower_name" == *"$lower_filter"* ]]
 }
 
 start_channel() {
