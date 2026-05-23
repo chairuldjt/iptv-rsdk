@@ -27,12 +27,6 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
-
-import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.tween
-import androidx.compose.ui.draw.scale
-import androidx.compose.ui.draw.shadow
-
 private fun remoteDigitFromKeyCode(keyCode: Int): String? = when (keyCode) {
     AndroidKeyEvent.KEYCODE_0, AndroidKeyEvent.KEYCODE_NUMPAD_0 -> "0"
     AndroidKeyEvent.KEYCODE_1, AndroidKeyEvent.KEYCODE_NUMPAD_1 -> "1"
@@ -223,34 +217,21 @@ fun PinGridButton(
 ) {
     var isFocused by remember { mutableStateOf(false) }
 
-    val scale by animateFloatAsState(
-        targetValue = if (isFocused) 1.15f else 1.0f,
-        animationSpec = tween(150),
-        label = "pin_button_scale"
-    )
-
     OutlinedButton(
         onClick = onClick,
         modifier = Modifier
             .aspectRatio(1.2f)
-            .scale(scale)
-            .shadow(
-                elevation = if (isFocused) 16.dp else 0.dp,
-                shape = RoundedCornerShape(12.dp),
-                ambientColor = Color.White.copy(alpha = if (isFocused) 0.9f else 0f),
-                spotColor = Color.White.copy(alpha = if (isFocused) 0.9f else 0f)
-            )
             .then(if (focusRequester != null) Modifier.focusRequester(focusRequester) else Modifier)
             .focusable()
             .onFocusChanged { isFocused = it.isFocused },
         shape = RoundedCornerShape(12.dp),
         colors = ButtonDefaults.outlinedButtonColors(
-            containerColor = if (isFocused) Color(0xFF6366F1).copy(alpha = 0.28f) else Color(0xFF1E293B),
+            containerColor = if (isFocused) Color(0xFF6366F1).copy(alpha = 0.2f) else Color(0xFF1E293B),
             contentColor = if (isFocused) Color.White else Color(0xFFCBD5E1)
         ),
         border = BorderStroke(
-            width = if (isFocused) 3.dp else 1.dp,
-            color = if (isFocused) Color.White else Color(0xFF334155)
+            width = if (isFocused) 2.dp else 1.dp,
+            color = if (isFocused) Color(0xFF6366F1) else Color(0xFF334155)
         )
     ) {
         Text(
