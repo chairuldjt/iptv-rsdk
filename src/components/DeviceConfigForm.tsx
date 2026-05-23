@@ -49,6 +49,7 @@ export default function DeviceConfigForm({
               className="w-full px-4 py-2 bg-slate-900 border border-slate-800 rounded-xl text-white text-sm focus:outline-none focus:border-primary"
             >
               <option value="api">API Server (Centralized / Global)</option>
+              <option value="api_relay">API Server Relay (Server Proxy Stream)</option>
               <option value="custom">Custom M3U URL (Device Specific)</option>
             </select>
           </div>

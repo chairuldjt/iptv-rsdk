@@ -15,7 +15,6 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
 import java.io.FileOutputStream
-import java.net.URLDecoder
 import java.net.URLEncoder
 import java.security.MessageDigest
 import jcifs.util.Crypto
@@ -66,27 +65,45 @@ object EducationSyncManager {
                 localFiles.forEach { it.delete() }
             }
 
-            val folderUrl = normalizeSmbFolderUrl(path)
-            _syncState.value = SyncState.Checking(
-                message = "Menghubungi folder SMB...",
-                detail = folderUrl
-            )
-
             ensureMd4Provider()
             val smbContext = SingletonContext.getInstance()
                 .withCredentials(NtlmPasswordAuthenticator(domain, username, password))
-            
-            val folder = SmbFile(folderUrl, smbContext)
-            val exists = folder.exists()
-            val isDirectory = exists && folder.isDirectory
-            if (!exists || !isDirectory) {
+
+            val folderCandidates = normalizeSmbFolderUrls(path)
+            var folder: SmbFile? = null
+            var folderUrl = folderCandidates.first()
+            var lastConnectionError: Exception? = null
+
+            for (candidateUrl in folderCandidates) {
+                _syncState.value = SyncState.Checking(
+                    message = "Menghubungi folder SMB...",
+                    detail = candidateUrl
+                )
+
+                try {
+                    val candidateFolder = SmbFile(candidateUrl, smbContext)
+                    val exists = candidateFolder.exists()
+                    val isDirectory = exists && candidateFolder.isDirectory
+                    if (exists && isDirectory) {
+                        folder = candidateFolder
+                        folderUrl = candidateUrl
+                        lastConnectionError = null
+                        break
+                    }
+                } catch (e: Exception) {
+                    lastConnectionError = e
+                }
+            }
+
+            val resolvedFolder = folder
+            if (resolvedFolder == null) {
+                if (lastConnectionError != null) {
+                    throw lastConnectionError
+                }
+
                 _syncState.value = SyncState.Error(
-                    message = if (!exists) {
-                        "Folder SMB tidak ditemukan atau tidak bisa dijangkau."
-                    } else {
-                        "Path SMB terbaca, tapi bukan folder."
-                    },
-                    detail = "Path: $folderUrl"
+                    message = "Folder SMB tidak ditemukan atau bukan folder.",
+                    detail = "Dicoba: ${folderCandidates.joinToString(" | ")}"
                 )
                 return@withContext
             }
@@ -96,7 +113,7 @@ object EducationSyncManager {
                 detail = folderUrl
             )
 
-            val remoteFiles = folder.listFiles()
+            val remoteFiles = resolvedFolder.listFiles()
                 ?.filter { file -> !file.isDirectory && file.name.isSupportedVideoName() }
                 ?: emptyList()
 
@@ -200,6 +217,7 @@ object EducationSyncManager {
             message.contains("md4") ||
                 message.contains("unsupportedcrypto") ||
                 message.contains("no such algorithm") -> "Provider MD4 untuk autentikasi SMB belum tersedia."
+            message.contains("network name cannot be found") -> "Nama share SMB tidak ditemukan. Pastikan bagian setelah IP adalah nama share, misalnya \\\\10.55.1.5\\File Cah-cah."
             message.contains("failed to connect") ||
                 message.contains("timed out") ||
                 message.contains("timeout") ||
@@ -235,7 +253,7 @@ object EducationSyncManager {
         field.set(null, provider)
     }
 
-    private fun normalizeSmbFolderUrl(path: String): String {
+    private fun normalizeSmbFolderUrls(path: String): List<String> {
         val trimmed = path.trim()
         val rawSmb = if (trimmed.startsWith("smb://", ignoreCase = true)) {
             trimmed.removePrefix("smb://")
@@ -251,30 +269,26 @@ object EducationSyncManager {
             .filter { it.isNotBlank() }
 
         if (normalized.isEmpty()) {
-            return "smb://"
+            return listOf("smb://")
         }
 
         val host = normalized.first()
-        val encodedPath = normalized
-            .drop(1)
-            .joinToString("/") { it.encodeSmbPathSegment() }
+        val rawPath = normalized.drop(1).joinToString("/")
+        val rawUrl = buildSmbUrl(host, rawPath)
 
-        val smb = if (encodedPath.isEmpty()) {
-            "smb://$host"
-        } else {
-            "smb://$host/$encodedPath"
-        }
+        val encodedPath = normalized.drop(1).joinToString("/") { it.encodeSmbPathSegment() }
+        val encodedUrl = buildSmbUrl(host, encodedPath)
+
+        return listOf(rawUrl, encodedUrl).distinct()
+    }
+
+    private fun buildSmbUrl(host: String, path: String): String {
+        val smb = if (path.isEmpty()) "smb://$host" else "smb://$host/$path"
         return if (smb.endsWith("/")) smb else "$smb/"
     }
 
     private fun String.encodeSmbPathSegment(): String {
-        val decoded = try {
-            URLDecoder.decode(this, "UTF-8")
-        } catch (e: Exception) {
-            this
-        }
-
-        return URLEncoder.encode(decoded, "UTF-8")
+        return URLEncoder.encode(this, "UTF-8")
             .replace("+", "%20")
     }
 

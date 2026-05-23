@@ -13,6 +13,18 @@ import { DEFAULT_CUSTOM_M3U_URL, DEFAULT_SYNC_MODE } from '@/lib/defaults'
 export const revalidate = 0 // Disable cache for live devices
 type DeviceStatusFilter = 'all' | 'online' | 'offline' | 'disabled'
 
+function getSyncModeLabel(syncMode: string) {
+  if (syncMode === 'custom') return 'Custom M3U'
+  if (syncMode === 'api_relay') return 'API Relay'
+  return 'API Server'
+}
+
+function getSyncModeBadgeClass(syncMode: string) {
+  if (syncMode === 'custom') return 'bg-amber-500/10 text-amber-400 border border-amber-500/20'
+  if (syncMode === 'api_relay') return 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
+  return 'bg-indigo-500/10 text-indigo-400 border border-indigo-500/20'
+}
+
 // Server Action to delete a device
 async function deleteDeviceAction(formData: FormData) {
   'use server'
@@ -382,8 +394,8 @@ export default async function DevicesPage({
                         </td>
                         <td className="p-4">
                           <div className="flex flex-col gap-1">
-                            <span className={`px-2 py-0.5 rounded text-[10px] font-bold w-fit uppercase ${(d.config?.syncMode || DEFAULT_SYNC_MODE) === 'custom' ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20' : 'bg-indigo-500/10 text-indigo-400 border border-indigo-500/20'}`}>
-                              {(d.config?.syncMode || DEFAULT_SYNC_MODE) === 'custom' ? 'Custom M3U' : 'API Server'}
+                            <span className={`px-2 py-0.5 rounded text-[10px] font-bold w-fit uppercase ${getSyncModeBadgeClass(d.config?.syncMode || DEFAULT_SYNC_MODE)}`}>
+                              {getSyncModeLabel(d.config?.syncMode || DEFAULT_SYNC_MODE)}
                             </span>
                             {(d.config?.syncMode || DEFAULT_SYNC_MODE) === 'custom' ? (
                               <div className="text-[10px] text-slate-500 truncate max-w-[150px] font-mono" title={d.config?.customM3uUrl || DEFAULT_CUSTOM_M3U_URL}>

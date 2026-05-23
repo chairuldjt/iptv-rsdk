@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import prisma from '@/lib/db'
 import { getErrorMessage } from '@/lib/errors'
+import { createRelayUrl } from '@/lib/streamRelay'
 
 export async function GET(
   request: Request,
@@ -87,13 +88,16 @@ export async function GET(
       },
     })
 
+    const shouldRelayStreams = config?.syncMode === 'api_relay'
+    const requestOrigin = new URL(request.url).origin
+
     // Map channels to expected client schema
     const mappedChannels = channels.map((c) => ({
       id: c.id,
       name: c.name,
       logo: c.logoUrl,
       group: c.category?.name || 'Uncategorized',
-      stream_url: c.streamUrl,
+      stream_url: shouldRelayStreams ? createRelayUrl(requestOrigin, c.streamUrl) : c.streamUrl,
       sort_order: c.sortOrder,
       active: c.isActive,
     }))
