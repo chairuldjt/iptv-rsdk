@@ -18,8 +18,7 @@ import java.io.FileOutputStream
 import java.net.URLDecoder
 import java.net.URLEncoder
 import java.security.MessageDigest
-import java.security.Security
-import org.bouncycastle.jce.provider.BouncyCastleProvider
+import jcifs.util.Crypto
 
 object EducationSyncManager {
 
@@ -198,6 +197,9 @@ object EducationSyncManager {
                     message.contains("logon failure") ||
                     message.contains("permission")
             ) -> "Akses SMB ditolak. Periksa username, password, domain, dan permission share."
+            message.contains("md4") ||
+                message.contains("unsupportedcrypto") ||
+                message.contains("no such algorithm") -> "Provider MD4 untuk autentikasi SMB belum tersedia."
             message.contains("failed to connect") ||
                 message.contains("timed out") ||
                 message.contains("timeout") ||
@@ -212,16 +214,25 @@ object EducationSyncManager {
     }
 
     private fun ensureMd4Provider() {
+        val provider = Md4Provider()
         try {
-            MessageDigest.getInstance("MD4", "BC")
-            return
+            Crypto.initProvider(provider)
         } catch (e: Exception) {
-            // Android's built-in BC provider on some STBs does not expose MD4.
+            forceJcifsProvider(provider)
         }
 
-        Security.removeProvider(BouncyCastleProvider.PROVIDER_NAME)
-        Security.insertProviderAt(BouncyCastleProvider(), 1)
-        MessageDigest.getInstance("MD4", "BC")
+        try {
+            MessageDigest.getInstance("MD4", provider).digest(byteArrayOf())
+            return
+        } catch (e: Exception) {
+            throw IllegalStateException("Provider MD4 lokal tidak bisa diinisialisasi.", e)
+        }
+    }
+
+    private fun forceJcifsProvider(provider: java.security.Provider) {
+        val field = Crypto::class.java.getDeclaredField("provider")
+        field.isAccessible = true
+        field.set(null, provider)
     }
 
     private fun normalizeSmbFolderUrl(path: String): String {
