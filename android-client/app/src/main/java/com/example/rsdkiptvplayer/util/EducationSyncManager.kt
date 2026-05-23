@@ -14,6 +14,8 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
 import java.io.FileOutputStream
+import java.net.URLDecoder
+import java.net.URLEncoder
 
 object EducationSyncManager {
 
@@ -146,14 +148,45 @@ object EducationSyncManager {
 
     private fun normalizeSmbFolderUrl(path: String): String {
         val trimmed = path.trim()
-        val smb = if (trimmed.startsWith("smb://", ignoreCase = true)) {
-            trimmed
+        val rawSmb = if (trimmed.startsWith("smb://", ignoreCase = true)) {
+            trimmed.removePrefix("smb://")
         } else {
-            "smb://" + trimmed
+            trimmed
                 .trimStart('\\', '/')
                 .replace('\\', '/')
         }
+
+        val normalized = rawSmb
+            .trim('/')
+            .split('/')
+            .filter { it.isNotBlank() }
+
+        if (normalized.isEmpty()) {
+            return "smb://"
+        }
+
+        val host = normalized.first()
+        val encodedPath = normalized
+            .drop(1)
+            .joinToString("/") { it.encodeSmbPathSegment() }
+
+        val smb = if (encodedPath.isEmpty()) {
+            "smb://$host"
+        } else {
+            "smb://$host/$encodedPath"
+        }
         return if (smb.endsWith("/")) smb else "$smb/"
+    }
+
+    private fun String.encodeSmbPathSegment(): String {
+        val decoded = try {
+            URLDecoder.decode(this, "UTF-8")
+        } catch (e: Exception) {
+            this
+        }
+
+        return URLEncoder.encode(decoded, "UTF-8")
+            .replace("+", "%20")
     }
 
     private fun String.isSupportedVideoName(): Boolean {
