@@ -25,7 +25,8 @@ export async function GET(
     }
 
     // Return the file with proper headers for APK files
-    return new NextResponse(fileBuffer, {
+    // Convert Node Buffer to Uint8Array to satisfy standard Web BodyInit type constraints
+    return new NextResponse(new Uint8Array(fileBuffer), {
       status: 200,
       headers: {
         'Content-Type': 'application/vnd.android.package-archive',
