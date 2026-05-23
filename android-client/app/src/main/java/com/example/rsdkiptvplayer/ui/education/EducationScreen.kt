@@ -4,6 +4,7 @@ import androidx.activity.compose.BackHandler
 import androidx.annotation.OptIn
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -62,7 +63,47 @@ fun EducationScreen(
                 exoPlayer = viewModel.exoPlayer,
                 aspectRatio = "fit"
             )
+        }
 
+        val syncState by com.example.rsdkiptvplayer.util.EducationSyncManager.syncState.collectAsState()
+
+        if (syncState is com.example.rsdkiptvplayer.util.EducationSyncManager.SyncState.Syncing) {
+            val state = syncState as com.example.rsdkiptvplayer.util.EducationSyncManager.SyncState.Syncing
+            Box(
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .padding(18.dp)
+                    .background(Color.Black.copy(alpha = 0.7f), RoundedCornerShape(10.dp))
+                    .border(1.dp, Color(0xFF10B981).copy(alpha = 0.4f), RoundedCornerShape(10.dp))
+                    .padding(horizontal = 12.dp, vertical = 8.dp)
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    CircularProgressIndicator(
+                        progress = state.progress,
+                        color = Color(0xFF10B981),
+                        modifier = Modifier.size(18.dp),
+                        strokeWidth = 2.dp
+                    )
+                    Column {
+                        Text(
+                            text = "Sinkronisasi Latar Belakang (${state.currentFile}/${state.totalFiles})",
+                            color = Color.White,
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Text(
+                            text = state.fileName,
+                            color = Color(0xFF94A3B8),
+                            fontSize = 9.sp,
+                            maxLines = 1,
+                            modifier = Modifier.width(180.dp)
+                        )
+                    }
+                }
+            }
         }
 
         if (isLoading) {

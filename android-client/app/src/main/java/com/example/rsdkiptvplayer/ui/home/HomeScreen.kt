@@ -47,6 +47,7 @@ import kotlin.math.abs
 import java.text.SimpleDateFormat
 import java.util.*
 import android.widget.Toast
+import com.example.rsdkiptvplayer.util.UpdateManager
 
 @Composable
 fun HomeScreen(
@@ -67,10 +68,14 @@ fun HomeScreen(
     var localIpAddress by remember { mutableStateOf("127.0.0.1") }
     var timeString by remember { mutableStateOf("") }
     var dateString by remember { mutableStateOf("") }
+    var versionText by remember { mutableStateOf("") }
 
     LaunchedEffect(Unit) {
         resolvedDeviceId = dataStoreManager.getDeviceId()
         localIpAddress = app.repository.getLocalIpAddress()
+        val versionCode = UpdateManager.getCurrentVersionCode(context)
+        val versionName = UpdateManager.getCurrentVersionName(context)
+        versionText = "v$versionName ($versionCode)"
     }
 
     LaunchedEffect(Unit) {
@@ -114,7 +119,8 @@ fun HomeScreen(
                 ipAddress = localIpAddress,
                 channelCount = channels.size,
                 time = timeString,
-                date = dateString
+                date = dateString,
+                version = versionText
             )
 
             Spacer(modifier = Modifier.weight(1f))
@@ -155,7 +161,8 @@ private fun HospitalityHeader(
     ipAddress: String,
     channelCount: Int,
     time: String,
-    date: String
+    date: String,
+    version: String
 ) {
     Box(modifier = Modifier.fillMaxWidth()) {
         Column(
@@ -178,6 +185,9 @@ private fun HospitalityHeader(
             InfoChip("IP $ipAddress")
             InfoChip("${channelCount} saluran tersedia")
             InfoChip("ID ${deviceId.takeLast(12)}")
+            if (version.isNotBlank()) {
+                InfoChip("Ver $version")
+            }
         }
 
         Column(

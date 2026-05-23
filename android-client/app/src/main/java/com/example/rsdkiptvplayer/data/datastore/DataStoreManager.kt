@@ -32,6 +32,8 @@ class DataStoreManager(private val context: Context) {
         val EDUCATION_SMB_USERNAME = stringPreferencesKey("education_smb_username")
         val EDUCATION_SMB_PASSWORD = stringPreferencesKey("education_smb_password")
         val EDUCATION_SMB_DOMAIN = stringPreferencesKey("education_smb_domain")
+        val EDUCATION_REPEAT_MODE = stringPreferencesKey("education_repeat_mode")
+        val EDUCATION_PLAY_ORDER = stringPreferencesKey("education_play_order")
         val TECHNICIAN_PIN = stringPreferencesKey("technician_pin")
     }
 
@@ -167,6 +169,14 @@ class DataStoreManager(private val context: Context) {
         prefs[EDUCATION_SMB_DOMAIN] ?: ""
     }
 
+    val educationRepeatModeFlow: Flow<String> = context.dataStore.data.map { prefs ->
+        prefs[EDUCATION_REPEAT_MODE] ?: "all"
+    }
+
+    val educationPlayOrderFlow: Flow<String> = context.dataStore.data.map { prefs ->
+        prefs[EDUCATION_PLAY_ORDER] ?: "alphabetical"
+    }
+
     suspend fun setEducationSmbCredentials(username: String, password: String, domain: String) {
         val prefs = context.dataStore.data.first()
         if (prefs[EDUCATION_SMB_USERNAME] != username || 
@@ -179,6 +189,17 @@ class DataStoreManager(private val context: Context) {
                 p[EDUCATION_SMB_DOMAIN] = domain.trim()
             }
             addLog("Education SMB credentials updated.")
+        }
+    }
+
+    suspend fun setEducationPlaylistConfig(repeatMode: String, playOrder: String) {
+        val prefs = context.dataStore.data.first()
+        if (prefs[EDUCATION_REPEAT_MODE] != repeatMode || prefs[EDUCATION_PLAY_ORDER] != playOrder) {
+            context.dataStore.edit { p ->
+                p[EDUCATION_REPEAT_MODE] = repeatMode
+                p[EDUCATION_PLAY_ORDER] = playOrder
+            }
+            addLog("Education playlist config updated: Repeat=$repeatMode, Order=$playOrder")
         }
     }
 

@@ -5,6 +5,7 @@ import retrofit2.http.Body
 import retrofit2.http.GET
 import retrofit2.http.POST
 import retrofit2.http.Path
+import retrofit2.http.Query
 
 // --- DATA TRANSFER OBJECTS ---
 
@@ -54,7 +55,10 @@ data class ConfigData(
     val education_video_path: String?,
     val education_smb_username: String?,
     val education_smb_password: String?,
-    val education_smb_domain: String?
+    val education_smb_domain: String?,
+    val education_repeat_mode: String? = "all",
+    val education_play_order: String? = "alphabetical",
+    val education_force_sync: Boolean? = false
 )
 
 data class ChannelResponse(
@@ -126,4 +130,17 @@ interface IptvApiService {
 
     @POST("api/device/log")
     suspend fun sendErrorLog(@Body request: LogRequest): Response<LogResponse>
+
+    @GET("api/app-update/check")
+    suspend fun checkUpdate(@Query("versionCode") currentCode: Int): Response<UpdateCheckResponse>
 }
+
+data class UpdateCheckResponse(
+    val status: Boolean,
+    val update_available: Boolean,
+    val version_name: String?,
+    val version_code: Int?,
+    val apk_url: String?,
+    val is_mandatory: Boolean?,
+    val changelog: String?
+)

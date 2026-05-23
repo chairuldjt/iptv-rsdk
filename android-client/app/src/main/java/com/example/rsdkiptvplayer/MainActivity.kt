@@ -5,15 +5,20 @@ import android.view.View
 import android.view.WindowInsets
 import android.view.WindowInsetsController
 import android.view.WindowManager
+import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
+import androidx.compose.foundation.layout.*
+import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.example.rsdkiptvplayer.theme.RSDKIPTVPlayerTheme
 import com.example.rsdkiptvplayer.ui.channels.ChannelBrowserScreen
 import com.example.rsdkiptvplayer.ui.education.EducationScreen
@@ -21,12 +26,20 @@ import com.example.rsdkiptvplayer.ui.home.HomeScreen
 import com.example.rsdkiptvplayer.ui.player.PlayerScreen
 import com.example.rsdkiptvplayer.ui.settings.SettingsScreen
 import com.example.rsdkiptvplayer.ui.splash.SplashScreen
+import com.example.rsdkiptvplayer.data.api.RetrofitClient
+import com.example.rsdkiptvplayer.data.api.UpdateCheckResponse
+import com.example.rsdkiptvplayer.util.UpdateManager
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         
+        val app = applicationContext as IptvApplication
+        val dataStoreManager = app.dataStoreManager
+
         setContent {
             RSDKIPTVPlayerTheme {
                 Surface(
@@ -36,6 +49,8 @@ class MainActivity : ComponentActivity() {
                     var currentScreen by remember { mutableStateOf("splash") }
                     var activeSettingsTab by remember { mutableStateOf(0) }
                     var selectedChannelId by remember { mutableIntStateOf(-1) }
+
+
 
                     when (currentScreen) {
                         "splash" -> {
@@ -140,3 +155,4 @@ class MainActivity : ComponentActivity() {
         }
     }
 }
+

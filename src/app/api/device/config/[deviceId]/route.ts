@@ -50,20 +50,25 @@ export async function GET(
           educationSmbUsername: '',
           educationSmbPassword: '',
           educationSmbDomain: '',
+          educationRepeatMode: 'all',
+          educationPlayOrder: 'alphabetical',
+          educationForceSync: false,
         },
       })
     }
 
-    // If forceSync or clearCacheTrigger is true, we should reset it to false after sending so it only fires once on client
+    // If forceSync, clearCacheTrigger, or educationForceSync is true, we should reset it to false after sending so it only fires once on client
     const currentForceSync = config.forceSync
     const currentClearCache = config.clearCacheTrigger || false
+    const currentEducationForceSync = config.educationForceSync || false
 
-    if (currentForceSync || currentClearCache) {
+    if (currentForceSync || currentClearCache || currentEducationForceSync) {
       await prisma.deviceConfig.update({
         where: { id: config.id },
         data: { 
           forceSync: false,
-          clearCacheTrigger: false
+          clearCacheTrigger: false,
+          educationForceSync: false
         },
       })
     }
@@ -97,6 +102,9 @@ export async function GET(
         education_smb_username: config.educationSmbUsername,
         education_smb_password: config.educationSmbPassword,
         education_smb_domain: config.educationSmbDomain,
+        education_repeat_mode: config.educationRepeatMode || 'all',
+        education_play_order: config.educationPlayOrder || 'alphabetical',
+        education_force_sync: currentEducationForceSync,
       },
     })
   } catch (error: unknown) {

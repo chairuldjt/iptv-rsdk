@@ -1,4 +1,6 @@
 import java.util.Properties
+import java.io.BufferedReader
+import java.io.InputStreamReader
 
 plugins {
   alias(libs.plugins.android.application)
@@ -19,6 +21,22 @@ fun releaseEnv(name: String): String =
         ?: providers.environmentVariable(name).orNull
         ?: error("$name must be set in android-client/.env or environment variables")
 
+val gitVersionCode: Int = try {
+    providers.exec {
+        commandLine("git", "rev-list", "--count", "HEAD")
+    }.standardOutput.asText.map { it.trim().toIntOrNull() ?: 2 }.get()
+} catch (e: Exception) {
+    2
+}
+
+val gitVersionName: String = try {
+    providers.exec {
+        commandLine("git", "describe", "--tags", "--always")
+    }.standardOutput.asText.map { it.trim().ifBlank { "1.1" } }.get()
+} catch (e: Exception) {
+    "1.1"
+}
+
 android {
     namespace = "com.example.rsdkiptvplayer"
     compileSdk = 36
@@ -26,8 +44,8 @@ android {
         applicationId = "com.example.rsdkiptvplayer"
         minSdk = 23
         targetSdk = 36
-        versionCode = 1
-        versionName = "1.0"
+        versionCode = gitVersionCode
+        versionName = gitVersionName
         
         buildConfigField("String", "DEFAULT_API_BASE_URL", "\"https://iptv.teknisirsdk.my.id\"")
     }

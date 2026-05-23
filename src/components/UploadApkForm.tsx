@@ -1,0 +1,243 @@
+'use client'
+
+import { useState, useRef } from 'react'
+import { uploadApkAction } from '../app/dashboard/updates/actions'
+
+export default function UploadApkForm() {
+  const [parsingState, setParsingState] = useState<'idle' | 'analyzing' | 'success' | 'error'>('idle')
+  const [versionCode, setVersionCode] = useState<string>('')
+  const [versionName, setVersionName] = useState<string>('')
+  const [errorMsg, setErrorMsg] = useState<string>('')
+  const [fileName, setFileName] = useState<string>('')
+  const [fileSize, setFileSize] = useState<string>('')
+  const fileInputRef = useRef<HTMLInputElement>(null)
+
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+
+    setFileName(file.name)
+    // Convert bytes to MB
+    const mbSize = (file.size / (1024 * 1024)).toFixed(2)
+    setFileSize(`${mbSize} MB`)
+
+    // Start parsing
+    setParsingState('analyzing')
+    setErrorMsg('')
+
+    try {
+      // Dynamic import of app-info-parser to avoid server-side/build complications
+      const AppInfoParserModule = await import('app-info-parser')
+      const AppInfoParser = AppInfoParserModule.default
+      const parser = new AppInfoParser(file)
+      const result = await parser.parse()
+
+      if (result && result.versionCode !== undefined && result.versionName) {
+        setVersionCode(String(result.versionCode))
+        setVersionName(result.versionName)
+        setParsingState('success')
+      } else {
+        throw new Error('Format APK tidak didukung atau Manifest tidak memiliki versionCode/versionName.')
+      }
+    } catch (err: any) {
+      console.error('Error parsing APK client-side:', err)
+      setParsingState('error')
+      setVersionCode('')
+      setVersionName('')
+      setErrorMsg(err.message || 'Gagal menganalisis berkas APK. Pastikan berkas valid.')
+    }
+  }
+
+  const handleResetFile = (e: React.MouseEvent) => {
+    e.preventDefault()
+    setParsingState('idle')
+    setVersionCode('')
+    setVersionName('')
+    setFileName('')
+    setFileSize('')
+    setErrorMsg('')
+    if (fileInputRef.current) {
+      fileInputRef.current.value = ''
+    }
+  }
+
+  return (
+    <div className="lg:col-span-1 glass-card p-6 rounded-2xl border border-border h-fit">
+      <h3 className="font-bold text-white text-lg mb-4">Deploy New Version</h3>
+      
+      <form action={uploadApkAction} className="space-y-4">
+        {/* APK File Upload Area */}
+        <div>
+          <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">
+            APK Binary File
+          </label>
+          
+          <input
+            type="file"
+            name="apkFile"
+            ref={fileInputRef}
+            accept=".apk"
+            onChange={handleFileChange}
+            className="hidden"
+            id="apk-file-input"
+          />
+
+          {parsingState === 'idle' && (
+            <label
+              htmlFor="apk-file-input"
+              className="flex flex-col items-center justify-center border-2 border-dashed border-slate-800 hover:border-indigo-500/50 bg-slate-950/40 hover:bg-slate-900/30 rounded-2xl p-6 cursor-pointer group transition-all duration-200"
+            >
+              <svg className="w-10 h-10 text-slate-500 group-hover:text-indigo-400 transition-colors mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+              </svg>
+              <span className="text-xs font-semibold text-slate-300">Pilih berkas APK</span>
+              <span className="text-[10px] text-slate-500 mt-1">Seret & lepas atau klik untuk mencari</span>
+            </label>
+          )}
+
+          {parsingState === 'analyzing' && (
+            <div className="flex flex-col items-center justify-center border border-slate-800 bg-slate-950/20 rounded-2xl p-6">
+              <svg className="animate-spin h-8 w-8 text-indigo-500 mb-3" fill="none" viewBox="0 0 24 24">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+              </svg>
+              <span className="text-xs font-semibold text-slate-300">Membaca Manifest APK...</span>
+              <span className="text-[10px] text-slate-500 mt-1">{fileName}</span>
+            </div>
+          )}
+
+          {parsingState === 'success' && (
+            <div className="border border-emerald-500/20 bg-emerald-500/5 rounded-2xl p-4 flex items-start gap-3">
+              <div className="p-2 rounded-xl bg-emerald-500/10 text-emerald-400 shrink-0">
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                </svg>
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-xs font-bold text-white truncate">{fileName}</p>
+                <p className="text-[10px] text-slate-400 mt-0.5">{fileSize}</p>
+                <div className="mt-2 flex items-center gap-1.5">
+                  <span className="px-1.5 py-0.5 rounded bg-emerald-500/15 text-emerald-400 text-[9px] font-bold uppercase tracking-wider border border-emerald-500/20">
+                    Auto-Detected
+                  </span>
+                </div>
+              </div>
+              <button
+                onClick={handleResetFile}
+                className="text-slate-500 hover:text-rose-400 p-1 hover:bg-slate-900 rounded-lg transition-colors cursor-pointer"
+                title="Ganti File"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                </svg>
+              </button>
+            </div>
+          )}
+
+          {parsingState === 'error' && (
+            <div className="border border-rose-500/20 bg-rose-500/5 rounded-2xl p-4">
+              <div className="flex items-start gap-3">
+                <div className="p-2 rounded-xl bg-rose-500/10 text-rose-400 shrink-0">
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                  </svg>
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs font-bold text-white truncate">Analisis Gagal</p>
+                  <p className="text-[10px] text-rose-400 mt-1 leading-relaxed">{errorMsg}</p>
+                </div>
+              </div>
+              <div className="mt-3 flex justify-end gap-2">
+                <button
+                  onClick={handleResetFile}
+                  className="px-3 py-1.5 bg-slate-900 hover:bg-slate-800 border border-slate-800 text-slate-300 text-[10px] font-bold rounded-lg cursor-pointer transition-colors"
+                >
+                  Pilih Ulang
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Version Code (Integer) */}
+        <div>
+          <div className="flex items-center justify-between mb-1">
+            <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider">
+              Version Code (Integer)
+            </label>
+            {versionCode && (
+              <span className="text-[9px] font-bold text-emerald-400 uppercase tracking-wider bg-emerald-500/10 border border-emerald-500/20 px-1.5 py-0.5 rounded">
+                Verified
+              </span>
+            )}
+          </div>
+          <input
+            type="number"
+            name="versionCode"
+            required
+            readOnly
+            value={versionCode}
+            min={1}
+            placeholder="Auto-detected on file select"
+            className="w-full px-4 py-2.5 bg-slate-900/60 border border-slate-800 rounded-xl text-white text-sm focus:outline-none font-mono cursor-not-allowed select-none opacity-80"
+          />
+          <p className="text-[10px] text-slate-500 mt-1">Nilai dibaca otomatis dari kode biner Manifest APK.</p>
+        </div>
+
+        {/* Version Name (String) */}
+        <div>
+          <div className="flex items-center justify-between mb-1">
+            <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider">
+              Version Name (String)
+            </label>
+            {versionName && (
+              <span className="text-[9px] font-bold text-emerald-400 uppercase tracking-wider bg-emerald-500/10 border border-emerald-500/20 px-1.5 py-0.5 rounded">
+                Verified
+              </span>
+            )}
+          </div>
+          <input
+            type="text"
+            name="versionName"
+            required
+            readOnly
+            value={versionName}
+            placeholder="Auto-detected on file select"
+            className="w-full px-4 py-2.5 bg-slate-900/60 border border-slate-800 rounded-xl text-white text-sm focus:outline-none cursor-not-allowed select-none opacity-80"
+          />
+        </div>
+
+        {/* Changelog */}
+        <div>
+          <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">
+            Changelog / Release Notes
+          </label>
+          <textarea
+            name="changelog"
+            rows={4}
+            placeholder="List bug fixes, improvements, and features..."
+            className="w-full px-4 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-white text-sm focus:outline-none focus:border-primary transition-colors"
+          />
+        </div>
+
+
+        {/* Submit button */}
+        <button
+          type="submit"
+          disabled={parsingState !== 'success'}
+          className={`w-full mt-2 py-3 rounded-xl font-bold text-white text-sm transition-all duration-200 cursor-pointer text-center ${
+            parsingState === 'success'
+              ? 'bg-primary hover:bg-indigo-500 glow-indigo'
+              : 'bg-slate-800 text-slate-500 cursor-not-allowed border border-slate-700/30'
+          }`}
+        >
+          {parsingState === 'analyzing'
+            ? 'Analyzing APK...'
+            : parsingState === 'success'
+            ? 'Upload & Save Update'
+            : 'Pilih Berkas APK Terlebih Dahulu'}
+        </button>
+      </form>
+    </div>
+  )
+}

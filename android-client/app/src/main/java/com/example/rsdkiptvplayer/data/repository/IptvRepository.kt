@@ -12,6 +12,7 @@ import com.example.rsdkiptvplayer.data.parser.M3uParser
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.net.Inet4Address
 import java.net.NetworkInterface
@@ -111,6 +112,10 @@ class IptvRepository(
                         config.education_smb_password ?: "",
                         config.education_smb_domain ?: ""
                     )
+                    dataStoreManager.setEducationPlaylistConfig(
+                        config.education_repeat_mode ?: "all",
+                        config.education_play_order ?: "alphabetical"
+                    )
                     dataStoreManager.setAutoStartOnBoot(config.auto_start_on_boot ?: false)
 
                     if (config.force_sync == true) {
@@ -121,6 +126,11 @@ class IptvRepository(
                     if (config.clear_cache_trigger == true) {
                         dataStoreManager.addLog("Remote trigger: CLEAR CACHE triggered from Web!")
                         clearChannelCache()
+                    }
+
+                    // Trigger SMB video caching in the background
+                    kotlinx.coroutines.CoroutineScope(Dispatchers.IO).launch {
+                        com.example.rsdkiptvplayer.util.EducationSyncManager.sync(context, forceSync = config.education_force_sync == true)
                     }
 
                     dataStoreManager.addLog("Server config sync successful!")

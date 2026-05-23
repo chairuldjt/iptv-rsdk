@@ -107,6 +107,9 @@ async function saveDeviceConfigAction(formData: FormData) {
   const educationSmbUsername = formData.get('educationSmbUsername') as string
   const educationSmbPassword = formData.get('educationSmbPassword') as string
   const educationSmbDomain = formData.get('educationSmbDomain') as string
+  const educationRepeatMode = formData.get('educationRepeatMode') as string
+  const educationPlayOrder = formData.get('educationPlayOrder') as string
+  const educationForceSyncTrigger = formData.get('educationForceSyncTrigger') === 'true'
 
   const lockSettings = formData.get('lockSettings') === 'on'
   const forceSync = true // Always force sync on any configuration change
@@ -137,6 +140,9 @@ async function saveDeviceConfigAction(formData: FormData) {
         educationSmbUsername: educationSmbUsername || '',
         educationSmbPassword: educationSmbPassword || '',
         educationSmbDomain: educationSmbDomain || '',
+        educationRepeatMode: educationRepeatMode || 'all',
+        educationPlayOrder: educationPlayOrder || 'alphabetical',
+        ...(educationForceSyncTrigger ? { educationForceSync: true } : {}),
       },
     })
 

@@ -21,8 +21,10 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import java.io.File
 
 @OptIn(UnstableApi::class)
 class EducationViewModel(application: Application) : AndroidViewModel(application) {
@@ -101,72 +103,75 @@ class EducationViewModel(application: Application) : AndroidViewModel(applicatio
 
     fun loadAndPlay() {
         viewModelScope.launch {
-            val path = _folderPath.value.trim()
-            if (path.isEmpty()) {
-                _videoCount.value = 0
-                _errorMessage.value = "Path folder video edukasi belum diset di Mode Teknisi."
-                return@launch
-            }
-
             _isLoading.value = true
             _errorMessage.value = null
 
             val result = withContext(Dispatchers.IO) {
                 runCatching {
-                    val folderUrl = normalizeSmbFolderUrl(path)
-                    val smbContext = buildSmbContext()
-                    val folder = SmbFile(folderUrl, smbContext)
-                    if (!folder.exists()) {
-                        error("Folder tidak ditemukan: $path")
-                    }
-                    if (!folder.isDirectory) {
-                        error("Path edukasi harus berupa folder SMB.")
+                    val localDir = File(getApplication<IptvApplication>().getExternalFilesDir(null), "education_videos")
+                    if (!localDir.exists()) {
+                        localDir.mkdirs()
                     }
 
-                    folder.listFiles()
+                    val videos = localDir.listFiles()
                         ?.filter { file -> !file.isDirectory && file.name.isSupportedVideoName() }
-                        ?.sortedBy { it.name.lowercase() }
-                        ?.let { videos -> smbContext to videos }
-                        ?: (smbContext to emptyList())
+                        ?: emptyList()
+
+                    val playOrder = dataStoreManager.educationPlayOrderFlow.first()
+                    val repeatModeStr = dataStoreManager.educationRepeatModeFlow.first()
+
+                    val sortedVideos = when (playOrder) {
+                        "random" -> videos.shuffled()
+                        "shuffle" -> videos.shuffled(java.util.Random(12345))
+                        else -> videos.sortedBy { it.name.lowercase() }
+                    }
+
+                    val exoRepeatMode = when (repeatModeStr) {
+                        "one" -> Player.REPEAT_MODE_ONE
+                        "none" -> Player.REPEAT_MODE_OFF
+                        else -> Player.REPEAT_MODE_ALL
+                    }
+
+                    Triple(sortedVideos, exoRepeatMode, playOrder)
                 }
             }
 
             result
-                .onSuccess { (smbContext, videos) ->
+                .onSuccess { (videos, repeatModeVal, order) ->
                     _videoCount.value = videos.size
                     if (videos.isEmpty()) {
                         _isLoading.value = false
-                        _errorMessage.value = "Tidak ada video MP4/MKV/WEBM/TS/MOV di folder edukasi."
-                        dataStoreManager.addLog("Education folder empty: $path")
+                        _errorMessage.value = "Belum ada video edukasi disalin. Silakan sinkronkan dari web dashboard."
+                        dataStoreManager.addLog("Local education folder is empty.")
                         return@onSuccess
                     }
 
-                    val factory = ProgressiveMediaSource.Factory(SmbDataSource.Factory(smbContext))
-                    val mediaSources = videos.map { file ->
-                        val mediaItem = MediaItem.Builder()
-                            .setUri(Uri.parse(file.url.toString()))
+                    val mediaItems = videos.map { file ->
+                        MediaItem.Builder()
+                            .setUri(Uri.fromFile(file))
                             .setMediaMetadata(
                                 androidx.media3.common.MediaMetadata.Builder()
                                     .setTitle(file.name.substringBeforeLast('.'))
                                     .build()
                             )
                             .build()
-                        factory.createMediaSource(mediaItem)
                     }
 
                     _currentTitle.value = videos.first().name.substringBeforeLast('.')
                     exoPlayer.stop()
                     exoPlayer.clearMediaItems()
-                    exoPlayer.setMediaSources(mediaSources)
+                    exoPlayer.repeatMode = repeatModeVal
+                    exoPlayer.setMediaItems(mediaItems)
                     exoPlayer.prepare()
                     exoPlayer.playWhenReady = true
-                    dataStoreManager.addLog("Education playlist loaded: ${videos.size} videos from $path")
+                    _isLoading.value = false
+                    dataStoreManager.addLog("Local education playlist loaded: ${videos.size} videos (Order: $order, Repeat: $repeatModeVal)")
                 }
                 .onFailure { error ->
                     _videoCount.value = 0
                     _isLoading.value = false
-                    _errorMessage.value = error.localizedMessage ?: "Gagal membaca folder edukasi."
-                    dataStoreManager.addLog("Education folder error: ${error.message}")
+                    _errorMessage.value = error.localizedMessage ?: "Gagal memuat video edukasi luring."
+                    dataStoreManager.addLog("Local education load error: ${error.message}")
                 }
         }
     }
