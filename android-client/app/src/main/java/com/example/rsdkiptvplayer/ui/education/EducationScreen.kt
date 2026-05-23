@@ -35,6 +35,7 @@ fun EducationScreen(
     val currentTitle by viewModel.currentTitle.collectAsState()
     val isLoading by viewModel.isLoading.collectAsState()
     val errorMessage by viewModel.errorMessage.collectAsState()
+    val syncState by com.example.rsdkiptvplayer.util.EducationSyncManager.syncState.collectAsState()
     val settingsFocusRequester = remember { FocusRequester() }
 
     LaunchedEffect(folderPath) {
@@ -64,8 +65,6 @@ fun EducationScreen(
                 aspectRatio = "fit"
             )
         }
-
-        val syncState by com.example.rsdkiptvplayer.util.EducationSyncManager.syncState.collectAsState()
 
         if (syncState is com.example.rsdkiptvplayer.util.EducationSyncManager.SyncState.Syncing) {
             val state = syncState as com.example.rsdkiptvplayer.util.EducationSyncManager.SyncState.Syncing
@@ -104,6 +103,15 @@ fun EducationScreen(
                     }
                 }
             }
+        }
+
+        if (syncState is com.example.rsdkiptvplayer.util.EducationSyncManager.SyncState.Checking ||
+            (syncState is com.example.rsdkiptvplayer.util.EducationSyncManager.SyncState.Syncing && videoCount == 0)
+        ) {
+            SyncStatusPanel(
+                syncState = syncState,
+                modifier = Modifier.align(Alignment.Center)
+            )
         }
 
         if (isLoading) {
@@ -152,11 +160,7 @@ fun EducationScreen(
                         )
                         Spacer(modifier = Modifier.height(8.dp))
                         Text(
-                            text = if (folderPath.isEmpty()) {
-                                "Isi path seperti \\\\10.45.128.129\\edukasi di menu Setting."
-                            } else {
-                                folderPath
-                            },
+                            text = buildEducationErrorDetail(folderPath, syncState),
                             color = Color(0xFF94A3B8),
                             fontSize = 12.sp,
                             textAlign = TextAlign.Center
@@ -185,5 +189,93 @@ fun EducationScreen(
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun SyncStatusPanel(
+    syncState: com.example.rsdkiptvplayer.util.EducationSyncManager.SyncState,
+    modifier: Modifier = Modifier
+) {
+    val title: String
+    val detail: String?
+    val progress: Float?
+
+    when (syncState) {
+        is com.example.rsdkiptvplayer.util.EducationSyncManager.SyncState.Checking -> {
+            title = syncState.message
+            detail = syncState.detail
+            progress = null
+        }
+        is com.example.rsdkiptvplayer.util.EducationSyncManager.SyncState.Syncing -> {
+            title = "Menyalin video edukasi (${syncState.currentFile}/${syncState.totalFiles})"
+            detail = syncState.fileName
+            progress = syncState.progress
+        }
+        else -> return
+    }
+
+    Card(
+        colors = CardDefaults.cardColors(containerColor = Color(0xFF0F172A)),
+        border = BorderStroke(1.dp, Color(0xFF10B981).copy(alpha = 0.38f)),
+        shape = RoundedCornerShape(16.dp),
+        modifier = modifier
+            .width(520.dp)
+            .padding(20.dp)
+    ) {
+        Row(
+            modifier = Modifier.padding(22.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(16.dp)
+        ) {
+            if (progress == null) {
+                CircularProgressIndicator(
+                    color = Color(0xFF10B981),
+                    modifier = Modifier.size(34.dp),
+                    strokeWidth = 3.dp
+                )
+            } else {
+                CircularProgressIndicator(
+                    progress = progress,
+                    color = Color(0xFF10B981),
+                    modifier = Modifier.size(34.dp),
+                    strokeWidth = 3.dp
+                )
+            }
+            Column {
+                Text(
+                    text = title,
+                    color = Color.White,
+                    fontSize = 15.sp,
+                    fontWeight = FontWeight.Bold,
+                    lineHeight = 20.sp
+                )
+                if (!detail.isNullOrBlank()) {
+                    Spacer(modifier = Modifier.height(5.dp))
+                    Text(
+                        text = detail,
+                        color = Color(0xFF94A3B8),
+                        fontSize = 11.sp,
+                        lineHeight = 16.sp
+                    )
+                }
+            }
+        }
+    }
+}
+
+private fun buildEducationErrorDetail(
+    folderPath: String,
+    syncState: com.example.rsdkiptvplayer.util.EducationSyncManager.SyncState
+): String {
+    val syncDetail = (syncState as? com.example.rsdkiptvplayer.util.EducationSyncManager.SyncState.Error)?.detail
+    if (!syncDetail.isNullOrBlank()) {
+        return syncDetail
+    }
+
+    return if (folderPath.isEmpty()) {
+        "Isi path seperti \\\\10.45.128.129\\NamaShare\\folder di menu Setting."
+    } else {
+        folderPath
     }
 }

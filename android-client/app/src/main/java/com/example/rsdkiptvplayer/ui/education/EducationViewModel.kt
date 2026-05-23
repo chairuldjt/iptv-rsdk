@@ -107,8 +107,14 @@ class EducationViewModel(application: Application) : AndroidViewModel(applicatio
             com.example.rsdkiptvplayer.util.EducationSyncManager.syncState.collectLatest { state ->
                 if (state is com.example.rsdkiptvplayer.util.EducationSyncManager.SyncState.Success && 
                     lastState is com.example.rsdkiptvplayer.util.EducationSyncManager.SyncState.Syncing) {
+                    _errorMessage.value = null
                     loadAndPlay()
+                } else if (state is com.example.rsdkiptvplayer.util.EducationSyncManager.SyncState.Checking ||
+                    state is com.example.rsdkiptvplayer.util.EducationSyncManager.SyncState.Syncing) {
+                    _isLoading.value = false
+                    _errorMessage.value = null
                 } else if (state is com.example.rsdkiptvplayer.util.EducationSyncManager.SyncState.Error) {
+                    _isLoading.value = false
                     _errorMessage.value = "Gagal menyalin video dari server: ${state.message}"
                 }
                 lastState = state

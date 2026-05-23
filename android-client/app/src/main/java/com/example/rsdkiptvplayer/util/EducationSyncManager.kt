@@ -4,6 +4,7 @@ import android.content.Context
 import com.example.rsdkiptvplayer.IptvApplication
 import jcifs.context.SingletonContext
 import jcifs.smb.NtlmPasswordAuthenticator
+import jcifs.smb.SmbException
 import jcifs.smb.SmbFile
 import jcifs.smb.SmbFileInputStream
 import kotlinx.coroutines.Dispatchers
@@ -24,9 +25,10 @@ object EducationSyncManager {
 
     sealed class SyncState {
         object Idle : SyncState()
+        data class Checking(val message: String, val detail: String? = null) : SyncState()
         data class Syncing(val currentFile: Int, val totalFiles: Int, val fileName: String, val progress: Float) : SyncState()
-        object Success : SyncState()
-        data class Error(val message: String) : SyncState()
+        data class Success(val message: String = "Sinkronisasi edukasi selesai.") : SyncState()
+        data class Error(val message: String, val detail: String? = null) : SyncState()
     }
 
     suspend fun sync(context: Context, forceSync: Boolean = false) = withContext(Dispatchers.IO) {
@@ -36,7 +38,10 @@ object EducationSyncManager {
 
             val path = dataStoreManager.educationVideoPathFlow.first().trim()
             if (path.isEmpty()) {
-                _syncState.value = SyncState.Error("Path folder video edukasi kosong.")
+                _syncState.value = SyncState.Error(
+                    message = "Path folder video edukasi kosong.",
+                    detail = "Isi path SMB seperti \\\\10.55.1.5\\NamaShare\\folder."
+                )
                 return@withContext
             }
 
@@ -52,22 +57,53 @@ object EducationSyncManager {
             val localFiles = localDir.listFiles() ?: emptyArray()
 
             if (forceSync) {
+                _syncState.value = SyncState.Checking(
+                    message = "Membersihkan cache video edukasi lokal...",
+                    detail = "Cache lama akan disalin ulang dari SMB."
+                )
                 localFiles.forEach { it.delete() }
             }
 
             val folderUrl = normalizeSmbFolderUrl(path)
+            _syncState.value = SyncState.Checking(
+                message = "Menghubungi folder SMB...",
+                detail = folderUrl
+            )
+
             val smbContext = SingletonContext.getInstance()
                 .withCredentials(NtlmPasswordAuthenticator(domain, username, password))
             
             val folder = SmbFile(folderUrl, smbContext)
-            if (!folder.exists() || !folder.isDirectory) {
-                _syncState.value = SyncState.Error("Folder SMB tidak dapat diakses atau bukan folder.")
+            val exists = folder.exists()
+            val isDirectory = exists && folder.isDirectory
+            if (!exists || !isDirectory) {
+                _syncState.value = SyncState.Error(
+                    message = if (!exists) {
+                        "Folder SMB tidak ditemukan atau tidak bisa dijangkau."
+                    } else {
+                        "Path SMB terbaca, tapi bukan folder."
+                    },
+                    detail = "Path: $folderUrl"
+                )
                 return@withContext
             }
+
+            _syncState.value = SyncState.Checking(
+                message = "Folder SMB terhubung. Membaca daftar video...",
+                detail = folderUrl
+            )
 
             val remoteFiles = folder.listFiles()
                 ?.filter { file -> !file.isDirectory && file.name.isSupportedVideoName() }
                 ?: emptyList()
+
+            if (remoteFiles.isEmpty()) {
+                _syncState.value = SyncState.Error(
+                    message = "Folder SMB terbaca, tapi tidak ada file video yang didukung.",
+                    detail = "Format didukung: mp4, mkv, webm, ts, m3u8, mov, avi."
+                )
+                return@withContext
+            }
 
             // 1. Delete local files not present on remote
             val remoteNames = remoteFiles.map { it.name }.toSet()
@@ -86,7 +122,7 @@ object EducationSyncManager {
             }
 
             if (filesToDownload.isEmpty()) {
-                _syncState.value = SyncState.Success
+                _syncState.value = SyncState.Success("Semua video edukasi sudah tersalin. Tidak ada file baru.")
                 return@withContext
             }
 
@@ -134,15 +170,40 @@ object EducationSyncManager {
                 }
             }
 
-            _syncState.value = SyncState.Success
-            dataStoreManager.addLog("Education videos cached successfully: ${filesToDownload.size} files downloaded.")
+            _syncState.value = SyncState.Success("Berhasil menyalin ${filesToDownload.size} video edukasi.")
+            dataStoreManager.addLog("Education videos cached successfully: ${filesToDownload.size} files downloaded from $folderUrl.")
         } catch (e: Exception) {
             e.printStackTrace()
-            _syncState.value = SyncState.Error(e.localizedMessage ?: "Gagal sinkronisasi SMB.")
+            _syncState.value = SyncState.Error(
+                message = classifySyncError(e),
+                detail = e.localizedMessage ?: e.javaClass.simpleName
+            )
             val app = context.applicationContext as IptvApplication
             kotlinx.coroutines.CoroutineScope(Dispatchers.IO).launch {
-                app.dataStoreManager.addLog("SMB Caching Error: ${e.message}")
+                app.dataStoreManager.addLog("SMB Caching Error: ${e.javaClass.simpleName}: ${e.message}")
             }
+        }
+    }
+
+    private fun classifySyncError(error: Exception): String {
+        val rawMessage = error.localizedMessage.orEmpty()
+        val message = rawMessage.lowercase()
+        return when {
+            error is SmbException && (
+                message.contains("access is denied") ||
+                    message.contains("logon failure") ||
+                    message.contains("permission")
+            ) -> "Akses SMB ditolak. Periksa username, password, domain, dan permission share."
+            message.contains("failed to connect") ||
+                message.contains("timed out") ||
+                message.contains("timeout") ||
+                message.contains("unreachable") ||
+                message.contains("network is unreachable") -> "Server SMB tidak bisa dijangkau dari STB. Periksa IP, jaringan, dan firewall."
+            message.contains("not found") ||
+                message.contains("cannot find") ||
+                message.contains("no such") -> "Path SMB tidak ditemukan. Periksa nama share dan folder."
+            message.contains("unknown host") -> "Host SMB tidak ditemukan. Gunakan IP server atau periksa DNS."
+            else -> "Gagal sinkronisasi SMB."
         }
     }
 
