@@ -1,7 +1,10 @@
 package com.example.rsdkiptvplayer.ui.home
 
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.ui.draw.alpha
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -479,16 +482,50 @@ private fun HospitalityCarouselCard(
         },
         label = "hospitality_carousel_scale"
     )
-    val cardWidth = when (distance) {
-        0 -> 150.dp
-        1 -> 112.dp
-        else -> 82.dp
-    }
-    val iconBoxSize = when (distance) {
-        0 -> 102.dp
-        1 -> 72.dp
-        else -> 50.dp
-    }
+    val cardWidth by animateDpAsState(
+        targetValue = when (distance) {
+            0 -> 150.dp
+            1 -> 112.dp
+            else -> 82.dp
+        },
+        label = "hospitality_carousel_width"
+    )
+    val iconBoxSize by animateDpAsState(
+        targetValue = when (distance) {
+            0 -> 102.dp
+            1 -> 72.dp
+            else -> 50.dp
+        },
+        label = "hospitality_carousel_box_size"
+    )
+    val offsetY by animateDpAsState(
+        targetValue = if (isActive) (-18).dp else 14.dp,
+        label = "hospitality_carousel_offset_y"
+    )
+    val borderWidth by animateDpAsState(
+        targetValue = if (isActive) 4.dp else 2.5.dp,
+        label = "hospitality_carousel_border_width"
+    )
+    val borderColor by animateColorAsState(
+        targetValue = if (isActive) item.accent else Color.White.copy(alpha = 0.45f),
+        label = "hospitality_carousel_border_color"
+    )
+    val cornerRadius by animateDpAsState(
+        targetValue = if (isActive) 24.dp else 18.dp,
+        label = "hospitality_carousel_corner_radius"
+    )
+    val cardShape = RoundedCornerShape(cornerRadius)
+
+    val shadowElevation by animateDpAsState(
+        targetValue = if (isActive) 24.dp else 7.dp,
+        label = "hospitality_carousel_shadow_elevation"
+    )
+
+    val contentAlpha by animateFloatAsState(
+        targetValue = if (distance <= 1) 1f else 0f,
+        label = "hospitality_carousel_content_alpha"
+    )
+
     val iconSize = when (distance) {
         0 -> 32.sp
         1 -> 22.sp
@@ -499,7 +536,7 @@ private fun HospitalityCarouselCard(
     Column(
         modifier = Modifier
             .width(cardWidth)
-            .offset(y = if (isActive) (-18).dp else 14.dp)
+            .offset(y = offsetY)
             .scale(scale)
             .clickable(
                 interactionSource = interactionSource,
@@ -527,7 +564,7 @@ private fun HospitalityCarouselCard(
             Box(
                 modifier = Modifier
                     .size(iconBoxSize)
-                    .clip(RoundedCornerShape(if (isActive) 24.dp else 18.dp))
+                    .clip(cardShape)
                     .background(
                         if (isActive) {
                             Brush.verticalGradient(
@@ -547,14 +584,14 @@ private fun HospitalityCarouselCard(
                     )
                     .border(
                         BorderStroke(
-                            width = if (isActive) 4.dp else 2.5.dp,
-                            color = if (isActive) item.accent else Color.White.copy(alpha = 0.45f)
+                            width = borderWidth,
+                            color = borderColor
                         ),
-                        RoundedCornerShape(if (isActive) 24.dp else 18.dp)
+                        cardShape
                     )
                     .shadow(
-                        elevation = if (isActive) 24.dp else 7.dp,
-                        shape = RoundedCornerShape(if (isActive) 24.dp else 18.dp),
+                        elevation = shadowElevation,
+                        shape = cardShape,
                         ambientColor = item.accent.copy(alpha = if (isActive) 0.80f else 0.14f),
                         spotColor = item.accent.copy(alpha = if (isActive) 0.95f else 0.18f)
                     ),
@@ -581,13 +618,33 @@ private fun HospitalityCarouselCard(
                 )
             }
         }
-        Spacer(modifier = Modifier.height(if (isActive) 14.dp else 6.dp))
-        if (distance <= 1) {
+        val textSpacerHeight by animateDpAsState(
+            targetValue = if (isActive) 14.dp else 6.dp,
+            label = "hospitality_carousel_text_spacer"
+        )
+        Spacer(modifier = Modifier.height(textSpacerHeight))
+        
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            modifier = Modifier.alpha(contentAlpha)
+        ) {
+            val titleBgAlpha by animateFloatAsState(
+                targetValue = if (isActive) 0.58f else 0.20f,
+                label = "hospitality_carousel_title_bg_alpha"
+            )
+            val titleHorizontalPadding by animateDpAsState(
+                targetValue = if (isActive) 12.dp else 8.dp,
+                label = "hospitality_carousel_title_padding_h"
+            )
+            val titleVerticalPadding by animateDpAsState(
+                targetValue = if (isActive) 4.dp else 2.5.dp,
+                label = "hospitality_carousel_title_padding_v"
+            )
             Box(
                 modifier = Modifier
                     .clip(RoundedCornerShape(10.dp))
-                    .background(Color.Black.copy(alpha = if (isActive) 0.58f else 0.20f))
-                    .padding(horizontal = if (isActive) 12.dp else 8.dp, vertical = if (isActive) 4.dp else 2.5.dp)
+                    .background(Color.Black.copy(alpha = titleBgAlpha))
+                    .padding(horizontal = titleHorizontalPadding, vertical = titleVerticalPadding)
             ) {
                 Text(
                     text = item.title,

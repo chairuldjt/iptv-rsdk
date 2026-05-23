@@ -50,6 +50,27 @@ class MainActivity : ComponentActivity() {
                     var activeSettingsTab by remember { mutableStateOf(0) }
                     var selectedChannelId by remember { mutableIntStateOf(-1) }
 
+                    LaunchedEffect(Unit) {
+                        app.repository.remoteCommandFlow.collect { (command, value) ->
+                            when (command) {
+                                "NAVIGATE_HOME" -> currentScreen = "home"
+                                "NAVIGATE_TV" -> currentScreen = "channels"
+                                "NAVIGATE_EDUCATION" -> currentScreen = "education"
+                                "NAVIGATE_SETTINGS" -> {
+                                    activeSettingsTab = value?.toIntOrNull() ?: 0
+                                    currentScreen = "settings"
+                                }
+                                "PLAY_CHANNEL" -> {
+                                    val chId = value?.toIntOrNull()
+                                    if (chId != null) {
+                                        selectedChannelId = chId
+                                        currentScreen = "player"
+                                    }
+                                }
+                            }
+                        }
+                    }
+
 
 
                     when (currentScreen) {

@@ -16,6 +16,12 @@ class IptvApplication : Application() {
     lateinit var repository: IptvRepository
         private set
 
+    lateinit var remoteServer: com.example.rsdkiptvplayer.util.LocalRemoteServer
+        private set
+
+    lateinit var remotePoller: com.example.rsdkiptvplayer.util.RemoteCommandPoller
+        private set
+
     override fun onCreate() {
         super.onCreate()
         instance = this
@@ -23,6 +29,24 @@ class IptvApplication : Application() {
         dataStoreManager = DataStoreManager(this)
         database = IptvDatabase.getDatabase(this)
         repository = IptvRepository(this, database.channelDao(), dataStoreManager)
+        
+        remoteServer = com.example.rsdkiptvplayer.util.LocalRemoteServer(this, dataStoreManager) { command, value ->
+            repository.emitRemoteCommand(command, value)
+        }
+        remoteServer.start()
+
+        remotePoller = com.example.rsdkiptvplayer.util.RemoteCommandPoller(dataStoreManager, remoteServer)
+        remotePoller.start()
+    }
+
+    override fun onTerminate() {
+        if (::remotePoller.isInitialized) {
+            remotePoller.stop()
+        }
+        if (::remoteServer.isInitialized) {
+            remoteServer.stop()
+        }
+        super.onTerminate()
     }
 
     companion object {

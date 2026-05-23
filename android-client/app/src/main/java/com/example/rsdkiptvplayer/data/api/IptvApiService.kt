@@ -133,6 +133,9 @@ interface IptvApiService {
 
     @GET("api/app-update/check")
     suspend fun checkUpdate(@Query("versionCode") currentCode: Int): Response<UpdateCheckResponse>
+
+    @GET("api/device/remote/poll")
+    suspend fun pollCommands(@Query("deviceId") deviceId: String): Response<PollResponse>
 }
 
 data class UpdateCheckResponse(
@@ -144,4 +147,14 @@ data class UpdateCheckResponse(
     val apk_file_name: String?,
     val is_mandatory: Boolean?,
     val changelog: String?
+)
+
+data class PollResponse(
+    val status: Boolean,
+    val commands: List<QueuedCommand>
+)
+
+data class QueuedCommand(
+    val command: String,
+    val value: String?
 )

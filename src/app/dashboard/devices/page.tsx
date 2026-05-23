@@ -2,6 +2,7 @@ import prisma from '@/lib/db'
 import { revalidatePath } from 'next/cache'
 import ConfirmForm from '@/components/ConfirmForm'
 import DeviceConfigForm from '@/components/DeviceConfigForm'
+import RemoteControlModal from '@/components/RemoteControlModal'
 import { redirect } from 'next/navigation'
 import { getOnlineThreshold } from '@/lib/time'
 import { cleanupOfflineDevices, getOfflineAutoDeleteDays, setOfflineAutoDeleteDays } from '@/lib/settings'
@@ -157,10 +158,11 @@ async function saveDeviceConfigAction(formData: FormData) {
 export default async function DevicesPage({
   searchParams,
 }: {
-  searchParams: Promise<{ edit?: string; success?: string; status?: string; cleanupSaved?: string }>
+  searchParams: Promise<{ edit?: string; success?: string; status?: string; cleanupSaved?: string; remote?: string }>
 }) {
   const resolvedSearchParams = await searchParams
   const editDeviceId = resolvedSearchParams.edit
+  const remoteDeviceId = resolvedSearchParams.remote
   const showSuccess = resolvedSearchParams.success === '1'
   const showCleanupSaved = resolvedSearchParams.cleanupSaved === '1'
   const statusFilter = (['all', 'online', 'offline', 'disabled'].includes(resolvedSearchParams.status || '')
@@ -181,6 +183,11 @@ export default async function DevicesPage({
   // Find the selected device for edit panel
   const editingDevice = editDeviceId
     ? devices.find((d) => d.deviceId === editDeviceId)
+    : null
+
+  // Find the selected device for remote modal
+  const remoteDevice = remoteDeviceId
+    ? devices.find((d) => d.deviceId === remoteDeviceId)
     : null
 
   const tenMinutesAgo = getOnlineThreshold(10)
@@ -382,6 +389,24 @@ export default async function DevicesPage({
                               Config
                             </a>
 
+                            {/* Remote Control Button */}
+                            {d.isActive && isOnline ? (
+                              <a
+                                href={`/dashboard/devices?remote=${d.deviceId}`}
+                                className="px-3 py-1.5 rounded-xl text-xs font-bold text-emerald-400 hover:text-white border border-emerald-500/20 hover:bg-emerald-500/15 transition-all animate-pulse"
+                              >
+                                Remote
+                              </a>
+                            ) : (
+                              <button
+                                disabled
+                                className="px-3 py-1.5 rounded-xl text-xs font-bold text-slate-600 border border-slate-800/40 cursor-not-allowed opacity-50"
+                                title="Device must be active and online to use web remote control"
+                              >
+                                Remote
+                              </button>
+                            )}
+
                             {/* Delete Form */}
                             <ConfirmForm
                               action={deleteDeviceAction}
@@ -447,6 +472,15 @@ export default async function DevicesPage({
             />
           </div>
         </div>
+        )}
+        {/* Remote Control Modal */}
+        {remoteDevice && (
+          <RemoteControlModal
+            deviceId={remoteDevice.deviceId}
+            deviceName={remoteDevice.deviceName}
+            deviceIp={remoteDevice.lastIp}
+            closeUrl="/dashboard/devices"
+          />
         )}
       </div>
     </div>

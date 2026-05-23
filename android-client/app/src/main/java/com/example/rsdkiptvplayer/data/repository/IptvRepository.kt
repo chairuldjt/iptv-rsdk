@@ -11,6 +11,8 @@ import com.example.rsdkiptvplayer.data.datastore.DataStoreManager
 import com.example.rsdkiptvplayer.data.parser.M3uParser
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -27,6 +29,13 @@ class IptvRepository(
 
     val allChannelsFlow: Flow<List<ChannelEntity>> = channelDao.getAllChannelsFlow()
     val allCategoriesFlow: Flow<List<String>> = channelDao.getAllCategoriesFlow()
+    
+    private val _remoteCommandFlow = MutableSharedFlow<Pair<String, String?>>(extraBufferCapacity = 10)
+    val remoteCommandFlow: SharedFlow<Pair<String, String?>> = _remoteCommandFlow
+
+    fun emitRemoteCommand(command: String, value: String?) {
+        _remoteCommandFlow.tryEmit(Pair(command, value))
+    }
     val serverUrlFlow: Flow<String> = dataStoreManager.serverUrlFlow
     val lockSettingsFlow: Flow<Boolean> = dataStoreManager.lockSettingsFlow
     val autoStartFlow: Flow<Boolean> = dataStoreManager.autoStartFlow
