@@ -846,6 +846,17 @@ private fun InfoAplikasiDialog(
         }
     }
 
+    LaunchedEffect(checkingState, isDownloading) {
+        if (checkingState != "checking" && !isDownloading) {
+            delay(100)
+            try {
+                dialogFocusRequester.requestFocus()
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+        }
+    }
+
     Box(
         modifier = Modifier
             .fillMaxSize()
