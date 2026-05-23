@@ -2,7 +2,7 @@ import prisma from '@/lib/db'
 import { revalidatePath } from 'next/cache'
 import ChannelLogo from '@/components/ChannelLogo'
 import ChannelPreviewButton from '@/components/ChannelPreviewButton'
-import { createPlayableStreamUrl } from '@/lib/playableStreams'
+import { createPlayableStreamUrl, createUdpOnDemandHlsPath, isUdpStreamUrl } from '@/lib/playableStreams'
 import { getHlsRelayBaseUrl } from '@/lib/settings'
 
 export const revalidate = 0 // Disable cache for live channel lists
@@ -207,7 +207,7 @@ export default async function ChannelsPage({
                       relayUrl={createPlayableStreamUrl({
                         origin: '',
                         name: c.name,
-                        streamUrl: c.streamUrl,
+                        streamUrl: isUdpStreamUrl(c.streamUrl) ? createUdpOnDemandHlsPath(c.id) : c.streamUrl,
                         hlsRelayBaseUrl,
                       })}
                     />
