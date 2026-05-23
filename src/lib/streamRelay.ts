@@ -37,9 +37,14 @@ export function verifyRelayToken(token: string): string | null {
 }
 
 export function createRelayUrl(origin: string, targetUrl: string): string {
-  const relayUrl = new URL('/api/stream/relay', origin)
-  relayUrl.searchParams.set('t', createRelayToken(targetUrl))
+  const relayUrl = new URL(createRelayPath(targetUrl), origin)
   return relayUrl.toString()
+}
+
+export function createRelayPath(targetUrl: string): string {
+  const relayUrl = new URL('/api/stream/relay', 'http://localhost')
+  relayUrl.searchParams.set('t', createRelayToken(targetUrl))
+  return `${relayUrl.pathname}${relayUrl.search}`
 }
 
 function sign(payload: string): string {

@@ -1,6 +1,8 @@
 import prisma from '@/lib/db'
 import { revalidatePath } from 'next/cache'
 import ChannelLogo from '@/components/ChannelLogo'
+import ChannelPreviewButton from '@/components/ChannelPreviewButton'
+import { createRelayPath } from '@/lib/streamRelay'
 
 export const revalidate = 0 // Disable cache for live channel lists
 const PAGE_SIZE = 200
@@ -196,21 +198,29 @@ export default async function ChannelsPage({
                     </div>
                   </div>
 
-                  {/* Toggle Activation Action */}
-                  <form action={toggleChannelAction} className="shrink-0">
-                    <input type="hidden" name="channelId" value={c.id} />
-                    <input type="hidden" name="currentStatus" value={c.isActive ? 'true' : 'false'} />
-                    <button
-                      type="submit"
-                      className={`px-3 py-1.5 rounded-xl text-xs font-bold cursor-pointer transition-all ${
-                        c.isActive
-                          ? 'bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border border-emerald-500/10'
-                          : 'bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/10'
-                      }`}
-                    >
-                      {c.isActive ? 'Active' : 'Disabled'}
-                    </button>
-                  </form>
+                  <div className="shrink-0 flex items-center gap-2">
+                    <ChannelPreviewButton
+                      name={c.name}
+                      directUrl={c.streamUrl}
+                      relayUrl={createRelayPath(c.streamUrl)}
+                    />
+
+                    {/* Toggle Activation Action */}
+                    <form action={toggleChannelAction}>
+                      <input type="hidden" name="channelId" value={c.id} />
+                      <input type="hidden" name="currentStatus" value={c.isActive ? 'true' : 'false'} />
+                      <button
+                        type="submit"
+                        className={`px-3 py-1.5 rounded-xl text-xs font-bold cursor-pointer transition-all ${
+                          c.isActive
+                            ? 'bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border border-emerald-500/10'
+                            : 'bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/10'
+                        }`}
+                      >
+                        {c.isActive ? 'Active' : 'Disabled'}
+                      </button>
+                    </form>
+                  </div>
                 </div>
               ))}
             </div>
