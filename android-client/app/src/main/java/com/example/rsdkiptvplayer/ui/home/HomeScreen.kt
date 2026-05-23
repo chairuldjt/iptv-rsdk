@@ -48,6 +48,9 @@ import java.text.SimpleDateFormat
 import java.util.*
 import android.widget.Toast
 import com.example.rsdkiptvplayer.util.UpdateManager
+import com.example.rsdkiptvplayer.data.api.RetrofitClient
+import com.example.rsdkiptvplayer.data.api.UpdateCheckResponse
+import kotlinx.coroutines.launch
 
 @Composable
 fun HomeScreen(
@@ -69,13 +72,16 @@ fun HomeScreen(
     var timeString by remember { mutableStateOf("") }
     var dateString by remember { mutableStateOf("") }
     var versionText by remember { mutableStateOf("") }
+    var currentVersionName by remember { mutableStateOf("") }
+    var currentVersionCode by remember { mutableIntStateOf(0) }
+    var showInfoDialog by remember { mutableStateOf(false) }
 
     LaunchedEffect(Unit) {
         resolvedDeviceId = dataStoreManager.getDeviceId()
         localIpAddress = app.repository.getLocalIpAddress()
-        val versionCode = UpdateManager.getCurrentVersionCode(context)
-        val versionName = UpdateManager.getCurrentVersionName(context)
-        versionText = "v$versionName ($versionCode)"
+        currentVersionCode = UpdateManager.getCurrentVersionCode(context)
+        currentVersionName = UpdateManager.getCurrentVersionName(context)
+        versionText = "v$currentVersionName ($currentVersionCode)"
     }
 
     LaunchedEffect(Unit) {
@@ -149,8 +155,20 @@ fun HomeScreen(
                     onYoutubeClick = {
                         Toast.makeText(context, "YouTube belum tersedia.", Toast.LENGTH_SHORT).show()
                     },
-                    onSettingsClick = { onNavigateToSettings(0) }
+                    onSettingsClick = { onNavigateToSettings(0) },
+                    onInfoClick = { showInfoDialog = true }
                 )
+        }
+
+        if (showInfoDialog) {
+            InfoAplikasiDialog(
+                deviceId = resolvedDeviceId,
+                ipAddress = localIpAddress,
+                serverUrl = serverUrl,
+                currentVersionCode = currentVersionCode,
+                currentVersionName = currentVersionName,
+                onDismiss = { showInfoDialog = false }
+            )
         }
     }
 }
@@ -267,7 +285,8 @@ private fun HospitalityMenuBar(
     onTvClick: () -> Unit,
     onServiceClick: () -> Unit,
     onYoutubeClick: () -> Unit,
-    onSettingsClick: () -> Unit
+    onSettingsClick: () -> Unit,
+    onInfoClick: () -> Unit
 ) {
     var selectedIndex by remember { mutableIntStateOf(2) }
     var dragAmount by remember { mutableFloatStateOf(0f) }
@@ -300,6 +319,13 @@ private fun HospitalityMenuBar(
             subtitle = "Dikunci",
             accent = Color(0xFFFF4444),
             action = onYoutubeClick
+        ),
+        HospitalityCarouselItem(
+            icon = "ℹ",
+            title = "INFO APLIKASI",
+            subtitle = "Cek Pembaruan",
+            accent = Color(0xFFC084FC),
+            action = onInfoClick
         ),
         HospitalityCarouselItem(
             icon = "⚙",
@@ -708,5 +734,312 @@ private fun HomeDialog(
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun InfoAplikasiDialog(
+    deviceId: String,
+    ipAddress: String,
+    serverUrl: String,
+    currentVersionCode: Int,
+    currentVersionName: String,
+    onDismiss: () -> Unit
+) {
+    val context = LocalContext.current
+    val coroutineScope = rememberCoroutineScope()
+
+    var checkingState by remember { mutableStateOf("idle") } // idle, checking, update_available, no_update, error
+    var statusMessage by remember { mutableStateOf("") }
+
+    // Update info if found
+    var updateVersionName by remember { mutableStateOf("") }
+    var updateVersionCode by remember { mutableIntStateOf(0) }
+    var apkUrl by remember { mutableStateOf("") }
+    var changelog by remember { mutableStateOf("") }
+
+    // Downloading state
+    var isDownloading by remember { mutableStateOf(false) }
+    var downloadProgress by remember { mutableStateOf(0f) }
+
+    val dialogFocusRequester = remember { FocusRequester() }
+
+    suspend fun checkUpdates() {
+        checkingState = "checking"
+        statusMessage = "Memeriksa pembaruan..."
+        delay(800) // visual delay for smoothness
+        try {
+            if (serverUrl.isBlank()) {
+                checkingState = "error"
+                statusMessage = "Server URL belum dikonfigurasi."
+                return
+            }
+            val apiService = RetrofitClient.getService(serverUrl)
+            val response = apiService.checkUpdate(currentVersionCode)
+            if (response.isSuccessful) {
+                val body = response.body()
+                if (body != null && body.update_available) {
+                    updateVersionName = body.version_name ?: ""
+                    updateVersionCode = body.version_code ?: 0
+                    apkUrl = body.apk_url ?: ""
+                    changelog = body.changelog ?: ""
+                    checkingState = "update_available"
+                    statusMessage = "Pembaruan tersedia!"
+                } else {
+                    checkingState = "no_update"
+                    statusMessage = "Aplikasi Anda sudah versi terbaru."
+                }
+            } else {
+                checkingState = "error"
+                statusMessage = "Gagal memeriksa pembaruan (HTTP ${response.code()})"
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
+            checkingState = "error"
+            statusMessage = "Koneksi gagal atau server offline."
+        }
+    }
+
+    suspend fun startDownload() {
+        isDownloading = true
+        statusMessage = "Mengunduh pembaruan... 0%"
+        try {
+            val downloadedFile = UpdateManager.downloadApk(context, apkUrl) { progress ->
+                downloadProgress = progress
+                statusMessage = "Mengunduh pembaruan... ${(progress * 100).toInt()}%"
+            }
+            if (downloadedFile != null) {
+                statusMessage = "Memasang pembaruan..."
+                UpdateManager.installApk(context, downloadedFile)
+            } else {
+                Toast.makeText(context, "Gagal mengunduh pembaruan.", Toast.LENGTH_LONG).show()
+                isDownloading = false
+                checkingState = "error"
+                statusMessage = "Gagal mengunduh berkas APK."
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
+            Toast.makeText(context, "Terjadi kesalahan saat mengunduh.", Toast.LENGTH_LONG).show()
+            isDownloading = false
+            checkingState = "error"
+            statusMessage = "Terjadi kesalahan saat mengunduh."
+        }
+    }
+
+    LaunchedEffect(Unit) {
+        delay(150)
+        try {
+            dialogFocusRequester.requestFocus()
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+    }
+
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color.Black.copy(alpha = 0.78f)),
+        contentAlignment = Alignment.Center
+    ) {
+        Card(
+            colors = CardDefaults.cardColors(containerColor = Color(0xF20B1725)),
+            border = BorderStroke(1.dp, Color(0xFFC084FC).copy(alpha = 0.35f)),
+            shape = RoundedCornerShape(20.dp),
+            modifier = Modifier
+                .width(460.dp)
+                .padding(16.dp)
+        ) {
+            Column(
+                modifier = Modifier.padding(26.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                // Circular Icon header
+                Box(
+                    modifier = Modifier
+                        .size(58.dp)
+                        .clip(CircleShape)
+                        .background(Color(0xFFC084FC).copy(alpha = 0.16f))
+                        .border(1.dp, Color(0xFFC084FC).copy(alpha = 0.45f), CircleShape),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text("ℹ", fontSize = 24.sp, color = Color.White, fontWeight = FontWeight.Bold)
+                }
+                
+                Spacer(modifier = Modifier.height(16.dp))
+                Text("Informasi & Pembaruan Aplikasi", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                Spacer(modifier = Modifier.height(20.dp))
+
+                // Detail Grid-like layout
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(Color.Black.copy(alpha = 0.25f), RoundedCornerShape(12.dp))
+                        .border(1.dp, Color.White.copy(alpha = 0.08f), RoundedCornerShape(12.dp))
+                        .padding(14.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    InfoRow("Versi Terpasang", "v$currentVersionName ($currentVersionCode)")
+                    InfoRow("ID Perangkat", deviceId)
+                    InfoRow("IP Address", ipAddress)
+                    InfoRow("URL Server", if (serverUrl.isBlank()) "Belum disetting" else serverUrl)
+                }
+
+                Spacer(modifier = Modifier.height(22.dp))
+
+                // Action area based on status
+                if (checkingState == "checking") {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        CircularProgressIndicator(
+                            color = Color(0xFFC084FC),
+                            strokeWidth = 2.dp,
+                            modifier = Modifier.size(24.dp)
+                        )
+                        Spacer(modifier = Modifier.height(10.dp))
+                        Text(statusMessage, color = Color.White, fontSize = 13.sp)
+                    }
+                } else if (checkingState == "update_available") {
+                    Column(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        Text(
+                            text = "Pembaruan Tersedia: v$updateVersionName (Build $updateVersionCode)",
+                            color = Color(0xFF86EFAC),
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 14.sp
+                        )
+                        if (changelog.isNotBlank()) {
+                            Text(
+                                text = "Catatan: $changelog",
+                                color = Color.White.copy(alpha = 0.7f),
+                                fontSize = 12.sp,
+                                textAlign = TextAlign.Center,
+                                modifier = Modifier.padding(top = 4.dp, bottom = 16.dp)
+                            )
+                        } else {
+                            Spacer(modifier = Modifier.height(16.dp))
+                        }
+
+                        if (isDownloading) {
+                            Column(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalAlignment = Alignment.CenterHorizontally
+                            ) {
+                                LinearProgressIndicator(
+                                    progress = { downloadProgress },
+                                    color = Color(0xFFC084FC),
+                                    trackColor = Color.White.copy(alpha = 0.15f),
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .height(8.dp)
+                                        .clip(CircleShape)
+                                )
+                                Spacer(modifier = Modifier.height(10.dp))
+                                Text(statusMessage, color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                            }
+                        } else {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(12.dp)
+                            ) {
+                                Button(
+                                    onClick = {
+                                        coroutineScope.launch {
+                                            startDownload()
+                                        }
+                                    },
+                                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFC084FC)),
+                                    shape = RoundedCornerShape(10.dp),
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .height(42.dp)
+                                        .focusRequester(dialogFocusRequester)
+                                        .focusable()
+                                ) {
+                                    Text("Perbarui Sekarang", fontWeight = FontWeight.Bold, color = Color.Black)
+                                }
+                                OutlinedButton(
+                                    onClick = { checkingState = "idle" },
+                                    colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.White),
+                                    border = BorderStroke(1.dp, Color.White.copy(alpha = 0.25f)),
+                                    shape = RoundedCornerShape(10.dp),
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .height(42.dp)
+                                ) {
+                                    Text("Batal", fontWeight = FontWeight.Bold)
+                                }
+                            }
+                        }
+                    }
+                } else {
+                    // Idle, No Update, or Error states
+                    Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.fillMaxWidth()) {
+                        if (checkingState == "no_update") {
+                            Text(
+                                text = statusMessage,
+                                color = Color(0xFF86EFAC),
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 13.sp,
+                                modifier = Modifier.padding(bottom = 16.dp)
+                            )
+                        } else if (checkingState == "error") {
+                            Text(
+                                text = statusMessage,
+                                color = Color(0xFFFCA5A5),
+                                fontWeight = FontWeight.SemiBold,
+                                fontSize = 13.sp,
+                                modifier = Modifier.padding(bottom = 16.dp)
+                            )
+                        }
+
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(12.dp)
+                        ) {
+                            Button(
+                                onClick = {
+                                    coroutineScope.launch {
+                                        checkUpdates()
+                                    }
+                                },
+                                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFC084FC)),
+                                shape = RoundedCornerShape(10.dp),
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .height(44.dp)
+                                    .focusRequester(dialogFocusRequester)
+                                    .focusable()
+                            ) {
+                                Text("Cek Pembaruan", fontWeight = FontWeight.Bold, color = Color.Black)
+                            }
+                            OutlinedButton(
+                                onClick = onDismiss,
+                                colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.White.copy(alpha = 0.85f)),
+                                border = BorderStroke(1.dp, Color.White.copy(alpha = 0.18f)),
+                                shape = RoundedCornerShape(10.dp),
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .height(44.dp)
+                            ) {
+                                Text("Tutup", fontWeight = FontWeight.Bold)
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun InfoRow(label: String, value: String) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(text = label, color = Color.White.copy(alpha = 0.5f), fontSize = 12.sp, fontWeight = FontWeight.Medium)
+        Text(text = value, color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
     }
 }
