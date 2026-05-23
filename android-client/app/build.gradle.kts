@@ -151,5 +151,6 @@ dependencies {
   implementation("androidx.media3:media3-ui:$media3Version")
 
   // SMB/CIFS reader for Windows network share education videos
+  implementation("org.bouncycastle:bcprov-jdk15to18:1.78.1")
   implementation("eu.agno3.jcifs:jcifs-ng:2.1.10")
 }

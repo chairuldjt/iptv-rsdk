@@ -17,6 +17,9 @@ import java.io.File
 import java.io.FileOutputStream
 import java.net.URLDecoder
 import java.net.URLEncoder
+import java.security.MessageDigest
+import java.security.Security
+import org.bouncycastle.jce.provider.BouncyCastleProvider
 
 object EducationSyncManager {
 
@@ -70,6 +73,7 @@ object EducationSyncManager {
                 detail = folderUrl
             )
 
+            ensureMd4Provider()
             val smbContext = SingletonContext.getInstance()
                 .withCredentials(NtlmPasswordAuthenticator(domain, username, password))
             
@@ -205,6 +209,19 @@ object EducationSyncManager {
             message.contains("unknown host") -> "Host SMB tidak ditemukan. Gunakan IP server atau periksa DNS."
             else -> "Gagal sinkronisasi SMB."
         }
+    }
+
+    private fun ensureMd4Provider() {
+        try {
+            MessageDigest.getInstance("MD4", "BC")
+            return
+        } catch (e: Exception) {
+            // Android's built-in BC provider on some STBs does not expose MD4.
+        }
+
+        Security.removeProvider(BouncyCastleProvider.PROVIDER_NAME)
+        Security.insertProviderAt(BouncyCastleProvider(), 1)
+        MessageDigest.getInstance("MD4", "BC")
     }
 
     private fun normalizeSmbFolderUrl(path: String): String {
