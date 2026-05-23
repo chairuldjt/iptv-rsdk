@@ -30,9 +30,7 @@ export function createUdpHlsRelayUrl(channelName: string, hlsRelayBaseUrl: strin
 }
 
 export function createUdpOnDemandHlsPath(channelId: number): string {
-  const relayUrl = new URL('/api/stream/udp-hls', 'http://localhost')
-  relayUrl.searchParams.set('channelId', channelId.toString())
-  return `${relayUrl.pathname}${relayUrl.search}`
+  return `/api/stream/udp-hls/${channelId}/index.m3u8`
 }
 
 export function isUdpStreamUrl(streamUrl: string): boolean {

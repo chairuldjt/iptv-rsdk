@@ -35,8 +35,7 @@ export async function getOnDemandHlsManifest(options: StartRelayOptions): Promis
   const relay = await ensureRelay(options)
   relay.lastAccessed = Date.now()
 
-  await waitForManifest(relay.manifestPath)
-  const manifest = await readFile(relay.manifestPath, 'utf-8')
+  const manifest = await waitForPlayableManifest(relay.manifestPath)
   return rewriteManifestSegments(manifest, options.segmentBaseUrl, getOutputSlug(options.channelId, options.name))
 }
 
@@ -137,15 +136,29 @@ function getOutputSlug(channelId: number, name: string): string {
   return `${slugifyChannelName(name)}-${channelId}`
 }
 
-async function waitForManifest(manifestPath: string): Promise<void> {
+async function waitForPlayableManifest(manifestPath: string): Promise<string> {
   const startedAt = Date.now()
 
-  while (Date.now() - startedAt < 8000) {
-    if (await fileExists(manifestPath)) return
+  while (Date.now() - startedAt < 12000) {
+    if (await fileExists(manifestPath)) {
+      const manifest = await readFile(manifestPath, 'utf-8')
+      if (manifestHasSegment(manifest)) {
+        return manifest
+      }
+    }
     await new Promise((resolve) => setTimeout(resolve, 250))
   }
 
-  throw new Error('Timed out waiting for HLS manifest.')
+  throw new Error('Timed out waiting for playable HLS segments.')
+}
+
+function manifestHasSegment(manifest: string): boolean {
+  return manifest
+    .split(/\r?\n/)
+    .some((line) => {
+      const trimmed = line.trim()
+      return trimmed.length > 0 && !trimmed.startsWith('#')
+    })
 }
 
 async function fileExists(filePath: string): Promise<boolean> {
