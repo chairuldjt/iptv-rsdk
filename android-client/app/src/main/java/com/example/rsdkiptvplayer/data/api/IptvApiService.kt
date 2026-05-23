@@ -141,6 +141,7 @@ data class UpdateCheckResponse(
     val version_name: String?,
     val version_code: Int?,
     val apk_url: String?,
+    val apk_file_name: String?,
     val is_mandatory: Boolean?,
     val changelog: String?
 )

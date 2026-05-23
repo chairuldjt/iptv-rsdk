@@ -20,6 +20,7 @@ import androidx.compose.ui.draw.scale
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shadow
@@ -49,8 +50,8 @@ import java.util.*
 import android.widget.Toast
 import com.example.rsdkiptvplayer.util.UpdateManager
 import com.example.rsdkiptvplayer.data.api.RetrofitClient
-import com.example.rsdkiptvplayer.data.api.UpdateCheckResponse
 import kotlinx.coroutines.launch
+import java.net.URI
 
 @Composable
 fun HomeScreen(
@@ -756,6 +757,7 @@ private fun InfoAplikasiDialog(
     var updateVersionName by remember { mutableStateOf("") }
     var updateVersionCode by remember { mutableIntStateOf(0) }
     var apkUrl by remember { mutableStateOf("") }
+    var apkFileName by remember { mutableStateOf("") }
     var changelog by remember { mutableStateOf("") }
 
     // Downloading state
@@ -781,7 +783,8 @@ private fun InfoAplikasiDialog(
                 if (body != null && body.update_available) {
                     updateVersionName = body.version_name ?: ""
                     updateVersionCode = body.version_code ?: 0
-                    apkUrl = body.apk_url ?: ""
+                    apkFileName = body.apk_file_name ?: ""
+                    apkUrl = resolveUpdateApkUrl(serverUrl, body.apk_url, body.apk_file_name)
                     changelog = body.changelog ?: ""
                     checkingState = "update_available"
                     statusMessage = "Pembaruan tersedia!"
@@ -804,10 +807,18 @@ private fun InfoAplikasiDialog(
         isDownloading = true
         statusMessage = "Mengunduh pembaruan... 0%"
         try {
-            val downloadedFile = UpdateManager.downloadApk(context, apkUrl) { progress ->
+            if (apkUrl.isBlank()) {
+                isDownloading = false
+                checkingState = "error"
+                statusMessage = "URL APK kosong dari server."
+                return
+            }
+
+            val downloadResult = UpdateManager.downloadApk(context, apkUrl) { progress ->
                 downloadProgress = progress
                 statusMessage = "Mengunduh pembaruan... ${(progress * 100).toInt()}%"
             }
+            val downloadedFile = downloadResult.file
             if (downloadedFile != null) {
                 statusMessage = "Memasang pembaruan..."
                 UpdateManager.installApk(context, downloadedFile)
@@ -815,7 +826,7 @@ private fun InfoAplikasiDialog(
                 Toast.makeText(context, "Gagal mengunduh pembaruan.", Toast.LENGTH_LONG).show()
                 isDownloading = false
                 checkingState = "error"
-                statusMessage = "Gagal mengunduh berkas APK."
+                statusMessage = "Gagal mengunduh APK: ${downloadResult.errorMessage ?: apkUrl}"
             }
         } catch (e: Exception) {
             e.printStackTrace()
@@ -919,6 +930,19 @@ private fun InfoAplikasiDialog(
                         } else {
                             Spacer(modifier = Modifier.height(16.dp))
                         }
+                        if (apkFileName.isNotBlank()) {
+                            Text(
+                                text = apkFileName,
+                                color = Color.White.copy(alpha = 0.5f),
+                                fontSize = 10.sp,
+                                textAlign = TextAlign.Center,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(bottom = 10.dp)
+                            )
+                        }
 
                         if (isDownloading) {
                             Column(
@@ -942,33 +966,26 @@ private fun InfoAplikasiDialog(
                                 modifier = Modifier.fillMaxWidth(),
                                 horizontalArrangement = Arrangement.spacedBy(12.dp)
                             ) {
-                                Button(
+                                InfoDialogButton(
+                                    text = "Perbarui Sekarang",
+                                    primary = true,
+                                    focusRequester = dialogFocusRequester,
                                     onClick = {
                                         coroutineScope.launch {
                                             startDownload()
                                         }
                                     },
-                                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFC084FC)),
-                                    shape = RoundedCornerShape(10.dp),
                                     modifier = Modifier
                                         .weight(1f)
                                         .height(42.dp)
-                                        .focusRequester(dialogFocusRequester)
-                                        .focusable()
-                                ) {
-                                    Text("Perbarui Sekarang", fontWeight = FontWeight.Bold, color = Color.Black)
-                                }
-                                OutlinedButton(
+                                )
+                                InfoDialogButton(
+                                    text = "Batal",
                                     onClick = { checkingState = "idle" },
-                                    colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.White),
-                                    border = BorderStroke(1.dp, Color.White.copy(alpha = 0.25f)),
-                                    shape = RoundedCornerShape(10.dp),
                                     modifier = Modifier
                                         .weight(1f)
                                         .height(42.dp)
-                                ) {
-                                    Text("Batal", fontWeight = FontWeight.Bold)
-                                }
+                                )
                             }
                         }
                     }
@@ -997,38 +1014,114 @@ private fun InfoAplikasiDialog(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.spacedBy(12.dp)
                         ) {
-                            Button(
+                            InfoDialogButton(
+                                text = "Cek Pembaruan",
+                                primary = true,
+                                focusRequester = dialogFocusRequester,
                                 onClick = {
                                     coroutineScope.launch {
                                         checkUpdates()
                                     }
                                 },
-                                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFC084FC)),
-                                shape = RoundedCornerShape(10.dp),
                                 modifier = Modifier
                                     .weight(1f)
                                     .height(44.dp)
-                                    .focusRequester(dialogFocusRequester)
-                                    .focusable()
-                            ) {
-                                Text("Cek Pembaruan", fontWeight = FontWeight.Bold, color = Color.Black)
-                            }
-                            OutlinedButton(
+                            )
+                            InfoDialogButton(
+                                text = "Tutup",
                                 onClick = onDismiss,
-                                colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.White.copy(alpha = 0.85f)),
-                                border = BorderStroke(1.dp, Color.White.copy(alpha = 0.18f)),
-                                shape = RoundedCornerShape(10.dp),
                                 modifier = Modifier
                                     .weight(1f)
                                     .height(44.dp)
-                            ) {
-                                Text("Tutup", fontWeight = FontWeight.Bold)
-                            }
+                            )
                         }
                     }
                 }
             }
         }
+    }
+}
+
+private fun resolveUpdateApkUrl(serverUrl: String, apiUrl: String?, fileName: String?): String {
+    val cleanServerUrl = serverUrl.trim().trimEnd('/')
+    if (!fileName.isNullOrBlank() && cleanServerUrl.isNotBlank()) {
+        return "$cleanServerUrl/uploads/apk/$fileName"
+    }
+
+    val candidate = apiUrl.orEmpty().trim()
+    if (candidate.isBlank()) return ""
+
+    return try {
+        val uri = URI(candidate)
+        val host = uri.host.orEmpty()
+        if ((host == "localhost" || host == "127.0.0.1" || host == "0.0.0.0") && cleanServerUrl.isNotBlank()) {
+            "$cleanServerUrl${uri.rawPath.orEmpty()}"
+        } else {
+            candidate
+        }
+    } catch (e: Exception) {
+        candidate
+    }
+}
+
+@Composable
+private fun InfoDialogButton(
+    text: String,
+    modifier: Modifier = Modifier,
+    primary: Boolean = false,
+    focusRequester: FocusRequester? = null,
+    onClick: () -> Unit
+) {
+    var isFocused by remember { mutableStateOf(false) }
+    val background = when {
+        primary -> Color(0xFFC084FC)
+        isFocused -> Color(0xFF6366F1)
+        else -> Color.Transparent
+    }
+    val textColor = if (primary && !isFocused) Color.Black else Color.White
+
+    Box(
+        modifier = modifier
+            .then(if (focusRequester != null) Modifier.focusRequester(focusRequester) else Modifier)
+            .onFocusChanged { isFocused = it.isFocused }
+            .onPreviewKeyEvent { keyEvent ->
+                if (keyEvent.type == KeyEventType.KeyDown &&
+                    (keyEvent.key == Key.DirectionCenter || keyEvent.key == Key.Enter)
+                ) {
+                    onClick()
+                    true
+                } else {
+                    false
+                }
+            }
+            .focusable()
+            .shadow(
+                elevation = if (isFocused) 26.dp else 0.dp,
+                shape = RoundedCornerShape(10.dp),
+                ambientColor = Color.White.copy(alpha = if (isFocused) 0.95f else 0f),
+                spotColor = Color.White.copy(alpha = if (isFocused) 0.95f else 0f)
+            )
+            .scale(if (isFocused) 1.03f else 1f)
+            .clip(RoundedCornerShape(10.dp))
+            .background(background)
+            .border(
+                BorderStroke(
+                    if (isFocused) 4.dp else 1.dp,
+                    if (isFocused) Color.White else Color.White.copy(alpha = 0.22f)
+                ),
+                RoundedCornerShape(10.dp)
+            )
+            .clickable(onClick = onClick),
+        contentAlignment = Alignment.Center
+    ) {
+        Text(
+            text = text,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            fontWeight = FontWeight.Bold,
+            color = textColor,
+            fontSize = 13.sp
+        )
     }
 }
 

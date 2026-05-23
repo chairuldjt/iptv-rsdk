@@ -49,6 +49,7 @@ export async function GET(request: Request) {
       version_name: activeUpdate.versionName,
       version_code: activeUpdate.versionCode,
       apk_url: apkUrl,
+      apk_file_name: activeUpdate.apkFileName,
       is_mandatory: activeUpdate.isMandatory,
       changelog: activeUpdate.changelog,
     })

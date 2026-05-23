@@ -13,6 +13,11 @@ import java.io.File
 import java.io.FileOutputStream
 import java.io.InputStream
 
+data class ApkDownloadResult(
+    val file: File? = null,
+    val errorMessage: String? = null
+)
+
 object UpdateManager {
 
     fun getCurrentVersionCode(context: Context): Int {
@@ -42,19 +47,23 @@ object UpdateManager {
         context: Context,
         apkUrl: String,
         onProgress: (Float) -> Unit
-    ): File? = withContext(Dispatchers.IO) {
+    ): ApkDownloadResult = withContext(Dispatchers.IO) {
         try {
             val client = OkHttpClient()
             val request = Request.Builder().url(apkUrl).build()
             val response = client.newCall(request).execute()
 
-            if (!response.isSuccessful) return@withContext null
+            if (!response.isSuccessful) {
+                response.close()
+                return@withContext ApkDownloadResult(errorMessage = "HTTP ${response.code} saat mengunduh APK.")
+            }
 
-            val body = response.body ?: return@withContext null
+            val body = response.body ?: return@withContext ApkDownloadResult(errorMessage = "Respons download kosong.")
             val contentLength = body.contentLength()
             val inputStream: InputStream = body.byteStream()
 
-            val apkFile = File(context.externalCacheDir, "update.apk")
+            val cacheDir = context.externalCacheDir ?: context.cacheDir
+            val apkFile = File(cacheDir, "update.apk")
             if (apkFile.exists()) {
                 apkFile.delete()
             }
@@ -79,10 +88,10 @@ object UpdateManager {
             outputStream.close()
             inputStream.close()
 
-            return@withContext apkFile
+            return@withContext ApkDownloadResult(file = apkFile)
         } catch (e: Exception) {
             e.printStackTrace()
-            return@withContext null
+            return@withContext ApkDownloadResult(errorMessage = e.message ?: e.javaClass.simpleName)
         }
     }
 
