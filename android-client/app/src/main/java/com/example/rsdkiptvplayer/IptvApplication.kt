@@ -3,9 +3,13 @@ package com.example.rsdkiptvplayer
 import android.app.Activity
 import android.app.Application
 import android.os.Bundle
+import com.example.rsdkiptvplayer.util.CrashHandler
 import com.example.rsdkiptvplayer.data.cache.IptvDatabase
 import com.example.rsdkiptvplayer.data.datastore.DataStoreManager
 import com.example.rsdkiptvplayer.data.repository.IptvRepository
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 
 class IptvApplication : Application() {
     
@@ -30,8 +34,16 @@ class IptvApplication : Application() {
     override fun onCreate() {
         super.onCreate()
         instance = this
+        Thread.setDefaultUncaughtExceptionHandler(CrashHandler(this))
         
         dataStoreManager = DataStoreManager(this)
+        CrashHandler.getSavedCrash(this)?.let { crash ->
+            CoroutineScope(Dispatchers.IO).launch {
+                dataStoreManager.addLog("Last app crash: $crash")
+                CrashHandler.clearSavedCrash(this@IptvApplication)
+            }
+        }
+
         database = IptvDatabase.getDatabase(this)
         repository = IptvRepository(this, database.channelDao(), dataStoreManager)
         
@@ -75,4 +87,3 @@ class IptvApplication : Application() {
             private set
     }
 }
-

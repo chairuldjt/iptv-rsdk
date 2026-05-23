@@ -17,6 +17,7 @@ import com.example.rsdkiptvplayer.data.datastore.DataStoreManager
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.first
 import java.io.ByteArrayOutputStream
+import kotlin.coroutines.resume
 
 class RemoteCommandPoller(
     private val dataStoreManager: DataStoreManager,
@@ -119,61 +120,97 @@ class RemoteCommandPoller(
         }
     }
 
-    private fun captureAndUploadScreenshot(apiService: IptvApiService, deviceId: String) {
-        val activity = IptvApplication.instance.currentActivity ?: return
-        val view = activity.window.decorView
-        if (view.width <= 0 || view.height <= 0) return
+    private suspend fun captureAndUploadScreenshot(apiService: IptvApiService, deviceId: String) {
+        val bitmap = captureCurrentActivityBitmap() ?: return
+        uploadBitmap(apiService, deviceId, bitmap)
+    }
 
-        // Scale down to 25% to minimize base64 payload size
+    private suspend fun captureCurrentActivityBitmap(): Bitmap? = withContext(Dispatchers.Main) {
+        val activity = IptvApplication.instance.currentActivity ?: return@withContext null
+        val view = activity.window.decorView
+        if (view.width <= 0 || view.height <= 0) return@withContext null
+
         val scale = 0.25f
-        val width = (view.width * scale).toInt()
-        val height = (view.height * scale).toInt()
-        if (width <= 0 || height <= 0) return
-        
-        val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
-        val location = IntArray(2)
-        view.getLocationInWindow(location)
+        val scaledWidth = (view.width * scale).toInt().coerceAtLeast(1)
+        val scaledHeight = (view.height * scale).toInt().coerceAtLeast(1)
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            val handler = Handler(Looper.getMainLooper())
+            captureWithPixelCopy(activity, view, scaledWidth, scaledHeight)
+        } else {
+            captureWithDrawingCache(view, scaledWidth, scaledHeight)
+        }
+    }
+
+    private suspend fun captureWithPixelCopy(
+        activity: Activity,
+        view: android.view.View,
+        scaledWidth: Int,
+        scaledHeight: Int
+    ): Bitmap? {
+        val fullBitmap = try {
+            Bitmap.createBitmap(view.width, view.height, Bitmap.Config.ARGB_8888)
+        } catch (e: OutOfMemoryError) {
+            Log.e("IPTV_POLL", "Unable to allocate screenshot bitmap: ${e.message}")
+            return null
+        }
+
+        val location = IntArray(2)
+        view.getLocationInWindow(location)
+        val sourceRect = Rect(location[0], location[1], location[0] + view.width, location[1] + view.height)
+
+        val result = suspendCancellableCoroutine { continuation ->
             try {
                 PixelCopy.request(
                     activity.window,
-                    Rect(location[0], location[1], location[0] + view.width, location[1] + view.height),
-                    bitmap,
+                    sourceRect,
+                    fullBitmap,
                     { copyResult ->
-                        if (copyResult == PixelCopy.SUCCESS) {
-                            scope.launch {
-                                uploadBitmap(apiService, deviceId, bitmap)
-                            }
-                        } else {
-                            bitmap.recycle()
+                        if (continuation.isActive) {
+                            continuation.resume(copyResult)
                         }
                     },
-                    handler
+                    Handler(Looper.getMainLooper())
                 )
             } catch (e: Exception) {
                 Log.e("IPTV_POLL", "PixelCopy failed: ${e.message}")
-                bitmap.recycle()
-            }
-        } else {
-            try {
-                @Suppress("DEPRECATION")
-                view.isDrawingCacheEnabled = true
-                val cache = view.drawingCache
-                if (cache != null) {
-                    val scaledBitmap = Bitmap.createScaledBitmap(cache, width, height, true)
-                    scope.launch {
-                        uploadBitmap(apiService, deviceId, scaledBitmap)
-                    }
-                } else {
-                    bitmap.recycle()
+                if (continuation.isActive) {
+                    continuation.resume(PixelCopy.ERROR_UNKNOWN)
                 }
-                @Suppress("DEPRECATION")
-                view.isDrawingCacheEnabled = false
-            } catch (e: Exception) {
-                bitmap.recycle()
             }
+        }
+
+        if (result != PixelCopy.SUCCESS) {
+            fullBitmap.recycle()
+            return null
+        }
+
+        return try {
+            Bitmap.createScaledBitmap(fullBitmap, scaledWidth, scaledHeight, true).also {
+                fullBitmap.recycle()
+            }
+        } catch (e: OutOfMemoryError) {
+            fullBitmap.recycle()
+            Log.e("IPTV_POLL", "Unable to scale screenshot bitmap: ${e.message}")
+            null
+        }
+    }
+
+    private fun captureWithDrawingCache(view: android.view.View, scaledWidth: Int, scaledHeight: Int): Bitmap? {
+        return try {
+            @Suppress("DEPRECATION")
+            view.isDrawingCacheEnabled = true
+            @Suppress("DEPRECATION")
+            val cache = view.drawingCache ?: return null
+            Bitmap.createScaledBitmap(cache, scaledWidth, scaledHeight, true)
+        } catch (e: Exception) {
+            Log.e("IPTV_POLL", "Drawing cache screenshot failed: ${e.message}")
+            null
+        } catch (e: OutOfMemoryError) {
+            Log.e("IPTV_POLL", "Unable to allocate drawing cache screenshot: ${e.message}")
+            null
+        } finally {
+            @Suppress("DEPRECATION")
+            view.isDrawingCacheEnabled = false
         }
     }
 
