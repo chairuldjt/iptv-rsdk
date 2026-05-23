@@ -20,6 +20,7 @@ export default function ChannelPreviewButton({
   const [mode, setMode] = useState<PlaybackMode>('relay')
   const [status, setStatus] = useState('Ready')
   const videoRef = useRef<HTMLVideoElement | null>(null)
+  const directUnsupported = directUrl.trim().toLowerCase().startsWith('udp://')
 
   const activeUrl = mode === 'relay' ? relayUrl : directUrl
 
@@ -28,6 +29,11 @@ export default function ChannelPreviewButton({
 
     const video = videoRef.current
     let hls: Hls | null = null
+    if (mode === 'direct' && directUnsupported) {
+      setStatus('Direct UDP streams cannot be played in this browser.')
+      return
+    }
+
     setStatus(mode === 'relay' ? 'Loading through server relay...' : 'Loading direct stream...')
 
     if (video.canPlayType('application/vnd.apple.mpegurl')) {
@@ -68,7 +74,7 @@ export default function ChannelPreviewButton({
       video.removeEventListener('error', onError)
       hls?.destroy()
     }
-  }, [activeUrl, mode, open])
+  }, [activeUrl, directUnsupported, mode, open])
 
   return (
     <>
@@ -103,8 +109,17 @@ export default function ChannelPreviewButton({
                   </button>
                   <button
                     type="button"
-                    onClick={() => setMode('direct')}
-                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${mode === 'direct' ? 'bg-sky-500 text-white' : 'text-slate-400 hover:text-white'}`}
+                    onClick={() => {
+                      if (!directUnsupported) setMode('direct')
+                    }}
+                    disabled={directUnsupported}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                      mode === 'direct'
+                        ? 'bg-sky-500 text-white'
+                        : directUnsupported
+                          ? 'text-slate-600 cursor-not-allowed'
+                          : 'text-slate-400 hover:text-white'
+                    }`}
                   >
                     Direct
                   </button>
@@ -134,7 +149,9 @@ export default function ChannelPreviewButton({
             <div className="px-5 py-3 border-t border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
               <span className="text-xs font-semibold text-slate-400">{status}</span>
               <span className="text-[11px] text-slate-500">
-                Relay tests whether the web server can reach the source; Direct tests this browser/network.
+                {directUnsupported
+                  ? 'UDP multicast is previewed through the HLS relay gateway.'
+                  : 'Relay tests whether the web server can reach the source; Direct tests this browser/network.'}
               </span>
             </div>
           </div>

@@ -109,3 +109,24 @@ Pastikan `.env` server berisi:
 DATABASE_URL="mysql://username:password@localhost:3306/iptv_rsdk"
 SESSION_SECRET="isi-random-panjang-minimal-32-karakter"
 ```
+
+### Relay IPTV UDP Multicast ke HLS
+
+Jika playlist berisi URL `udp://@238.x.x.x:1234`, browser dan client di luar VLAN IPTV perlu HLS relay. Server Ubuntu dapat menjalankan relay otomatis dari M3U:
+
+```bash
+sudo env APP_DIR=/var/www/html/iptv-rsdk \
+  M3U_URL=http://10.0.0.1/iptv/iptv_rsdk.m3u \
+  LOCALADDR=10.0.0.199 \
+  OUTPUT_ROOT=/var/www/html/landingpage/relay \
+  ./scripts/iptv-relay-install.sh
+
+sudo systemctl start iptv-relay-all
+journalctl -u iptv-relay-all -f
+```
+
+Dashboard Devices -> `HLS Relay Base URL` harus mengarah ke root relay, contoh:
+
+```text
+http://10.55.1.5/relay
+```

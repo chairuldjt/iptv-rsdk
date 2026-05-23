@@ -2,7 +2,8 @@ import prisma from '@/lib/db'
 import { revalidatePath } from 'next/cache'
 import ChannelLogo from '@/components/ChannelLogo'
 import ChannelPreviewButton from '@/components/ChannelPreviewButton'
-import { createRelayPath } from '@/lib/streamRelay'
+import { createPlayableStreamUrl } from '@/lib/playableStreams'
+import { getHlsRelayBaseUrl } from '@/lib/settings'
 
 export const revalidate = 0 // Disable cache for live channel lists
 const PAGE_SIZE = 200
@@ -33,6 +34,7 @@ export default async function ChannelsPage({
   const filterPlaylistId = resolvedSearchParams.playlistId ? parseInt(resolvedSearchParams.playlistId) : undefined
   const searchQuery = resolvedSearchParams.search || ''
   const currentPage = Math.max(1, parseInt(resolvedSearchParams.page || '1', 10) || 1)
+  const hlsRelayBaseUrl = await getHlsRelayBaseUrl()
 
   // Fetch all playlists for filter selector
   const playlists = await prisma.playlist.findMany({
@@ -202,7 +204,12 @@ export default async function ChannelsPage({
                     <ChannelPreviewButton
                       name={c.name}
                       directUrl={c.streamUrl}
-                      relayUrl={createRelayPath(c.streamUrl)}
+                      relayUrl={createPlayableStreamUrl({
+                        origin: '',
+                        name: c.name,
+                        streamUrl: c.streamUrl,
+                        hlsRelayBaseUrl,
+                      })}
                     />
 
                     {/* Toggle Activation Action */}

@@ -1,7 +1,8 @@
 import { NextResponse } from 'next/server'
 import prisma from '@/lib/db'
 import { getErrorMessage } from '@/lib/errors'
-import { createRelayUrl } from '@/lib/streamRelay'
+import { createPlayableStreamUrl } from '@/lib/playableStreams'
+import { getHlsRelayBaseUrl } from '@/lib/settings'
 
 export async function GET(
   request: Request,
@@ -90,6 +91,7 @@ export async function GET(
 
     const shouldRelayStreams = config?.syncMode === 'api_relay'
     const requestOrigin = new URL(request.url).origin
+    const hlsRelayBaseUrl = shouldRelayStreams ? await getHlsRelayBaseUrl() : ''
 
     // Map channels to expected client schema
     const mappedChannels = channels.map((c) => ({
@@ -97,7 +99,14 @@ export async function GET(
       name: c.name,
       logo: c.logoUrl,
       group: c.category?.name || 'Uncategorized',
-      stream_url: shouldRelayStreams ? createRelayUrl(requestOrigin, c.streamUrl) : c.streamUrl,
+      stream_url: shouldRelayStreams
+        ? createPlayableStreamUrl({
+            origin: requestOrigin,
+            name: c.name,
+            streamUrl: c.streamUrl,
+            hlsRelayBaseUrl,
+          })
+        : c.streamUrl,
       sort_order: c.sortOrder,
       active: c.isActive,
     }))

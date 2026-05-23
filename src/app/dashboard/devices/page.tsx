@@ -7,7 +7,13 @@ import DeviceSearchAndLimit from '@/components/DeviceSearchAndLimit'
 import DevicePagination from '@/components/DevicePagination'
 import { redirect } from 'next/navigation'
 import { getOnlineThreshold } from '@/lib/time'
-import { cleanupOfflineDevices, getOfflineAutoDeleteDays, setOfflineAutoDeleteDays } from '@/lib/settings'
+import {
+  cleanupOfflineDevices,
+  getHlsRelayBaseUrl,
+  getOfflineAutoDeleteDays,
+  setHlsRelayBaseUrl,
+  setOfflineAutoDeleteDays,
+} from '@/lib/settings'
 import { DEFAULT_CUSTOM_M3U_URL, DEFAULT_SYNC_MODE } from '@/lib/defaults'
 
 export const revalidate = 0 // Disable cache for live devices
@@ -90,6 +96,21 @@ async function saveOfflineCleanupSettingAction(formData: FormData) {
   }
 
   redirect('/dashboard/devices?cleanupSaved=1')
+}
+
+async function saveStreamRelaySettingAction(formData: FormData) {
+  'use server'
+  const hlsRelayBaseUrl = formData.get('hlsRelayBaseUrl') as string
+
+  try {
+    await setHlsRelayBaseUrl(hlsRelayBaseUrl)
+    revalidatePath('/dashboard/devices')
+    revalidatePath('/dashboard/channels')
+  } catch (error) {
+    console.error('Save stream relay setting error:', error)
+  }
+
+  redirect('/dashboard/devices?relaySaved=1')
 }
 
 // Server Action to trigger a remote cache clear
@@ -177,6 +198,7 @@ export default async function DevicesPage({
     success?: string
     status?: string
     cleanupSaved?: string
+    relaySaved?: string
     remote?: string
     q?: string
     page?: string
@@ -188,6 +210,7 @@ export default async function DevicesPage({
   const remoteDeviceId = resolvedSearchParams.remote
   const showSuccess = resolvedSearchParams.success === '1'
   const showCleanupSaved = resolvedSearchParams.cleanupSaved === '1'
+  const showRelaySaved = resolvedSearchParams.relaySaved === '1'
   const statusFilter = (['all', 'online', 'offline', 'disabled'].includes(resolvedSearchParams.status || '')
     ? resolvedSearchParams.status
     : 'all') as DeviceStatusFilter
@@ -201,6 +224,7 @@ export default async function DevicesPage({
   const currentPage = pageParam > 0 ? pageParam : 1
 
   const offlineAutoDeleteDays = await getOfflineAutoDeleteDays()
+  const hlsRelayBaseUrl = await getHlsRelayBaseUrl()
   const cleanedDeviceCount = await cleanupOfflineDevices(offlineAutoDeleteDays)
 
   // Fetch all devices
@@ -282,6 +306,12 @@ export default async function DevicesPage({
           </div>
         )}
 
+        {showRelaySaved && (
+          <div className="p-3 bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 rounded-xl text-xs font-bold">
+            Stream relay base URL saved. API Relay devices will receive the updated HLS URLs on the next sync.
+          </div>
+        )}
+
         <div className="glass-panel p-4 rounded-2xl border border-border flex flex-col lg:flex-row gap-4 lg:items-end lg:justify-between">
           <div>
             <span className="block text-[10px] font-bold text-slate-500 uppercase mb-2">Filter Devices</span>
@@ -326,6 +356,29 @@ export default async function DevicesPage({
             </button>
           </form>
         </div>
+
+        <form action={saveStreamRelaySettingAction} className="glass-panel p-4 rounded-2xl border border-border flex flex-col lg:flex-row gap-4 lg:items-end lg:justify-between">
+          <div className="flex-1">
+            <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">HLS Relay Base URL</label>
+            <input
+              type="url"
+              name="hlsRelayBaseUrl"
+              defaultValue={hlsRelayBaseUrl}
+              required
+              placeholder="http://10.55.1.5/relay"
+              className="w-full px-4 py-2 bg-slate-900 border border-slate-800 rounded-xl text-white text-sm focus:outline-none focus:border-primary font-mono"
+            />
+            <p className="text-[10px] text-slate-500 mt-1">
+              UDP playlist entries are exposed as /channel-slug/index.m3u8 under this base URL.
+            </p>
+          </div>
+          <button
+            type="submit"
+            className="px-4 py-2.5 rounded-xl bg-primary hover:bg-indigo-500 text-white text-xs font-bold transition-all cursor-pointer"
+          >
+            Save Relay URL
+          </button>
+        </form>
 
         {/* Device List Table Card - Always Full Width */}
         <div className="glass-card rounded-2xl border border-border overflow-hidden">
