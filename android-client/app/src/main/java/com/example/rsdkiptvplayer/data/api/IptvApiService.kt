@@ -136,6 +136,9 @@ interface IptvApiService {
 
     @GET("api/device/remote/poll")
     suspend fun pollCommands(@Query("deviceId") deviceId: String): Response<PollResponse>
+
+    @POST("api/device/remote/screenshot/upload")
+    suspend fun uploadScreenshot(@Body request: UploadScreenshotRequest): Response<LogResponse>
 }
 
 data class UpdateCheckResponse(
@@ -151,10 +154,16 @@ data class UpdateCheckResponse(
 
 data class PollResponse(
     val status: Boolean,
+    val capture_screenshot: Boolean? = false,
     val commands: List<QueuedCommand>
 )
 
 data class QueuedCommand(
     val command: String,
     val value: String?
+)
+
+data class UploadScreenshotRequest(
+    val deviceId: String,
+    val image: String
 )
