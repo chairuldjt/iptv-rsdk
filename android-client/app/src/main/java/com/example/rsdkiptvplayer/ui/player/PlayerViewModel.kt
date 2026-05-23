@@ -4,6 +4,7 @@ import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.media3.common.MediaItem
+import androidx.media3.common.MimeTypes
 import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
 import androidx.media3.exoplayer.ExoPlayer
@@ -244,7 +245,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         exoPlayer.stop()
         exoPlayer.clearMediaItems()
         
-        val mediaItem = MediaItem.fromUri(channel.streamUrl)
+        val mediaItem = buildMediaItem(channel.streamUrl)
         exoPlayer.setMediaItem(mediaItem)
         exoPlayer.prepare()
         exoPlayer.playWhenReady = true
@@ -317,6 +318,17 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         _selectedChannel.value = null
         _isBuffering.value = false
         _errorMessage.value = null
+    }
+
+    private fun buildMediaItem(streamUrl: String): MediaItem {
+        val lowerUrl = streamUrl.lowercase()
+        val builder = MediaItem.Builder().setUri(streamUrl)
+
+        if (lowerUrl.contains("/api/stream/udp-hls") || lowerUrl.contains(".m3u8")) {
+            builder.setMimeType(MimeTypes.APPLICATION_M3U8)
+        }
+
+        return builder.build()
     }
 
     override fun onCleared() {
