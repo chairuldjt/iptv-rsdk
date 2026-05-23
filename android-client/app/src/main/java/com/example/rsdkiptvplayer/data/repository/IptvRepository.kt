@@ -137,9 +137,12 @@ class IptvRepository(
                         clearChannelCache()
                     }
 
-                    // Trigger SMB video caching in the background
-                    kotlinx.coroutines.CoroutineScope(Dispatchers.IO).launch {
-                        com.example.rsdkiptvplayer.util.EducationSyncManager.sync(context, forceSync = config.education_force_sync == true)
+                    val educationPath = dataStoreManager.getEducationVideoPath()
+                    if (educationPath.isNotBlank()) {
+                        // Trigger SMB video caching in the background
+                        kotlinx.coroutines.CoroutineScope(Dispatchers.IO).launch {
+                            com.example.rsdkiptvplayer.util.EducationSyncManager.sync(context, forceSync = config.education_force_sync == true)
+                        }
                     }
 
                     dataStoreManager.addLog("Server config sync successful!")

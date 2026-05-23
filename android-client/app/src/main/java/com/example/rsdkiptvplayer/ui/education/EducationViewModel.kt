@@ -105,8 +105,9 @@ class EducationViewModel(application: Application) : AndroidViewModel(applicatio
         viewModelScope.launch {
             var lastState: com.example.rsdkiptvplayer.util.EducationSyncManager.SyncState = com.example.rsdkiptvplayer.util.EducationSyncManager.SyncState.Idle
             com.example.rsdkiptvplayer.util.EducationSyncManager.syncState.collectLatest { state ->
-                if (state is com.example.rsdkiptvplayer.util.EducationSyncManager.SyncState.Success && 
-                    lastState is com.example.rsdkiptvplayer.util.EducationSyncManager.SyncState.Syncing) {
+                if (state is com.example.rsdkiptvplayer.util.EducationSyncManager.SyncState.Success &&
+                    (lastState is com.example.rsdkiptvplayer.util.EducationSyncManager.SyncState.Checking ||
+                        lastState is com.example.rsdkiptvplayer.util.EducationSyncManager.SyncState.Syncing)) {
                     _errorMessage.value = null
                     loadAndPlay()
                 } else if (state is com.example.rsdkiptvplayer.util.EducationSyncManager.SyncState.Checking ||
@@ -115,7 +116,11 @@ class EducationViewModel(application: Application) : AndroidViewModel(applicatio
                     _errorMessage.value = null
                 } else if (state is com.example.rsdkiptvplayer.util.EducationSyncManager.SyncState.Error) {
                     _isLoading.value = false
-                    _errorMessage.value = "Gagal menyalin video dari server: ${state.message}"
+                    if (_videoCount.value == 0) {
+                        _errorMessage.value = "Gagal menyalin video dari server: ${state.message}"
+                    } else {
+                        dataStoreManager.addLog("Education background sync failed while cached playback continues: ${state.message}")
+                    }
                 }
                 lastState = state
             }
