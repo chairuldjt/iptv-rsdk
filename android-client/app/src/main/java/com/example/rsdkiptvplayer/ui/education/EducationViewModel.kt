@@ -99,6 +99,19 @@ class EducationViewModel(application: Application) : AndroidViewModel(applicatio
                 }
             }
         })
+
+        viewModelScope.launch {
+            var lastState: com.example.rsdkiptvplayer.util.EducationSyncManager.SyncState = com.example.rsdkiptvplayer.util.EducationSyncManager.SyncState.Idle
+            com.example.rsdkiptvplayer.util.EducationSyncManager.syncState.collectLatest { state ->
+                if (state is com.example.rsdkiptvplayer.util.EducationSyncManager.SyncState.Success && 
+                    lastState is com.example.rsdkiptvplayer.util.EducationSyncManager.SyncState.Syncing) {
+                    loadAndPlay()
+                } else if (state is com.example.rsdkiptvplayer.util.EducationSyncManager.SyncState.Error) {
+                    _errorMessage.value = "Gagal menyalin video dari server: ${state.message}"
+                }
+                lastState = state
+            }
+        }
     }
 
     fun loadAndPlay() {
@@ -141,8 +154,14 @@ class EducationViewModel(application: Application) : AndroidViewModel(applicatio
                     _videoCount.value = videos.size
                     if (videos.isEmpty()) {
                         _isLoading.value = false
-                        _errorMessage.value = "Belum ada video edukasi disalin. Silakan sinkronkan dari web dashboard."
-                        dataStoreManager.addLog("Local education folder is empty.")
+                        val currentSyncState = com.example.rsdkiptvplayer.util.EducationSyncManager.syncState.value
+                        if (currentSyncState !is com.example.rsdkiptvplayer.util.EducationSyncManager.SyncState.Syncing) {
+                            viewModelScope.launch {
+                                com.example.rsdkiptvplayer.util.EducationSyncManager.sync(getApplication())
+                            }
+                        }
+                        _errorMessage.value = "Belum ada video edukasi disalin. Memulai sinkronisasi otomatis..."
+                        dataStoreManager.addLog("Local education folder is empty. Triggering auto-sync.")
                         return@onSuccess
                     }
 

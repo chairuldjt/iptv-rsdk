@@ -305,6 +305,8 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
         viewModelScope.launch {
             dataStoreManager.setEducationVideoPath(path)
             dataStoreManager.setEducationSmbCredentials(username, password, domain)
+            // Trigger sync immediately in the background when settings are saved
+            com.example.rsdkiptvplayer.util.EducationSyncManager.sync(getApplication())
         }
     }
 
