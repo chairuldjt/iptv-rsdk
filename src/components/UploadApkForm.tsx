@@ -1,9 +1,11 @@
 'use client'
 
-import { useState, useRef } from 'react'
+import { useState, useRef, useEffect, useActionState } from 'react'
 import { uploadApkAction } from '../app/dashboard/updates/actions'
 
 export default function UploadApkForm() {
+  const [state, formAction, isPending] = useActionState(uploadApkAction, null)
+
   const [parsingState, setParsingState] = useState<'idle' | 'analyzing' | 'success' | 'error'>('idle')
   const [versionCode, setVersionCode] = useState<string>('')
   const [versionName, setVersionName] = useState<string>('')
@@ -11,6 +13,23 @@ export default function UploadApkForm() {
   const [fileName, setFileName] = useState<string>('')
   const [fileSize, setFileSize] = useState<string>('')
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const formRef = useRef<HTMLFormElement>(null)
+
+  // Reset form upon successful server upload
+  useEffect(() => {
+    if (state?.success) {
+      setParsingState('idle')
+      setVersionCode('')
+      setVersionName('')
+      setFileName('')
+      setFileSize('')
+      setErrorMsg('')
+      if (fileInputRef.current) {
+        fileInputRef.current.value = ''
+      }
+      formRef.current?.reset()
+    }
+  }, [state])
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
@@ -65,7 +84,7 @@ export default function UploadApkForm() {
     <div className="lg:col-span-1 glass-card p-6 rounded-2xl border border-border h-fit">
       <h3 className="font-bold text-white text-lg mb-4">Deploy New Version</h3>
       
-      <form action={uploadApkAction} className="space-y-4">
+      <form ref={formRef} action={formAction} className="space-y-4">
         {/* APK File Upload Area */}
         <div>
           <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">
@@ -221,21 +240,42 @@ export default function UploadApkForm() {
         </div>
 
 
+        {/* Status Message Alert */}
+        {state && (
+          <div className={`p-3 rounded-xl border text-xs font-semibold ${
+            state.success 
+              ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400' 
+              : 'bg-rose-500/10 border-rose-500/20 text-rose-400'
+          }`}>
+            {state.message}
+          </div>
+        )}
+
         {/* Submit button */}
         <button
           type="submit"
-          disabled={parsingState !== 'success'}
-          className={`w-full mt-2 py-3 rounded-xl font-bold text-white text-sm transition-all duration-200 cursor-pointer text-center ${
-            parsingState === 'success'
+          disabled={parsingState !== 'success' || isPending}
+          className={`w-full mt-2 py-3 rounded-xl font-bold text-white text-sm transition-all duration-200 cursor-pointer text-center flex items-center justify-center gap-2 ${
+            parsingState === 'success' && !isPending
               ? 'bg-primary hover:bg-indigo-500 glow-indigo'
               : 'bg-slate-800 text-slate-500 cursor-not-allowed border border-slate-700/30'
           }`}
         >
-          {parsingState === 'analyzing'
-            ? 'Analyzing APK...'
-            : parsingState === 'success'
-            ? 'Upload & Save Update'
-            : 'Pilih Berkas APK Terlebih Dahulu'}
+          {isPending ? (
+            <>
+              <svg className="animate-spin h-4 w-4 text-slate-400" fill="none" viewBox="0 0 24 24">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+              </svg>
+              <span>Mengirim & Menyimpan APK (Mohon Tunggu...)</span>
+            </>
+          ) : parsingState === 'analyzing' ? (
+            'Analyzing APK...'
+          ) : parsingState === 'success' ? (
+            'Upload & Save Update'
+          ) : (
+            'Pilih Berkas APK Terlebih Dahulu'
+          )}
         </button>
       </form>
     </div>

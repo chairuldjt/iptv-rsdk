@@ -6,7 +6,7 @@ import { writeFile, mkdir, unlink } from 'fs/promises'
 import path from 'path'
 
 // Server Action for uploading a new APK update
-export async function uploadApkAction(formData: FormData) {
+export async function uploadApkAction(prevState: any, formData: FormData) {
   const versionCodeStr = formData.get('versionCode') as string
   const versionName = formData.get('versionName') as string
   const changelog = formData.get('changelog') as string
@@ -14,38 +14,68 @@ export async function uploadApkAction(formData: FormData) {
   const apkFile = formData.get('apkFile') as File
 
   if (!versionCodeStr || !versionName || !apkFile || apkFile.size === 0) {
-    return
+    return { success: false, message: 'Harap lengkapi semua data dan berkas APK.' }
   }
 
   const versionCode = parseInt(versionCodeStr, 10)
-  if (isNaN(versionCode)) return
+  if (isNaN(versionCode)) {
+    return { success: false, message: 'Format Version Code tidak valid.' }
+  }
 
   try {
     // 1. Convert file to buffer and write to disk
     const buffer = Buffer.from(await apkFile.arrayBuffer())
     const uploadDir = path.join(process.cwd(), 'public', 'uploads', 'apk')
-    await mkdir(uploadDir, { recursive: true })
+    
+    try {
+      await mkdir(uploadDir, { recursive: true })
+    } catch (err: any) {
+      console.error('Failed to create upload directory:', err)
+      return { 
+        success: false, 
+        message: `Gagal membuat folder penyimpanan di server. Pastikan server memiliki izin menulis (write permission) ke folder public/uploads. Error: ${err.message}` 
+      }
+    }
     
     // Clean file name to prevent directory traversal
     const safeFileName = `${versionCode}_${apkFile.name.replace(/[^a-zA-Z0-9.\-_]/g, '')}`
     const filePath = path.join(uploadDir, safeFileName)
-    await writeFile(filePath, buffer)
+    
+    try {
+      await writeFile(filePath, buffer)
+    } catch (err: any) {
+      console.error('Failed to write APK file:', err)
+      return { 
+        success: false, 
+        message: `Gagal menulis file APK ke disk server. Pastikan server memiliki izin menulis ke folder public/uploads/apk. Error: ${err.message}` 
+      }
+    }
 
     // 2. Save record to Prisma
-    await prisma.appUpdate.create({
-      data: {
-        versionCode,
-        versionName,
-        apkFileName: safeFileName,
-        changelog: changelog || null,
-        isMandatory,
-        isDeployed: false, // Upload as draft by default
+    try {
+      await prisma.appUpdate.create({
+        data: {
+          versionCode,
+          versionName,
+          apkFileName: safeFileName,
+          changelog: changelog || null,
+          isMandatory,
+          isDeployed: false, // Upload as draft by default
+        }
+      })
+    } catch (err: any) {
+      console.error('Failed to insert database record:', err)
+      return { 
+        success: false, 
+        message: `Gagal menyimpan data ke database. Error: ${err.message}` 
       }
-    })
+    }
 
     revalidatePath('/dashboard/updates')
-  } catch (error) {
+    return { success: true, message: 'Berkas APK berhasil diunggah dan disimpan sebagai draft!' }
+  } catch (error: any) {
     console.error('Upload APK error:', error)
+    return { success: false, message: `Terjadi kesalahan sistem: ${error.message}` }
   }
 }
 
