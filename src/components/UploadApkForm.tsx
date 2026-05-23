@@ -1,35 +1,22 @@
 'use client'
 
-import { useState, useRef, useEffect, useActionState } from 'react'
-import { uploadApkAction } from '../app/dashboard/updates/actions'
+import { useState, useRef } from 'react'
 
 export default function UploadApkForm() {
-  const [state, formAction, isPending] = useActionState(uploadApkAction, null)
-
   const [parsingState, setParsingState] = useState<'idle' | 'analyzing' | 'success' | 'error'>('idle')
   const [versionCode, setVersionCode] = useState<string>('')
   const [versionName, setVersionName] = useState<string>('')
   const [errorMsg, setErrorMsg] = useState<string>('')
   const [fileName, setFileName] = useState<string>('')
   const [fileSize, setFileSize] = useState<string>('')
+  
+  // Upload progress states
+  const [isUploading, setIsUploading] = useState<boolean>(false)
+  const [uploadProgress, setUploadProgress] = useState<number>(0)
+  const [uploadResult, setUploadResult] = useState<{ success: boolean; message: string } | null>(null)
+
   const fileInputRef = useRef<HTMLInputElement>(null)
   const formRef = useRef<HTMLFormElement>(null)
-
-  // Reset form upon successful server upload
-  useEffect(() => {
-    if (state?.success) {
-      setParsingState('idle')
-      setVersionCode('')
-      setVersionName('')
-      setFileName('')
-      setFileSize('')
-      setErrorMsg('')
-      if (fileInputRef.current) {
-        fileInputRef.current.value = ''
-      }
-      formRef.current?.reset()
-    }
-  }, [state])
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
@@ -43,6 +30,7 @@ export default function UploadApkForm() {
     // Start parsing
     setParsingState('analyzing')
     setErrorMsg('')
+    setUploadResult(null)
 
     try {
       // Dynamic import of app-info-parser to avoid server-side/build complications
@@ -75,16 +63,85 @@ export default function UploadApkForm() {
     setFileName('')
     setFileSize('')
     setErrorMsg('')
+    setUploadResult(null)
     if (fileInputRef.current) {
       fileInputRef.current.value = ''
     }
+  }
+
+  const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault()
+    if (parsingState !== 'success' || isUploading) return
+
+    const formData = new FormData(e.currentTarget)
+    setIsUploading(true)
+    setUploadProgress(0)
+    setUploadResult(null)
+
+    const xhr = new XMLHttpRequest()
+
+    // Track upload progress dynamically
+    xhr.upload.onprogress = (event) => {
+      if (event.lengthComputable) {
+        const percentComplete = Math.round((event.loaded / event.total) * 100)
+        setUploadProgress(percentComplete)
+      }
+    }
+
+    xhr.onload = () => {
+      setIsUploading(false)
+      try {
+        const response = JSON.parse(xhr.responseText)
+        const isSuccess = xhr.status >= 200 && xhr.status < 300 && response.success
+        
+        setUploadResult({
+          success: isSuccess,
+          message: response.message || `HTTP ${xhr.status}: ${xhr.statusText}`
+        })
+
+        if (isSuccess) {
+          // Reset form fields
+          setParsingState('idle')
+          setVersionCode('')
+          setVersionName('')
+          setFileName('')
+          setFileSize('')
+          setErrorMsg('')
+          if (fileInputRef.current) {
+            fileInputRef.current.value = ''
+          }
+          formRef.current?.reset()
+          
+          // Refresh the page data so the history updates
+          setTimeout(() => {
+            window.location.reload()
+          }, 1500)
+        }
+      } catch (err) {
+        setUploadResult({
+          success: false,
+          message: `Gagal membaca respon server. Status HTTP: ${xhr.status}`
+        })
+      }
+    }
+
+    xhr.onerror = () => {
+      setIsUploading(false)
+      setUploadResult({
+        success: false,
+        message: 'Koneksi gagal. Periksa jaringan internet Anda atau pastikan ukuran file tidak diblokir oleh Nginx/Cloudflare.'
+      })
+    }
+
+    xhr.open('POST', '/api/app-update/upload')
+    xhr.send(formData)
   }
 
   return (
     <div className="lg:col-span-1 glass-card p-6 rounded-2xl border border-border h-fit">
       <h3 className="font-bold text-white text-lg mb-4">Deploy New Version</h3>
       
-      <form ref={formRef} action={formAction} className="space-y-4">
+      <form ref={formRef} onSubmit={handleSubmit} className="space-y-4">
         {/* APK File Upload Area */}
         <div>
           <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">
@@ -99,6 +156,7 @@ export default function UploadApkForm() {
             onChange={handleFileChange}
             className="hidden"
             id="apk-file-input"
+            disabled={isUploading}
           />
 
           {parsingState === 'idle' && (
@@ -141,15 +199,17 @@ export default function UploadApkForm() {
                   </span>
                 </div>
               </div>
-              <button
-                onClick={handleResetFile}
-                className="text-slate-500 hover:text-rose-400 p-1 hover:bg-slate-900 rounded-lg transition-colors cursor-pointer"
-                title="Ganti File"
-              >
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                </svg>
-              </button>
+              {!isUploading && (
+                <button
+                  onClick={handleResetFile}
+                  className="text-slate-500 hover:text-rose-400 p-1 hover:bg-slate-900 rounded-lg transition-colors cursor-pointer"
+                  title="Ganti File"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                  </svg>
+                </button>
+              )}
             </div>
           )}
 
@@ -235,39 +295,71 @@ export default function UploadApkForm() {
             name="changelog"
             rows={4}
             placeholder="List bug fixes, improvements, and features..."
-            className="w-full px-4 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-white text-sm focus:outline-none focus:border-primary transition-colors"
+            disabled={isUploading}
+            className="w-full px-4 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-white text-sm focus:outline-none focus:border-primary transition-colors disabled:opacity-50"
           />
         </div>
 
+        {/* Real-time Upload Progress Bar */}
+        {isUploading && (
+          <div className="space-y-2 animate-fade-in">
+            <div className="flex items-center justify-between text-xs font-bold">
+              <span className="text-indigo-400 animate-pulse">Mengunggah APK...</span>
+              <span className="text-slate-300">{uploadProgress}%</span>
+            </div>
+            <div className="w-full h-2.5 bg-slate-950 border border-slate-800 rounded-full overflow-hidden">
+              <div 
+                className="h-full bg-gradient-to-r from-indigo-500 to-emerald-400 transition-all duration-150 rounded-full"
+                style={{ width: `${uploadProgress}%` }}
+              ></div>
+            </div>
+            {uploadProgress === 100 && (
+              <p className="text-[10px] text-emerald-400 font-medium animate-pulse text-center">
+                Unggahan selesai, server sedang memproses dan menyimpan berkas...
+              </p>
+            )}
+          </div>
+        )}
 
         {/* Status Message Alert */}
-        {state && (
-          <div className={`p-3 rounded-xl border text-xs font-semibold ${
-            state.success 
+        {uploadResult && (
+          <div className={`p-3 rounded-xl border text-xs font-semibold flex items-start gap-2 ${
+            uploadResult.success 
               ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400' 
               : 'bg-rose-500/10 border-rose-500/20 text-rose-400'
           }`}>
-            {state.message}
+            <span className="mt-0.5">
+              {uploadResult.success ? (
+                <svg className="w-4 h-4 text-emerald-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+              ) : (
+                <svg className="w-4 h-4 text-rose-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+              )}
+            </span>
+            <span>{uploadResult.message}</span>
           </div>
         )}
 
         {/* Submit button */}
         <button
           type="submit"
-          disabled={parsingState !== 'success' || isPending}
+          disabled={parsingState !== 'success' || isUploading}
           className={`w-full mt-2 py-3 rounded-xl font-bold text-white text-sm transition-all duration-200 cursor-pointer text-center flex items-center justify-center gap-2 ${
-            parsingState === 'success' && !isPending
+            parsingState === 'success' && !isUploading
               ? 'bg-primary hover:bg-indigo-500 glow-indigo'
               : 'bg-slate-800 text-slate-500 cursor-not-allowed border border-slate-700/30'
           }`}
         >
-          {isPending ? (
+          {isUploading ? (
             <>
               <svg className="animate-spin h-4 w-4 text-slate-400" fill="none" viewBox="0 0 24 24">
                 <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
                 <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
               </svg>
-              <span>Mengirim & Menyimpan APK (Mohon Tunggu...)</span>
+              <span>Mengunggah ({uploadProgress}%)</span>
             </>
           ) : parsingState === 'analyzing' ? (
             'Analyzing APK...'
