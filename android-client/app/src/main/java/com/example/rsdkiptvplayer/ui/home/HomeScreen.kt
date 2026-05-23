@@ -14,6 +14,8 @@ import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -122,11 +124,12 @@ fun HomeScreen(
         )
 
         val configuration = androidx.compose.ui.platform.LocalConfiguration.current
-        val isSmallScreen = configuration.screenWidthDp < 760
+        val isSmallScreen = configuration.screenWidthDp < 760 || configuration.screenHeightDp < 500
 
         Column(
             modifier = Modifier
                 .fillMaxSize()
+                .safeDrawingPadding()
                 .padding(
                     horizontal = if (isSmallScreen) 18.dp else 34.dp,
                     vertical = if (isSmallScreen) 10.dp else 18.dp
@@ -195,7 +198,7 @@ private fun HospitalityHeader(
     version: String
 ) {
     val configuration = androidx.compose.ui.platform.LocalConfiguration.current
-    val isSmallScreen = configuration.screenWidthDp < 760
+    val isSmallScreen = configuration.screenWidthDp < 760 || configuration.screenHeightDp < 500
 
     Box(modifier = Modifier.fillMaxWidth()) {
         Column(
@@ -223,32 +226,34 @@ private fun HospitalityHeader(
             }
         }
 
-        Column(
-            modifier = Modifier.align(Alignment.TopCenter),
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
-            Image(
-                painter = painterResource(id = R.drawable.ic_kariadi_hospitality_logo),
-                contentDescription = "Kariadi IPTV",
-                modifier = Modifier
-                    .size(if (isSmallScreen) 48.dp else 72.dp)
-                    .shadow(12.dp, RoundedCornerShape(if (isSmallScreen) 10.dp else 16.dp))
-            )
-            Spacer(modifier = Modifier.height(if (isSmallScreen) 4.dp else 8.dp))
-            Text(
-                text = "RSUP Dr. Kariadi",
-                color = Color(0xFFFFE9A6),
-                fontSize = if (isSmallScreen) 16.sp else 22.sp,
-                fontWeight = FontWeight.ExtraBold,
-                letterSpacing = 0.5.sp
-            )
-            Text(
-                text = "Rujukan Nasional • Kelas A • Pendidikan",
-                color = Color.White.copy(alpha = 0.88f),
-                fontSize = if (isSmallScreen) 8.sp else 11.sp,
-                fontWeight = FontWeight.SemiBold,
-                letterSpacing = if (isSmallScreen) 0.6.sp else 1.4.sp
-            )
+        if (!isSmallScreen) {
+            Column(
+                modifier = Modifier.align(Alignment.TopCenter),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Image(
+                    painter = painterResource(id = R.drawable.ic_kariadi_hospitality_logo),
+                    contentDescription = "Kariadi IPTV",
+                    modifier = Modifier
+                        .size(72.dp)
+                        .shadow(12.dp, RoundedCornerShape(16.dp))
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(
+                    text = "RSUP Dr. Kariadi",
+                    color = Color(0xFFFFE9A6),
+                    fontSize = 22.sp,
+                    fontWeight = FontWeight.ExtraBold,
+                    letterSpacing = 0.5.sp
+                )
+                Text(
+                    text = "Rujukan Nasional • Kelas A • Pendidikan",
+                    color = Color.White.copy(alpha = 0.88f),
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    letterSpacing = 1.4.sp
+                )
+            }
         }
 
         Column(
@@ -307,7 +312,7 @@ private fun HospitalityMenuBar(
     onInfoClick: () -> Unit
 ) {
     val configuration = androidx.compose.ui.platform.LocalConfiguration.current
-    val isSmallScreen = configuration.screenWidthDp < 760
+    val isSmallScreen = configuration.screenWidthDp < 760 || configuration.screenHeightDp < 500
 
     var selectedIndex by remember { mutableIntStateOf(2) }
     var dragAmount by remember { mutableFloatStateOf(0f) }
@@ -856,6 +861,8 @@ private fun InfoAplikasiDialog(
 ) {
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
+    val configuration = androidx.compose.ui.platform.LocalConfiguration.current
+    val isSmallScreen = configuration.screenWidthDp < 760 || configuration.screenHeightDp < 500
 
     var checkingState by remember { mutableStateOf("idle") } // idle, checking, update_available, no_update, error
     var statusMessage by remember { mutableStateOf("") }
@@ -975,28 +982,40 @@ private fun InfoAplikasiDialog(
             border = BorderStroke(1.dp, Color(0xFFC084FC).copy(alpha = 0.35f)),
             shape = RoundedCornerShape(20.dp),
             modifier = Modifier
-                .width(460.dp)
-                .padding(16.dp)
+                .width(if (isSmallScreen) 400.dp else 460.dp)
+                .padding(if (isSmallScreen) 8.dp else 16.dp)
         ) {
             Column(
-                modifier = Modifier.padding(26.dp),
+                modifier = Modifier
+                    .padding(if (isSmallScreen) 16.dp else 26.dp)
+                    .verticalScroll(rememberScrollState()),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
                 // Circular Icon header
                 Box(
                     modifier = Modifier
-                        .size(58.dp)
+                        .size(if (isSmallScreen) 44.dp else 58.dp)
                         .clip(CircleShape)
                         .background(Color(0xFFC084FC).copy(alpha = 0.16f))
                         .border(1.dp, Color(0xFFC084FC).copy(alpha = 0.45f), CircleShape),
                     contentAlignment = Alignment.Center
                 ) {
-                    Text("ℹ", fontSize = 24.sp, color = Color.White, fontWeight = FontWeight.Bold)
+                    Text(
+                        text = "ℹ",
+                        fontSize = if (isSmallScreen) 18.sp else 24.sp,
+                        color = Color.White,
+                        fontWeight = FontWeight.Bold
+                    )
                 }
                 
-                Spacer(modifier = Modifier.height(16.dp))
-                Text("Informasi & Pembaruan Aplikasi", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = Color.White)
-                Spacer(modifier = Modifier.height(20.dp))
+                Spacer(modifier = Modifier.height(if (isSmallScreen) 10.dp else 16.dp))
+                Text(
+                    text = "Informasi & Pembaruan Aplikasi",
+                    fontSize = if (isSmallScreen) 15.sp else 18.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = Color.White
+                )
+                Spacer(modifier = Modifier.height(if (isSmallScreen) 12.dp else 20.dp))
 
                 // Detail Grid-like layout
                 Column(
@@ -1004,8 +1023,8 @@ private fun InfoAplikasiDialog(
                         .fillMaxWidth()
                         .background(Color.Black.copy(alpha = 0.25f), RoundedCornerShape(12.dp))
                         .border(1.dp, Color.White.copy(alpha = 0.08f), RoundedCornerShape(12.dp))
-                        .padding(14.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                        .padding(if (isSmallScreen) 10.dp else 14.dp),
+                    verticalArrangement = Arrangement.spacedBy(if (isSmallScreen) 6.dp else 8.dp)
                 ) {
                     InfoRow("Versi Terpasang", "v$currentVersionName ($currentVersionCode)")
                     InfoRow("MAC Address", macAddress)
@@ -1013,7 +1032,7 @@ private fun InfoAplikasiDialog(
                     InfoRow("URL Server", if (serverUrl.isBlank()) "Belum disetting" else serverUrl)
                 }
 
-                Spacer(modifier = Modifier.height(22.dp))
+                Spacer(modifier = Modifier.height(if (isSmallScreen) 14.dp else 22.dp))
 
                 // Action area based on status
                 if (checkingState == "checking") {
