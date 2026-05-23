@@ -69,6 +69,7 @@ fun HomeScreen(
     val educationPath by dataStoreManager.educationVideoPathFlow.collectAsState(initial = "")
 
     var resolvedDeviceId by remember { mutableStateOf("STB-RSDK-DEVICE") }
+    var macAddress by remember { mutableStateOf("Tidak tersedia") }
     var localIpAddress by remember { mutableStateOf("127.0.0.1") }
     var timeString by remember { mutableStateOf("") }
     var dateString by remember { mutableStateOf("") }
@@ -79,6 +80,7 @@ fun HomeScreen(
 
     LaunchedEffect(Unit) {
         resolvedDeviceId = dataStoreManager.getDeviceId()
+        macAddress = app.repository.getMacAddress() ?: "Tidak tersedia"
         localIpAddress = app.repository.getLocalIpAddress()
         currentVersionCode = UpdateManager.getCurrentVersionCode(context)
         currentVersionName = UpdateManager.getCurrentVersionName(context)
@@ -163,7 +165,7 @@ fun HomeScreen(
 
         if (showInfoDialog) {
             InfoAplikasiDialog(
-                deviceId = resolvedDeviceId,
+                macAddress = macAddress,
                 ipAddress = localIpAddress,
                 serverUrl = serverUrl,
                 currentVersionCode = currentVersionCode,
@@ -740,7 +742,7 @@ private fun HomeDialog(
 
 @Composable
 private fun InfoAplikasiDialog(
-    deviceId: String,
+    macAddress: String,
     ipAddress: String,
     serverUrl: String,
     currentVersionCode: Int,
@@ -901,7 +903,7 @@ private fun InfoAplikasiDialog(
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     InfoRow("Versi Terpasang", "v$currentVersionName ($currentVersionCode)")
-                    InfoRow("ID Perangkat", deviceId)
+                    InfoRow("MAC Address", macAddress)
                     InfoRow("IP Address", ipAddress)
                     InfoRow("URL Server", if (serverUrl.isBlank()) "Belum disetting" else serverUrl)
                 }

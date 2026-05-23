@@ -415,7 +415,7 @@ class IptvRepository(
         return mi.availMem / 1048576L // convert to MB
     }
 
-    private fun getMacAddress(): String? {
+    fun getMacAddress(): String? {
         try {
             val all = Collections.list(NetworkInterface.getNetworkInterfaces())
             for (nif in all) {
