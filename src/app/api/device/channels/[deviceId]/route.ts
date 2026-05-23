@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import prisma from '@/lib/db'
 import { getErrorMessage } from '@/lib/errors'
-import { createPlayableStreamUrl } from '@/lib/playableStreams'
+import { createPlayableStreamUrl, createUdpOnDemandHlsPath, isUdpStreamUrl } from '@/lib/playableStreams'
 import { getHlsRelayBaseUrl } from '@/lib/settings'
 
 export async function GET(
@@ -100,7 +100,8 @@ export async function GET(
       logo: c.logoUrl,
       group: c.category?.name || 'Uncategorized',
       stream_url: shouldRelayStreams
-        ? createPlayableStreamUrl({
+        ? createRelayedClientStreamUrl({
+            channelId: c.id,
             origin: requestOrigin,
             name: c.name,
             streamUrl: c.streamUrl,
@@ -123,4 +124,29 @@ export async function GET(
       { status: 500 }
     )
   }
+}
+
+function createRelayedClientStreamUrl({
+  channelId,
+  origin,
+  name,
+  streamUrl,
+  hlsRelayBaseUrl,
+}: {
+  channelId: number
+  origin: string
+  name: string
+  streamUrl: string
+  hlsRelayBaseUrl: string
+}): string {
+  if (isUdpStreamUrl(streamUrl)) {
+    return new URL(createUdpOnDemandHlsPath(channelId), origin).toString()
+  }
+
+  return createPlayableStreamUrl({
+    origin,
+    name,
+    streamUrl,
+    hlsRelayBaseUrl,
+  })
 }
