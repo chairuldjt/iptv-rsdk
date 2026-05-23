@@ -3,6 +3,8 @@ import { revalidatePath } from 'next/cache'
 import ConfirmForm from '@/components/ConfirmForm'
 import DeviceConfigForm from '@/components/DeviceConfigForm'
 import RemoteControlModal from '@/components/RemoteControlModal'
+import DeviceSearchAndLimit from '@/components/DeviceSearchAndLimit'
+import DevicePagination from '@/components/DevicePagination'
 import { redirect } from 'next/navigation'
 import { getOnlineThreshold } from '@/lib/time'
 import { cleanupOfflineDevices, getOfflineAutoDeleteDays, setOfflineAutoDeleteDays } from '@/lib/settings'
@@ -158,7 +160,16 @@ async function saveDeviceConfigAction(formData: FormData) {
 export default async function DevicesPage({
   searchParams,
 }: {
-  searchParams: Promise<{ edit?: string; success?: string; status?: string; cleanupSaved?: string; remote?: string }>
+  searchParams: Promise<{
+    edit?: string
+    success?: string
+    status?: string
+    cleanupSaved?: string
+    remote?: string
+    q?: string
+    page?: string
+    limit?: string
+  }>
 }) {
   const resolvedSearchParams = await searchParams
   const editDeviceId = resolvedSearchParams.edit
@@ -168,6 +179,15 @@ export default async function DevicesPage({
   const statusFilter = (['all', 'online', 'offline', 'disabled'].includes(resolvedSearchParams.status || '')
     ? resolvedSearchParams.status
     : 'all') as DeviceStatusFilter
+
+  const searchQuery = resolvedSearchParams.q || ''
+  const limitParam = parseInt(resolvedSearchParams.limit || '25', 10)
+  const pageParam = parseInt(resolvedSearchParams.page || '1', 10)
+
+  const allowedLimits = [10, 25, 50, 100]
+  const pageSize = allowedLimits.includes(limitParam) ? limitParam : 25
+  const currentPage = pageParam > 0 ? pageParam : 1
+
   const offlineAutoDeleteDays = await getOfflineAutoDeleteDays()
   const cleanedDeviceCount = await cleanupOfflineDevices(offlineAutoDeleteDays)
 
@@ -208,6 +228,26 @@ export default async function DevicesPage({
     if (statusFilter === 'disabled') return !d.isActive
     return true
   })
+
+  // Apply search query
+  const searchedDevices = filteredDevices.filter((d) => {
+    if (!searchQuery) return true
+    const q = searchQuery.toLowerCase()
+    return (
+      d.deviceName.toLowerCase().includes(q) ||
+      d.deviceId.toLowerCase().includes(q) ||
+      (d.lastIp && d.lastIp.toLowerCase().includes(q)) ||
+      (d.macAddress && d.macAddress.toLowerCase().includes(q))
+    )
+  })
+
+  // Apply pagination
+  const totalItems = searchedDevices.length
+  const totalPages = Math.ceil(totalItems / pageSize)
+  const safeCurrentPage = Math.min(currentPage, Math.max(1, totalPages))
+  const startIndex = (safeCurrentPage - 1) * pageSize
+  const paginatedDevices = searchedDevices.slice(startIndex, startIndex + pageSize)
+
   const filterItems: Array<{ label: string; value: DeviceStatusFilter; count: number }> = [
     { label: 'All', value: 'all', count: devices.length },
     { label: 'Online', value: 'online', count: deviceStats.online },
@@ -277,9 +317,13 @@ export default async function DevicesPage({
 
         {/* Device List Table Card - Always Full Width */}
         <div className="glass-card rounded-2xl border border-border overflow-hidden">
-          <div className="px-6 py-5 border-b border-border">
-            <h3 className="font-bold text-white text-lg">Registered Devices ({filteredDevices.length}/{devices.length})</h3>
+          <div className="px-6 py-5 border-b border-border flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+            <h3 className="font-bold text-white text-lg">
+              Registered Devices ({searchQuery ? `${searchedDevices.length} found` : filteredDevices.length}/{devices.length})
+            </h3>
           </div>
+
+          <DeviceSearchAndLimit />
 
           <div className="overflow-x-auto">
             <table className="w-full text-left border-collapse text-sm">
@@ -293,16 +337,16 @@ export default async function DevicesPage({
                 </tr>
               </thead>
               <tbody className="divide-y divide-border/60">
-                {filteredDevices.length === 0 ? (
+                {searchedDevices.length === 0 ? (
                   <tr>
                     <td colSpan={5} className="p-12 text-center text-slate-500 text-sm">
                       {devices.length === 0
                         ? 'No STB devices registered yet. Open the RSDK IPTV Android Player app on any STB to register automatically!'
-                        : 'No devices match the selected filter.'}
+                        : 'No devices match the selected search query or filter.'}
                     </td>
                   </tr>
                 ) : (
-                  filteredDevices.map((d) => {
+                  paginatedDevices.map((d) => {
                     const isOnline = d.isActive && d.lastOnline && d.lastOnline.getTime() >= tenMinutesAgo.getTime()
                     return (
                       <tr key={d.id} className="hover:bg-slate-800/10 transition-colors">
@@ -432,6 +476,11 @@ export default async function DevicesPage({
               </tbody>
             </table>
           </div>
+          <DevicePagination
+            totalItems={totalItems}
+            pageSize={pageSize}
+            currentPage={safeCurrentPage}
+          />
         </div>
 
         {/* Modal Backdrop & Configuration Panel */}
