@@ -14,6 +14,7 @@ export type DefaultDeviceConfig = {
   startScreen: string
   lockSettings: boolean
   autoStartOnBoot: boolean
+  muteSelectionSound: boolean
   technicianPin: string
   educationVideoPath: string
   educationSmbUsername: string
@@ -35,6 +36,7 @@ export const FALLBACK_DEFAULT_DEVICE_CONFIG: DefaultDeviceConfig = {
   startScreen: process.env.IPTV_DEFAULT_START_SCREEN || 'live_tv',
   lockSettings: envBoolean('IPTV_DEFAULT_LOCK_SETTINGS', true),
   autoStartOnBoot: envBoolean('IPTV_DEFAULT_AUTO_START_ON_BOOT', false),
+  muteSelectionSound: false,
   technicianPin: process.env.IPTV_DEFAULT_TECHNICIAN_PIN || '2468',
   educationVideoPath: process.env.IPTV_DEFAULT_EDUCATION_VIDEO_PATH || '',
   educationSmbUsername: process.env.IPTV_DEFAULT_EDUCATION_SMB_USERNAME || '',
@@ -107,6 +109,7 @@ export function defaultDeviceConfigFromFormData(formData: FormData): DefaultDevi
     startScreen: stringValue(formData, 'startScreen', FALLBACK_DEFAULT_DEVICE_CONFIG.startScreen),
     lockSettings: formData.get('lockSettings') === 'on',
     autoStartOnBoot: formData.get('autoStartOnBoot') === 'on',
+    muteSelectionSound: formData.get('muteSelectionSound') === 'on',
     technicianPin: stringValue(formData, 'technicianPin', FALLBACK_DEFAULT_DEVICE_CONFIG.technicianPin),
     educationVideoPath: stringValue(formData, 'educationVideoPath', ''),
     educationSmbUsername: stringValue(formData, 'educationSmbUsername', ''),
@@ -132,6 +135,7 @@ function normalizeDefaultDeviceConfig(value: unknown): DefaultDeviceConfig {
     startScreen: oneOf(source.startScreen, ['live_tv', 'category_list', 'home_screen'], FALLBACK_DEFAULT_DEVICE_CONFIG.startScreen),
     lockSettings: safeBoolean(source.lockSettings, FALLBACK_DEFAULT_DEVICE_CONFIG.lockSettings),
     autoStartOnBoot: safeBoolean(source.autoStartOnBoot, FALLBACK_DEFAULT_DEVICE_CONFIG.autoStartOnBoot),
+    muteSelectionSound: safeBoolean(source.muteSelectionSound, FALLBACK_DEFAULT_DEVICE_CONFIG.muteSelectionSound),
     technicianPin: safeString(source.technicianPin, FALLBACK_DEFAULT_DEVICE_CONFIG.technicianPin),
     educationVideoPath: safeString(source.educationVideoPath, ''),
     educationSmbUsername: safeString(source.educationSmbUsername, ''),

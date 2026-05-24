@@ -3,6 +3,7 @@ import prisma from '@/lib/db'
 import { getErrorMessage } from '@/lib/errors'
 import { DEFAULT_CUSTOM_M3U_URL, DEFAULT_SYNC_MODE } from '@/lib/defaults'
 import { createDeviceConfigData, getDefaultDeviceConfig } from '@/lib/defaultDeviceConfig'
+import { getSoundPreference } from '@/lib/sound'
 
 export async function GET(
   request: Request,
@@ -61,6 +62,9 @@ export async function GET(
       where: { isGlobal: true }
     })
 
+    // Get sound preference for this device
+    const muteSelectionSound = await getSoundPreference(deviceId)
+
     return NextResponse.json({
       status: true,
       message: 'Config loaded',
@@ -90,6 +94,7 @@ export async function GET(
         education_source: config.educationSource || 'smb',
         education_playback_mode: config.educationPlaybackMode || 'copy',
         education_force_sync: currentEducationForceSync,
+        mute_selection_sound: muteSelectionSound,
       },
     })
   } catch (error: unknown) {

@@ -37,6 +37,7 @@ class DataStoreManager(private val context: Context) {
         val EDUCATION_SOURCE = stringPreferencesKey("education_source")
         val EDUCATION_PLAYBACK_MODE = stringPreferencesKey("education_playback_mode")
         val TECHNICIAN_PIN = stringPreferencesKey("technician_pin")
+        val MUTE_SELECTION_SOUND = booleanPreferencesKey("mute_selection_sound")
     }
 
     // Generate or get existing Device ID
@@ -316,6 +317,26 @@ class DataStoreManager(private val context: Context) {
     // Auto start on boot
     val autoStartFlow: Flow<Boolean> = context.dataStore.data.map { prefs ->
         prefs[AUTO_START_ON_BOOT] ?: false
+    }
+
+    // Mute selection sound (home screen carousel chime)
+    val muteSelectionSoundFlow: Flow<Boolean> = context.dataStore.data.map { prefs ->
+        prefs[MUTE_SELECTION_SOUND] ?: false
+    }
+
+    suspend fun getMuteSelectionSound(): Boolean {
+        val prefs = context.dataStore.data.first()
+        return prefs[MUTE_SELECTION_SOUND] ?: false
+    }
+
+    suspend fun setMuteSelectionSound(muted: Boolean) {
+        val current = getMuteSelectionSound()
+        if (current != muted) {
+            context.dataStore.edit { prefs ->
+                prefs[MUTE_SELECTION_SOUND] = muted
+            }
+            addLog("Selection sound mute changed to: $muted")
+        }
     }
 
     val autoStartLocalOverrideFlow: Flow<Boolean> = context.dataStore.data.map { prefs ->

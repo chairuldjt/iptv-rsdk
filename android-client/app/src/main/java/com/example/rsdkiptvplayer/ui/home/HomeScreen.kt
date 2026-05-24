@@ -467,6 +467,8 @@ private fun HospitalityMenuBar(
     var dragAmount by remember { mutableFloatStateOf(0f) }
     var hasPlayedSelectionSound by remember { mutableStateOf(false) }
     val carouselFocusRequester = menuFocusRequester
+    val app = context.applicationContext as com.example.rsdkiptvplayer.IptvApplication
+    val muteSelectionSound by app.dataStoreManager.muteSelectionSoundFlow.collectAsState(initial = false)
     val soundPool = remember {
         SoundPool.Builder()
             .setMaxStreams(2)
@@ -553,7 +555,7 @@ private fun HospitalityMenuBar(
             hasPlayedSelectionSound = true
             return@LaunchedEffect
         }
-        if (selectionSoundId != 0) {
+        if (selectionSoundId != 0 && !muteSelectionSound) {
             soundPool.play(selectionSoundId, 0.38f, 0.42f, 1, 0, 1.0f)
         }
     }
