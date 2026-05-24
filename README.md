@@ -67,6 +67,9 @@ Untuk mempermudah pengembangan backend (Web Admin & API) serta frontend (Android
 6. **[Panduan Konfigurasi Default & Build](docs/CONFIGURATION_AND_BUILD.md)**  
    Mendokumentasikan lokasi variabel default dalam kode sumber untuk kustomisasi APK massal serta langkah-langkah build dan instalasi via ADB.
 
+7. **[Arsitektur Infrastruktur](docs/INFRASTRUCTURE.md)**  
+   Menjelaskan topologi jaringan kantor/rumah, server IPTV lokal, mode direct vs relay on-demand, dan checklist troubleshooting playback.
+
 ---
 
 ## 🛠️ Ringkasan Fitur Wajib (MVP Checklist)
