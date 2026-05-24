@@ -13,12 +13,10 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -124,7 +122,7 @@ fun EntertainmentScreen(onBack: () -> Unit) {
             .safeDrawingPadding()
             .padding(horizontal = 42.dp, vertical = 26.dp)
     ) {
-        Header(onBack = onBack)
+        Header()
 
         when {
             isLoading -> {
@@ -171,7 +169,7 @@ fun EntertainmentScreen(onBack: () -> Unit) {
 }
 
 @Composable
-private fun Header(onBack: () -> Unit) {
+private fun Header() {
     Row(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.SpaceBetween,
@@ -192,36 +190,6 @@ private fun Header(onBack: () -> Unit) {
                 fontWeight = FontWeight.SemiBold
             )
         }
-
-        FocusButton(text = "Kembali", onClick = onBack)
-    }
-}
-
-@Composable
-private fun FocusButton(text: String, onClick: () -> Unit) {
-    var isFocused by remember { mutableStateOf(false) }
-    Box(
-        modifier = Modifier
-            .onFocusChanged { isFocused = it.isFocused }
-            .onPreviewKeyEvent { keyEvent ->
-                if (keyEvent.type == KeyEventType.KeyDown &&
-                    (keyEvent.key == Key.DirectionCenter || keyEvent.key == Key.Enter || keyEvent.key == Key.NumPadEnter)
-                ) {
-                    onClick()
-                    true
-                } else {
-                    false
-                }
-            }
-            .focusable()
-            .clip(RoundedCornerShape(14.dp))
-            .background(if (isFocused) Color(0xFF2EE6C6) else Color.Black.copy(alpha = 0.38f))
-            .border(1.dp, if (isFocused) Color.White else Color.White.copy(alpha = 0.18f), RoundedCornerShape(14.dp))
-            .clickable(onClick = onClick)
-            .padding(horizontal = 18.dp, vertical = 10.dp),
-        contentAlignment = Alignment.Center
-    ) {
-        Text(text, color = if (isFocused) Color.Black else Color.White, fontSize = 13.sp, fontWeight = FontWeight.Bold)
     }
 }
 
@@ -346,7 +314,7 @@ private fun EntertainmentWebView(option: EntertainmentOption, onBack: () -> Unit
             update = {}
         )
 
-        PlayerChrome(title = option.title, subtitle = option.subtitle, onBack = onBack)
+        DetailChrome(title = option.title, subtitle = option.subtitle)
     }
 
     DisposableEffect(Unit) {
@@ -365,6 +333,9 @@ private fun EntertainmentPlayer(option: EntertainmentOption, onBack: () -> Unit)
     val context = LocalContext.current
     var resolvedUrl by remember(option.url, option.contentType) { mutableStateOf<String?>(null) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
+    var controlsVisible by remember { mutableStateOf(false) }
+    var isPlaying by remember { mutableStateOf(true) }
+    val playerFocusRequester = remember { FocusRequester() }
     val player = remember {
         ExoPlayer.Builder(context).build().apply {
             repeatMode = Player.REPEAT_MODE_ALL
@@ -374,6 +345,11 @@ private fun EntertainmentPlayer(option: EntertainmentOption, onBack: () -> Unit)
 
     BackHandler { onBack() }
 
+    LaunchedEffect(Unit) {
+        delay(150)
+        runCatching { playerFocusRequester.requestFocus() }
+    }
+
     LaunchedEffect(option) {
         runCatching {
             if (option.contentType == "m3u_player") resolveM3uUrl(option.url) else option.url
@@ -382,15 +358,73 @@ private fun EntertainmentPlayer(option: EntertainmentOption, onBack: () -> Unit)
             player.setMediaItem(MediaItem.fromUri(Uri.parse(mediaUrl)))
             player.prepare()
             player.playWhenReady = true
+            isPlaying = true
         }.onFailure { error ->
             errorMessage = error.localizedMessage ?: "Konten tidak bisa diputar."
         }
     }
 
-    Box(Modifier.fillMaxSize().background(Color.Black)) {
+    LaunchedEffect(controlsVisible) {
+        if (controlsVisible) {
+            delay(4500)
+            controlsVisible = false
+        }
+    }
+
+    Box(
+        Modifier
+            .fillMaxSize()
+            .background(Color.Black)
+            .focusRequester(playerFocusRequester)
+            .focusable()
+            .onPreviewKeyEvent { keyEvent ->
+                if (keyEvent.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
+
+                when (keyEvent.key) {
+                    Key.DirectionCenter, Key.Enter, Key.NumPadEnter -> {
+                        if (controlsVisible) {
+                            if (player.isPlaying) {
+                                player.pause()
+                                isPlaying = false
+                            } else {
+                                player.play()
+                                isPlaying = true
+                            }
+                        } else {
+                            controlsVisible = true
+                        }
+                        true
+                    }
+                    Key.DirectionLeft -> {
+                        if (controlsVisible) {
+                            player.seekTo((player.currentPosition - 10_000L).coerceAtLeast(0L))
+                            true
+                        } else {
+                            false
+                        }
+                    }
+                    Key.DirectionRight -> {
+                        if (controlsVisible) {
+                            val target = player.currentPosition + 10_000L
+                            val duration = player.duration.takeIf { it > 0 }
+                            player.seekTo(if (duration != null) target.coerceAtMost(duration) else target)
+                            true
+                        } else {
+                            false
+                        }
+                    }
+                    else -> false
+                }
+            }
+    ) {
         AndroidView(
             modifier = Modifier.fillMaxSize(),
-            factory = { PlayerView(it).apply { this.player = player; useController = true } },
+            factory = {
+                PlayerView(it).apply {
+                    this.player = player
+                    useController = false
+                }
+            },
             update = { it.player = player }
         )
 
@@ -401,7 +435,14 @@ private fun EntertainmentPlayer(option: EntertainmentOption, onBack: () -> Unit)
             Text(it, color = Color.White, fontSize = 16.sp, fontWeight = FontWeight.Bold, modifier = Modifier.align(Alignment.Center))
         }
 
-        PlayerChrome(title = option.title, subtitle = option.subtitle, onBack = onBack)
+        DetailChrome(title = option.title, subtitle = option.subtitle)
+
+        if (controlsVisible) {
+            SimplePlayerControls(
+                isPlaying = isPlaying,
+                modifier = Modifier.align(Alignment.Center)
+            )
+        }
     }
 
     DisposableEffect(Unit) {
@@ -410,7 +451,7 @@ private fun EntertainmentPlayer(option: EntertainmentOption, onBack: () -> Unit)
 }
 
 @Composable
-private fun PlayerChrome(title: String, subtitle: String, onBack: () -> Unit) {
+private fun DetailChrome(title: String, subtitle: String) {
     Row(
         modifier = Modifier
             .padding(18.dp)
@@ -421,24 +462,33 @@ private fun PlayerChrome(title: String, subtitle: String, onBack: () -> Unit) {
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(10.dp)
     ) {
-        var backFocused by remember { mutableStateOf(false) }
-        IconButton(
-            onClick = onBack,
-            modifier = Modifier
-                .size(38.dp)
-                .clip(CircleShape)
-                .background(if (backFocused) Color(0xFFEF4444) else Color(0xFF1F2937))
-                .border(BorderStroke(1.dp, if (backFocused) Color.White else Color(0xFF475569)), CircleShape)
-                .focusable()
-                .onFocusChanged { backFocused = it.isFocused }
-        ) {
-            Text("<", color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.Bold)
-        }
-
         Column {
             Text(title.uppercase(), color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.ExtraBold, letterSpacing = 1.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
             Text(subtitle, color = Color(0xFFCBD5E1), fontSize = 10.sp, fontWeight = FontWeight.Medium, maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
+    }
+}
+
+@Composable
+private fun SimplePlayerControls(isPlaying: Boolean, modifier: Modifier = Modifier) {
+    Row(
+        modifier = modifier
+            .clip(RoundedCornerShape(999.dp))
+            .background(Color.Black.copy(alpha = 0.72f))
+            .border(1.dp, Color.White.copy(alpha = 0.22f), RoundedCornerShape(999.dp))
+            .padding(horizontal = 22.dp, vertical = 14.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(24.dp)
+    ) {
+        Text("<<", color = Color.White, fontSize = 24.sp, fontWeight = FontWeight.ExtraBold)
+        Text(
+            if (isPlaying) "PAUSE" else "PLAY",
+            color = Color(0xFFFFE9A6),
+            fontSize = 18.sp,
+            fontWeight = FontWeight.ExtraBold,
+            letterSpacing = 1.sp
+        )
+        Text(">>", color = Color.White, fontSize = 24.sp, fontWeight = FontWeight.ExtraBold)
     }
 }
 
