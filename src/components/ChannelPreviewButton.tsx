@@ -88,7 +88,7 @@ export default function ChannelPreviewButton({
       </button>
 
       {open && (
-        <div className="fixed inset-0 z-50 bg-slate-950/85 backdrop-blur-sm p-4 flex items-center justify-center">
+        <div className="fixed inset-0 z-[100] bg-slate-950/85 backdrop-blur-sm p-4 flex items-center justify-center">
           <div className="w-full max-w-5xl rounded-2xl border border-slate-700 bg-slate-950 shadow-2xl overflow-hidden">
             <div className="px-5 py-4 border-b border-slate-800 flex flex-col md:flex-row md:items-center justify-between gap-3">
               <div className="min-w-0">

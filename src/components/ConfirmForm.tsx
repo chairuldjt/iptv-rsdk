@@ -1,6 +1,7 @@
 'use client'
 
 import React, { useState, useRef, useTransition } from 'react'
+import { createPortal } from 'react-dom'
 
 interface ConfirmFormProps extends React.FormHTMLAttributes<HTMLFormElement> {
   action: (formData: FormData) => void | Promise<void>
@@ -46,8 +47,8 @@ export default function ConfirmForm({ action, message, children, ...props }: Con
         {children}
       </form>
 
-      {showModal && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-background/90 backdrop-blur-sm animate-fade-in">
+      {showModal && createPortal(
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-background/90 backdrop-blur-sm animate-fade-in">
           <div className="w-full max-w-md card p-6 rounded-2xl border border-border shadow-2xl animate-slide-up text-center space-y-6">
             <div className="w-12 h-12 rounded-full bg-destructive/10 border border-destructive/20 flex items-center justify-center mx-auto text-destructive">
               <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
@@ -97,7 +98,8 @@ export default function ConfirmForm({ action, message, children, ...props }: Con
               </button>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </>
   )

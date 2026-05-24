@@ -102,7 +102,7 @@ export default function RemoteControlModal({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/85 backdrop-blur-md animate-fade-in">
+    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-950/85 backdrop-blur-md animate-fade-in">
       <div className="w-full max-w-sm glass-card p-6 rounded-3xl border border-indigo-500/30 shadow-2xl relative flex flex-col items-center bg-slate-900/90 text-white animate-scale-in">
         
         {/* Modal Close Button */}
