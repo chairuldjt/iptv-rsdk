@@ -41,8 +41,17 @@ export default async function UpdatesPage() {
                   </div>
                 )}
               </div>
-              <div className="text-xs text-right font-semibold text-slate-400 self-end md:self-center">
-                Deployed: {new Date(deployedUpdate.updatedAt).toLocaleDateString()}
+              <div className="flex flex-col items-end gap-3 self-end md:self-center">
+                <div className="text-xs text-right font-semibold text-slate-400">
+                  Deployed: {new Date(deployedUpdate.updatedAt).toLocaleDateString()}
+                </div>
+                <a
+                  href={createApkDownloadUrl(deployedUpdate.apkFileName)}
+                  download={deployedUpdate.apkFileName}
+                  className="px-4 py-2 rounded-xl bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/20 text-emerald-400 hover:text-emerald-300 text-xs font-bold transition-all"
+                >
+                  Download APK
+                </a>
               </div>
             </div>
           )}
@@ -85,6 +94,14 @@ export default async function UpdatesPage() {
                     </div>
 
                     <div className="flex items-center gap-3 self-end md:self-center">
+                      <a
+                        href={createApkDownloadUrl(u.apkFileName)}
+                        download={u.apkFileName}
+                        className="px-4 py-2 text-xs font-bold text-emerald-400 hover:text-white border border-emerald-500/20 hover:bg-emerald-500/15 rounded-xl transition-all"
+                      >
+                        Download
+                      </a>
+
                       {!u.isDeployed && (
                         <form action={deployUpdateAction}>
                           <input type="hidden" name="updateId" value={u.id} />
@@ -120,4 +137,8 @@ export default async function UpdatesPage() {
       </div>
     </div>
   )
+}
+
+function createApkDownloadUrl(fileName: string) {
+  return `/uploads/apk/${encodeURIComponent(fileName)}`
 }

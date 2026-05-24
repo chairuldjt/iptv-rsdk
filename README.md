@@ -116,7 +116,7 @@ SESSION_SECRET="isi-random-panjang-minimal-32-karakter"
 Default konfigurasi untuk STB baru bisa diset lewat dashboard `Setup Defaults`. Jika belum ada nilai yang disimpan dari dashboard, backend akan memakai fallback dari `.env` berikut:
 
 ```env
-IPTV_DEFAULT_SYNC_MODE="api_relay"
+IPTV_DEFAULT_SYNC_MODE="custom"
 IPTV_DEFAULT_CUSTOM_M3U_URL="http://10.0.0.1/iptv/iptv_rsdk.m3u"
 IPTV_DEFAULT_ASPECT_RATIO="fit"
 IPTV_DEFAULT_SYNC_INTERVAL="1800"

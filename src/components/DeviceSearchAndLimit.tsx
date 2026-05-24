@@ -1,7 +1,7 @@
 'use client'
 
 import { useRouter, usePathname, useSearchParams } from 'next/navigation'
-import { useState, useEffect, useTransition } from 'react'
+import { useCallback, useEffect, useState, useTransition } from 'react'
 
 export default function DeviceSearchAndLimit() {
   const router = useRouter()
@@ -14,12 +14,7 @@ export default function DeviceSearchAndLimit() {
 
   const [search, setSearch] = useState(currentSearch)
 
-  // Sync state with URL params
-  useEffect(() => {
-    setSearch(searchParams.get('q') || '')
-  }, [searchParams])
-
-  const updateParams = (newSearch: string, newLimit: string) => {
+  const updateParams = useCallback((newSearch: string, newLimit: string) => {
     const params = new URLSearchParams(searchParams.toString())
     if (newSearch) {
       params.set('q', newSearch)
@@ -32,7 +27,7 @@ export default function DeviceSearchAndLimit() {
     startTransition(() => {
       router.push(`${pathname}?${params.toString()}`, { scroll: false })
     })
-  }
+  }, [pathname, router, searchParams])
 
   // Handle change of search query with a debounce
   useEffect(() => {
@@ -41,7 +36,7 @@ export default function DeviceSearchAndLimit() {
       updateParams(search, currentLimit)
     }, 450)
     return () => clearTimeout(delayDebounce)
-  }, [search])
+  }, [currentLimit, currentSearch, search, updateParams])
 
   return (
     <div className="flex flex-col sm:flex-row gap-4 items-center justify-between w-full mb-6 px-6 pt-5">

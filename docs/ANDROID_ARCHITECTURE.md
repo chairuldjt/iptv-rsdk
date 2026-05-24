@@ -6,18 +6,18 @@ Dokumen ini menjelaskan struktur arsitektur, modul data, konfigurasi network, se
 
 ## 🏗️ 1. Arsitektur Utama (MVVM & Clean Architecture)
 
-Aplikasi Android dibangun menggunakan **Model-View-ViewModel (MVVM)** yang bersih, terpisah antara UI (Activities/Fragments), Business Logic (ViewModels), dan Data Layer (Repositories & Cache).
+Aplikasi Android dibangun menggunakan **Model-View-ViewModel (MVVM)** dengan UI Jetpack Compose, business logic di ViewModel, dan data layer di Repository/Cache.
 
 ```
    ┌────────────────────────────────────────────────────────┐
    │                     VIEW LAYER                         │
-   │    LiveTvActivity / SettingsActivity / BootReceiver    │
+   │ MainActivity + Compose Screens / BootReceiver          │
    └──────────────────────────┬─────────────────────────────┘
                               │ Observes UI State
                               ▼
    ┌────────────────────────────────────────────────────────┐
    │                   VIEWMODEL LAYER                      │
-   │      TvPlayerViewModel / SettingsViewModel             │
+   │ PlayerViewModel / SettingsViewModel / Education VM     │
    └──────────────────────────┬─────────────────────────────┘
                               │ Requests Data
                               ▼
@@ -73,6 +73,7 @@ http://10.55.1.5:9000
 ### Mode Sinkronisasi
 - `custom`: default APK saat ini. Channel diambil dari URL M3U custom/fallback lokal.
 - `api`: channel diambil dari Web Admin/API global playlist.
+- `api_relay`: channel diambil dari Web Admin/API, tetapi URL stream yang diterima client diarahkan ke HLS relay on-demand server.
 
 Android tetap mengambil remote config dari Web Admin walau sedang berada di mode `custom`, sehingga perubahan mode dari dashboard dapat diterapkan tanpa reinstall.
 
@@ -93,7 +94,7 @@ Untuk mendukung **Offline Mode**, seluruh kategori dan channel yang sukses diund
 data class ChannelEntity(
     @PrimaryKey val id: Int,
     val name: String,
-    val logo: String,
+    val logo: String?,
     val groupName: String, // Berperan sebagai kategori
     val streamUrl: String,
     val sortOrder: Int,
@@ -116,24 +117,29 @@ Pengaturan aspek rasio dinamis dipetakan ke fungsi layout `PlayerView`:
 *   `fit`: `AspectRatioFrameLayout.RESIZE_MODE_FIT` (Menjaga rasio asli dengan garis hitam).
 *   `stretch`: `AspectRatioFrameLayout.RESIZE_MODE_FILL` (Memenuhi layar penuh secara paksa).
 *   `zoom`: `AspectRatioFrameLayout.RESIZE_MODE_ZOOM` (Memotong video agar penuh layar).
-*   `16_9`: Memaksa rasio aspek 16:9.
-*   `4_3`: Memaksa rasio aspek 4:3.
+*   `16_9`: Wrapper Compose memakai `Modifier.aspectRatio(16f / 9f)`, lalu `PlayerView` tetap `RESIZE_MODE_FIT`.
+*   `4_3`: Wrapper Compose memakai `Modifier.aspectRatio(4f / 3f)`, lalu `PlayerView` tetap `RESIZE_MODE_FIT`.
 
 ```kotlin
-fun applyAspectRatio(playerView: PlayerView, ratio: String) {
-    when (ratio) {
-        "fit" -> playerView.resizeMode = AspectRatioFrameLayout.RESIZE_MODE_FIT
-        "stretch" -> playerView.resizeMode = AspectRatioFrameLayout.RESIZE_MODE_FILL
-        "zoom" -> playerView.resizeMode = AspectRatioFrameLayout.RESIZE_MODE_ZOOM
-        "16_9" -> {
-            playerView.resizeMode = AspectRatioFrameLayout.RESIZE_MODE_FIXED_WIDTH
-            playerView.setAspectRatio(16f / 9f)
-        }
-        "4_3" -> {
-            playerView.resizeMode = AspectRatioFrameLayout.RESIZE_MODE_FIXED_WIDTH
-            playerView.setAspectRatio(4f / 3f)
-        }
+@Composable
+fun AspectRatioPlayer(exoPlayer: ExoPlayer, aspectRatio: String) {
+    val playerModifier = when (aspectRatio) {
+        "16_9" -> Modifier.aspectRatio(16f / 9f)
+        "4_3" -> Modifier.aspectRatio(4f / 3f)
+        else -> Modifier.fillMaxSize()
     }
+
+    AndroidView(
+        factory = { context -> PlayerView(context).apply { player = exoPlayer } },
+        update = { playerView ->
+            playerView.resizeMode = when (aspectRatio) {
+                "stretch" -> AspectRatioFrameLayout.RESIZE_MODE_FILL
+                "zoom" -> AspectRatioFrameLayout.RESIZE_MODE_ZOOM
+                else -> AspectRatioFrameLayout.RESIZE_MODE_FIT
+            }
+        },
+        modifier = playerModifier
+    )
 }
 ```
 
@@ -193,19 +199,25 @@ Untuk kebutuhan perangkat STB / TV komersial yang berfungsi sebagai kios/display
 ### File: `BootReceiver.kt`
 ```kotlin
 class BootReceiver : BroadcastReceiver() {
-    override fun onReceive(context: Context, intent: Action) {
-        if (intent.action == Intent.ACTION_BOOT_COMPLETED || 
-            intent.action == "android.intent.action.QUICKBOOT_POWERON") {
-            
-            // Periksa dari DataStore apakah auto-start aktif
-            CoroutineScope(Dispatchers.IO).launch {
-                val autoStartEnabled = context.dataStore.data.first()[AUTO_START_ON_BOOT] ?: false
-                if (autoStartEnabled) {
-                    val launchIntent = Intent(context, LiveTvActivity::class.java).apply {
+    override fun onReceive(context: Context, intent: Intent) {
+        val action = intent.action ?: return
+        if (action !in supportedActions) return
+
+        val pendingResult = goAsync()
+        CoroutineScope(Dispatchers.IO).launch {
+            try {
+                val autoStartEnabled = DataStoreManager(context).autoStartFlow.first()
+                if (!autoStartEnabled) return@launch
+
+                val launchIntent = context.packageManager
+                    .getLaunchIntentForPackage(context.packageName)
+                    ?.apply { addFlags(Intent.FLAG_ACTIVITY_NEW_TASK) }
+                    ?: Intent(context, MainActivity::class.java).apply {
                         addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                     }
-                    context.startActivity(launchIntent)
-                }
+                context.startActivity(launchIntent)
+            } finally {
+                pendingResult.finish()
             }
         }
     }

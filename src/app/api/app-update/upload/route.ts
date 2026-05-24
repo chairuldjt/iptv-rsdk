@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import prisma from '@/lib/db'
+import { getErrorMessage } from '@/lib/errors'
 import { writeFile, mkdir } from 'fs/promises'
 import path from 'path'
 
@@ -32,12 +33,12 @@ export async function POST(request: Request) {
     // Try to create directory with permission fallback check
     try {
       await mkdir(uploadDir, { recursive: true })
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('[APK UPLOAD ERROR] Directory creation failed:', err)
       return NextResponse.json(
         { 
           success: false, 
-          message: `Gagal membuat folder penyimpanan di server (EACCES). Pastikan user PM2/Next.js memiliki hak akses menulis (write permission) ke folder public/uploads. Detail: ${err.message}` 
+          message: `Gagal membuat folder penyimpanan di server (EACCES). Pastikan user PM2/Next.js memiliki hak akses menulis (write permission) ke folder public/uploads. Detail: ${getErrorMessage(err)}` 
         },
         { status: 500 }
       )
@@ -49,12 +50,12 @@ export async function POST(request: Request) {
     // Try to write file with permission fallback check
     try {
       await writeFile(filePath, buffer)
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('[APK UPLOAD ERROR] File write failed:', err)
       return NextResponse.json(
         { 
           success: false, 
-          message: `Gagal menyimpan file APK ke disk server (EACCES). Pastikan folder public/uploads/apk memiliki hak akses menulis yang benar. Detail: ${err.message}` 
+          message: `Gagal menyimpan file APK ke disk server (EACCES). Pastikan folder public/uploads/apk memiliki hak akses menulis yang benar. Detail: ${getErrorMessage(err)}` 
         },
         { status: 500 }
       )
@@ -72,22 +73,22 @@ export async function POST(request: Request) {
           isDeployed: false,
         }
       })
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('[APK UPLOAD ERROR] Database write failed:', err)
       return NextResponse.json(
         { 
           success: false, 
-          message: `Gagal menyimpan informasi update ke database. Detail: ${err.message}` 
+          message: `Gagal menyimpan informasi update ke database. Detail: ${getErrorMessage(err)}` 
         },
         { status: 500 }
       )
     }
 
     return NextResponse.json({ success: true, message: 'Berkas APK berhasil diunggah!' })
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('[APK UPLOAD SYSTEM ERROR]:', error)
     return NextResponse.json(
-      { success: false, message: `Terjadi kesalahan sistem di server: ${error.message}` },
+      { success: false, message: `Terjadi kesalahan sistem di server: ${getErrorMessage(error)}` },
       { status: 500 }
     )
   }

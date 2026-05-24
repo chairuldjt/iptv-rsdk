@@ -4,6 +4,7 @@ import android.app.ActivityManager
 import android.content.Context
 import android.os.Build
 import android.os.SystemClock
+import com.example.rsdkiptvplayer.BuildConfig
 import com.example.rsdkiptvplayer.data.api.*
 import com.example.rsdkiptvplayer.data.cache.ChannelDao
 import com.example.rsdkiptvplayer.data.cache.ChannelEntity
@@ -57,7 +58,7 @@ class IptvRepository(
         val request = RegisterRequest(
             device_id = deviceId,
             device_name = "${Build.MANUFACTURER} ${Build.MODEL}",
-            app_version = "1.0.0",
+            app_version = BuildConfig.VERSION_NAME,
             android_version = Build.VERSION.RELEASE,
             mac_address = getMacAddress(),
             local_ip = getLocalIpAddress()
@@ -363,7 +364,7 @@ class IptvRepository(
             val request = RegisterRequest(
                 device_id = deviceId,
                 device_name = "${Build.MANUFACTURER} ${Build.MODEL}",
-                app_version = "1.0.0",
+                app_version = BuildConfig.VERSION_NAME,
                 android_version = Build.VERSION.RELEASE,
                 mac_address = getMacAddress(),
                 local_ip = getLocalIpAddress()

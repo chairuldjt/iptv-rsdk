@@ -1,12 +1,17 @@
 'use server'
 
 import prisma from '@/lib/db'
+import { getErrorMessage } from '@/lib/errors'
 import { revalidatePath } from 'next/cache'
 import { writeFile, mkdir, unlink } from 'fs/promises'
 import path from 'path'
 
 // Server Action for uploading a new APK update
-export async function uploadApkAction(prevState: any, formData: FormData) {
+export async function uploadApkAction(
+  prevState: { success: boolean; message: string } | null,
+  formData: FormData
+) {
+  void prevState
   const versionCodeStr = formData.get('versionCode') as string
   const versionName = formData.get('versionName') as string
   const changelog = formData.get('changelog') as string
@@ -29,11 +34,11 @@ export async function uploadApkAction(prevState: any, formData: FormData) {
     
     try {
       await mkdir(uploadDir, { recursive: true })
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Failed to create upload directory:', err)
       return { 
         success: false, 
-        message: `Gagal membuat folder penyimpanan di server. Pastikan server memiliki izin menulis (write permission) ke folder public/uploads. Error: ${err.message}` 
+        message: `Gagal membuat folder penyimpanan di server. Pastikan server memiliki izin menulis (write permission) ke folder public/uploads. Error: ${getErrorMessage(err)}` 
       }
     }
     
@@ -43,11 +48,11 @@ export async function uploadApkAction(prevState: any, formData: FormData) {
     
     try {
       await writeFile(filePath, buffer)
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Failed to write APK file:', err)
       return { 
         success: false, 
-        message: `Gagal menulis file APK ke disk server. Pastikan server memiliki izin menulis ke folder public/uploads/apk. Error: ${err.message}` 
+        message: `Gagal menulis file APK ke disk server. Pastikan server memiliki izin menulis ke folder public/uploads/apk. Error: ${getErrorMessage(err)}` 
       }
     }
 
@@ -63,19 +68,19 @@ export async function uploadApkAction(prevState: any, formData: FormData) {
           isDeployed: false, // Upload as draft by default
         }
       })
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Failed to insert database record:', err)
       return { 
         success: false, 
-        message: `Gagal menyimpan data ke database. Error: ${err.message}` 
+        message: `Gagal menyimpan data ke database. Error: ${getErrorMessage(err)}` 
       }
     }
 
     revalidatePath('/dashboard/updates')
     return { success: true, message: 'Berkas APK berhasil diunggah dan disimpan sebagai draft!' }
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Upload APK error:', error)
-    return { success: false, message: `Terjadi kesalahan sistem: ${error.message}` }
+    return { success: false, message: `Terjadi kesalahan sistem: ${getErrorMessage(error)}` }
   }
 }
 

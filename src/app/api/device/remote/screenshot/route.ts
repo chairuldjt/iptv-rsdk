@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { deviceScreens, activeScreenRequests } from '@/lib/remoteQueue'
+import { getErrorMessage } from '@/lib/errors'
 
 // Disable caching for live screen transmission
 export const revalidate = 0
@@ -45,10 +46,10 @@ export async function POST(request: Request) {
       { status: false, message: 'Invalid payload: must contain image or active parameter' },
       { status: 400 }
     )
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Remote Screenshot POST Error:', error)
     return NextResponse.json(
-      { status: false, message: 'Server error: ' + error.message },
+      { status: false, message: 'Server error: ' + getErrorMessage(error) },
       { status: 500 }
     )
   }
@@ -75,10 +76,10 @@ export async function GET(request: Request) {
       image,
       isStreaming: activeScreenRequests.has(deviceId)
     })
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Remote Screenshot GET Error:', error)
     return NextResponse.json(
-      { status: false, message: 'Server error: ' + error.message },
+      { status: false, message: 'Server error: ' + getErrorMessage(error) },
       { status: 500 }
     )
   }

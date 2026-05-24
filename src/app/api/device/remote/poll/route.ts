@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { popCommands, activeScreenRequests } from '@/lib/remoteQueue'
+import { getErrorMessage } from '@/lib/errors'
 
 export const revalidate = 0 // Disable cache for API polling
 
@@ -47,10 +48,10 @@ export async function GET(request: Request) {
       capture_screenshot: activeScreenRequests.has(deviceId),
       commands: []
     })
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Remote Poll API Error:', error)
     return NextResponse.json(
-      { status: false, message: 'Server error: ' + error.message },
+      { status: false, message: 'Server error: ' + getErrorMessage(error) },
       { status: 500 }
     )
   }

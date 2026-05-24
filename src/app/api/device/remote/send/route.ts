@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import prisma from '@/lib/db'
+import { getErrorMessage } from '@/lib/errors'
 import { pushCommand } from '@/lib/remoteQueue'
 
 export async function POST(request: Request) {
@@ -33,10 +34,10 @@ export async function POST(request: Request) {
       status: true,
       message: `Successfully queued command: ${command}`,
     })
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Remote Command API Error:', error)
     return NextResponse.json(
-      { status: false, message: 'Server error: ' + error.message },
+      { status: false, message: 'Server error: ' + getErrorMessage(error) },
       { status: 500 }
     )
   }

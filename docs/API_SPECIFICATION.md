@@ -1,32 +1,29 @@
 # RSDK IPTV Player - REST API Specification
 
-Dokumen ini mendefinisikan seluruh endpoint RESTful API yang digunakan untuk komunikasi antara client Android TV (STB) dan Web Admin Backend Server. Semua request dan response wajib menggunakan format **JSON** dengan header `Content-Type: application/json`.
+Dokumen ini mendefinisikan endpoint REST yang dipakai Android TV Client, Web Admin, update APK, remote control, dan relay stream. Semua endpoint JSON memakai `Content-Type: application/json`, kecuali upload APK dan file download.
 
 ---
 
-## 📌 1. Registrasi Perangkat (Auto-Register)
+## 1. Device Registration
 
-Endpoint ini dipanggil pertama kali ketika aplikasi Android dibuka di perangkat STB baru, atau dipanggil setiap kali aplikasi pertama kali melakukan inisialisasi koneksi setelah booting.
+**Endpoint:** `POST /api/device/register`  
+**Akses:** Terbuka untuk Zero-Config client.
 
-*   **Endpoint:** `/api/device/register`
-*   **Method:** `POST`
-*   **Akses:** Terbuka (Tanpa Token/Auth untuk mempermudah Zero-Config)
-
-### Request Payload:
+### Request
 ```json
 {
   "device_id": "STB-RSDK-A8F91C-9823-UUID",
   "device_name": "Living Room STB-X96",
-  "app_version": "1.0.0",
+  "app_version": "v1.2.3",
   "android_version": "10",
-  "mac_address": "00:1B:44:11:3A:B7", 
+  "mac_address": "00:1B:44:11:3A:B7",
   "local_ip": "192.168.1.15"
 }
 ```
-*Note: `mac_address` bersifat opsional dan dikirim jika berhasil didapatkan, namun identifikasi utama wajib menggunakan UUID `device_id`.*
 
-### Response (Perangkat Baru - Otomatis Aktif):
-**HTTP Status:** `200 OK`
+`device_id` wajib. Field lain opsional, tetapi Android client mengirimnya bila tersedia.
+
+### Response
 ```json
 {
   "status": true,
@@ -34,152 +31,106 @@ Endpoint ini dipanggil pertama kali ketika aplikasi Android dibuka di perangkat 
   "data": {
     "device_id": "STB-RSDK-A8F91C-9823-UUID",
     "active": true,
-    "sync_interval": 1800,
-    "created_at": "2026-05-22T12:00:00+07:00"
-  }
-}
-```
-
-### Response (Perangkat Sudah Terdaftar tapi Dinonaktifkan Admin):
-**HTTP Status:** `200 OK`
-```json
-{
-  "status": false,
-  "message": "Device has been deactivated by administrator",
-  "data": {
-    "device_id": "STB-RSDK-A8F91C-9823-UUID",
-    "active": false,
     "sync_interval": 1800
   }
 }
 ```
 
-### Alur Logika Server:
-1. Periksa apakah `device_id` sudah ada di tabel `devices`.
-2. Jika **Belum Ada**:
-   * Masukkan record baru ke database.
-   * Atur kolom `is_active = 1` (Aktif secara default).
-   * Atur profil konfigurasi global default ke perangkat tersebut.
-   * Berikan response status `active = true`.
-3. Jika **Sudah Ada**:
-   * Perbarui kolom `last_online = NOW()`, `app_version`, `android_version`, `local_ip`, dan `mac_address`.
-   * Periksa kolom `is_active`. Jika `is_active = 0`, return `active = false` agar perangkat diblokir di client.
+Untuk device yang sudah terdaftar tetapi dinonaktifkan admin, endpoint tetap mengembalikan HTTP `200` dengan `status: true`, `data.active: false`, dan message `Device registered but inactive`. Client memakai `active` untuk menampilkan status blokir.
+
+Server juga mencoba mencocokkan `mac_address` saat `device_id` baru belum ditemukan, supaya reinstall APK bisa mempertahankan record/config device lama.
 
 ---
 
-## 📌 2. Konfigurasi Perangkat (Device Config)
+## 2. Device Config
 
-Mendapatkan setelan pengaturan dinamis perangkat yang dikontrol penuh oleh Web Admin Panel.
+**Endpoint:** `GET /api/device/config/{device_id}`
 
-*   **Endpoint:** `/api/device/config/{device_id}`
-*   **Method:** `GET`
-
-### Response Sukses:
-**HTTP Status:** `200 OK`
+### Response Sukses
 ```json
 {
   "status": true,
-  "message": "Config loaded successfully",
+  "message": "Config loaded",
   "data": {
     "device_id": "STB-RSDK-A8F91C-9823-UUID",
     "active": true,
-    "playlist_id": 1,
+    "playlist_id": null,
+    "sync_mode": "custom",
+    "custom_m3u_url": "http://10.0.0.1/iptv/iptv_rsdk.m3u",
     "default_category": "National TV",
-    "default_channel_id": 10,
+    "default_channel_id": null,
     "aspect_ratio": "fit",
     "sync_interval": 1800,
     "start_screen": "live_tv",
     "lock_settings": true,
     "force_sync": false,
+    "clear_cache_trigger": false,
     "auto_start_on_boot": false,
     "technician_pin_enabled": true,
-    "technician_pin": "2468"
+    "technician_pin": "2468",
+    "education_video_path": "\\\\10.45.128.129\\edukasi",
+    "education_smb_username": "",
+    "education_smb_password": "",
+    "education_smb_domain": "",
+    "education_repeat_mode": "all",
+    "education_play_order": "alphabetical",
+    "education_force_sync": false
   }
 }
 ```
 
-### Response Error (Perangkat Tidak Ditemukan):
-**HTTP Status:** `404 Not Found`
-```json
-{
-  "status": false,
-  "message": "Device configuration not found",
-  "data": null
-}
-```
+### Response Error
+Device tidak ditemukan mengembalikan HTTP `404` dengan message `Device not found`. Device inactive mengembalikan HTTP `403` dengan message `Device is inactive`.
 
-### Keterangan Kolom Setelan:
+### Keterangan Field Penting
 | Key | Tipe | Deskripsi |
-| :--- | :--- | :--- |
-| `playlist_id` | Integer | ID playlist M3U aktif yang digunakan perangkat ini. |
-| `default_category` | String | Nama kategori default yang otomatis dipilih saat pertama dibuka. |
-| `default_channel_id`| Integer | ID Channel default yang langsung disetel/diputar saat start screen. |
-| `aspect_ratio` | String | Pilihan rasio aspek video player (`fit`, `stretch`, `zoom`, `16_9`, `4_3`). |
-| `sync_interval` | Integer | Interval sinkronisasi otomatis daftar channel dalam satuan detik (contoh: 1800s = 30 menit). |
-| `start_screen` | String | Layar awal saat aplikasi terbuka (`live_tv`, `category_list`, `home_screen`). |
-| `lock_settings` | Boolean | Jika `true`, memblokir akses menu konfigurasi lokal bagi user biasa. |
-| `force_sync` | Boolean | Jika `true`, memaksa client menghapus cache lokal dan sinkronisasi ulang channel detik itu juga. |
-| `auto_start_on_boot`| Boolean | Mengaktifkan/menonaktifkan fitur autostart setelah STB menyala. |
-| `technician_pin` | String | PIN yang digunakan untuk masuk ke mode teknisi. Default `2468`. |
+| --- | --- | --- |
+| `sync_mode` | String | `custom`, `api`, atau `api_relay`. |
+| `custom_m3u_url` | String | URL M3U yang dipakai saat `sync_mode = custom`. |
+| `playlist_id` | Integer/null | ID global playlist saat mode API, atau `null` untuk custom. |
+| `force_sync` | Boolean | Trigger sekali pakai untuk sync channel. Di-reset server setelah dikirim. |
+| `clear_cache_trigger` | Boolean | Trigger sekali pakai untuk menghapus cache channel lokal. Di-reset server setelah dikirim. |
+| `education_force_sync` | Boolean | Trigger sekali pakai untuk sync ulang cache video edukasi. Di-reset server setelah dikirim. |
+| `education_*` | String | Path SMB, kredensial, repeat mode, dan urutan playlist edukasi. |
 
 ---
 
-## 📌 3. Daftar Channel (Get Channels)
+## 3. Device Channels
 
-Mendapatkan semua daftar kategori dan channel TV yang telah di-parse oleh Web Admin dan ditugaskan ke perangkat ini berdasarkan `playlist_id` mereka.
+**Endpoint:** `GET /api/device/channels/{device_id}`
 
-*   **Endpoint:** `/api/device/channels/{device_id}`
-*   **Method:** `GET`
+Jika `sync_mode = custom`, server mengembalikan `data: []`; client mengambil playlist dari `custom_m3u_url` pada config.
 
-### Response Sukses:
-**HTTP Status:** `200 OK`
+Jika `sync_mode = api`, server mengirim URL stream asli dari global playlist. Jika `sync_mode = api_relay`, URL stream UDP/remote dipetakan menjadi URL HLS relay on-demand.
+
+### Response
 ```json
 {
   "status": true,
-  "message": "Channels loaded successfully",
+  "message": "Channels loaded",
   "data": [
     {
       "id": 10,
       "name": "Trans TV HD",
-      "logo": "http://10.55.1.5/rsdk-iptv/logos/transtv.png",
+      "logo": "http://10.55.1.5/logos/transtv.png",
       "group": "National TV",
-      "stream_url": "http://10.55.1.5/live/transtv/index.m3u8",
+      "stream_url": "https://iptv.teknisirsdk.my.id/api/stream/udp-hls/10/index.m3u8",
       "sort_order": 1,
       "active": true
-    },
-    {
-      "id": 11,
-      "name": "HBO Asia",
-      "logo": "http://10.55.1.5/rsdk-iptv/logos/hbo.png",
-      "group": "Movies",
-      "stream_url": "http://10.55.1.5/live/hbo/index.m3u8",
-      "sort_order": 2,
-      "active": true
-    },
-    {
-      "id": 12,
-      "name": "Disney Channel",
-      "logo": "http://10.55.1.5/rsdk-iptv/logos/disney.png",
-      "group": "Kids",
-      "stream_url": "http://10.55.1.5/live/disney/index.m3u8",
-      "sort_order": 3,
-      "active": false
     }
   ]
 }
 ```
-*Note: Hanya channel dengan status `active: true` yang akan ditampilkan di TV player utama client.*
+
+Hanya channel aktif dari global playlist yang dikirim oleh server.
 
 ---
 
-## 📌 4. Detak Jantung / Status Heartbeat (Device Status)
+## 4. Device Heartbeat
 
-Dikirim oleh client secara periodik (misal setiap 5-10 menit) untuk memperbarui indikator *Last Online*, memperbarui informasi IP, memantau channel apa yang sedang diputar, serta metrik kesehatan perangkat.
+**Endpoint:** `POST /api/device/status`
 
-*   **Endpoint:** `/api/device/status`
-*   **Method:** `POST`
-
-### Request Payload:
+### Request
 ```json
 {
   "device_id": "STB-RSDK-A8F91C-9823-UUID",
@@ -191,34 +142,33 @@ Dikirim oleh client secara periodik (misal setiap 5-10 menit) untuk memperbarui 
 }
 ```
 
-### Response Sukses:
-**HTTP Status:** `200 OK`
+### Response
 ```json
 {
   "status": true,
   "message": "Heartbeat accepted",
   "data": {
     "force_sync": false,
-    "lock_settings": true
+    "lock_settings": true,
+    "active": true
   }
 }
 ```
 
+Device tidak ditemukan mengembalikan HTTP `404`; client versi terbaru akan mencoba register ulang otomatis.
+
 ---
 
-## 📌 5. Log Error Perangkat (Remote Logging)
+## 5. Device Logging
 
-Mengirimkan laporan error sistem, kendala pemutaran video stream (*playback error*), kegagalan koneksi database/API lokal dari client ke server Web Admin agar dapat di-troubleshoot dari jauh.
+**Endpoint:** `POST /api/device/log`
 
-*   **Endpoint:** `/api/device/log`
-*   **Method:** `POST`
-
-### Request Payload:
+### Request
 ```json
 {
   "device_id": "STB-RSDK-A8F91C-9823-UUID",
   "error_type": "PLAYBACK_ERROR",
-  "error_message": "ExoPlayer: BehindLiveWindowException - Source error occurred during playback",
+  "error_message": "ExoPlayer source error",
   "channel_id": 11,
   "stream_url": "http://10.55.1.5/live/hbo/index.m3u8",
   "android_sdk": 29,
@@ -226,11 +176,117 @@ Mengirimkan laporan error sistem, kendala pemutaran video stream (*playback erro
 }
 ```
 
-### Response Sukses:
-**HTTP Status:** `200 OK`
+`timestamp` dikirim client untuk konteks, tetapi waktu penyimpanan utama memakai `createdAt` database server.
+
+---
+
+## 6. App Update
+
+### Check Update
+**Endpoint:** `GET /api/app-update/check?versionCode={currentVersionCode}`
+
+Response saat ada APK deployed yang lebih baru:
 ```json
 {
   "status": true,
-  "message": "Error log recorded successfully"
+  "update_available": true,
+  "version_name": "v1.2.3",
+  "version_code": 123,
+  "apk_url": "https://iptv.teknisirsdk.my.id/uploads/apk/app-release.apk",
+  "apk_file_name": "app-release.apk",
+  "is_mandatory": false,
+  "changelog": "Perbaikan playback"
 }
 ```
+
+### Upload APK
+**Endpoint:** `POST /api/app-update/upload`  
+**Akses:** Web Admin.  
+**Format:** `multipart/form-data` berisi file APK dan metadata versi. File tersimpan di `public/uploads/apk`.
+
+### Download APK
+**Endpoint:** `GET /uploads/apk/{filename}`  
+Mengirim file APK yang sudah di-upload untuk proses update client.
+
+---
+
+## 7. Remote Control
+
+Remote command memakai queue in-memory di proses Next.js. Queue akan hilang saat proses server restart, sehingga fitur ini cocok untuk kontrol langsung, bukan job permanen.
+
+### Queue Command dari Web Admin
+**Endpoint:** `POST /api/device/remote/send`
+
+```json
+{
+  "deviceId": "STB-RSDK-A8F91C-9823-UUID",
+  "command": "NAVIGATE_TV",
+  "value": null
+}
+```
+
+Command yang dipakai client saat ini:
+`NAVIGATE_HOME`, `NAVIGATE_TV`, `NAVIGATE_EDUCATION`, `NAVIGATE_SETTINGS`, dan `PLAY_CHANNEL`.
+
+### Poll Command dari Android
+**Endpoint:** `GET /api/device/remote/poll?deviceId={deviceId}`
+
+```json
+{
+  "status": true,
+  "capture_screenshot": false,
+  "commands": [
+    {
+      "command": "PLAY_CHANNEL",
+      "value": "10"
+    }
+  ]
+}
+```
+
+### Screenshot Remote
+**Endpoint:** `POST /api/device/remote/screenshot`  
+Web Admin menyalakan/mematikan permintaan screenshot aktif.
+
+**Endpoint:** `GET /api/device/remote/screenshot?deviceId={deviceId}`  
+Web Admin mengambil frame screenshot terbaru.
+
+**Endpoint:** `POST /api/device/remote/screenshot/upload`  
+Android mengirim screenshot base64:
+```json
+{
+  "deviceId": "STB-RSDK-A8F91C-9823-UUID",
+  "image": "data:image/jpeg;base64,..."
+}
+```
+
+---
+
+## 8. Stream Relay
+
+### UDP HLS Manifest
+**Endpoint:** `GET /api/stream/udp-hls/{channelId}/index.m3u8`
+
+Memulai atau memakai ulang proses ffmpeg on-demand untuk channel UDP lalu mengembalikan manifest HLS.
+
+### UDP HLS Segment
+**Endpoint:** `GET /api/stream/udp-hls/{channelId}/segments/{fileName}`
+
+Mengirim segment `.ts` hasil relay dari output root yang dikonfigurasi.
+
+### Generic Relay
+**Endpoint:** `GET /api/stream/relay?url={encodedUrl}`
+
+Proxy ringan untuk preview stream HTTP/HLS tertentu dari dashboard.
+
+---
+
+## 9. Auth Web Admin
+
+**Endpoint:** `POST /api/auth/login`  
+Membuat cookie `admin_session` bila username/password valid.
+
+**Endpoint:** `POST /api/auth/logout`  
+Menghapus cookie `admin_session`.
+
+Route `/dashboard/*` diproteksi oleh `src/proxy.ts` sesuai konvensi Next.js 16.

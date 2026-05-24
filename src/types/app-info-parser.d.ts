@@ -5,7 +5,7 @@ declare module 'app-info-parser' {
       versionCode: number;
       versionName: string;
       package: string;
-      [key: string]: any;
+      [key: string]: unknown;
     }>;
   }
 }

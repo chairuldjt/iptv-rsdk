@@ -10,6 +10,12 @@ interface RemoteControlModalProps {
   closeUrl: string
 }
 
+type RemoteResponse = {
+  status?: boolean
+  message?: string
+  image?: string
+}
+
 export default function RemoteControlModal({
   deviceId,
   deviceName,
@@ -46,7 +52,7 @@ export default function RemoteControlModal({
       try {
         const response = await fetch(`/api/device/remote/screenshot?deviceId=${encodeURIComponent(deviceId)}`)
         if (response.ok) {
-          const data = await response.json()
+          const data = await response.json() as RemoteResponse
           if (data.status && data.image) {
             setScreenshot(data.image)
           }
@@ -78,7 +84,7 @@ export default function RemoteControlModal({
         body: JSON.stringify({ deviceId, command, value }),
       })
 
-      const data = await response.json()
+      const data = await response.json() as RemoteResponse
       if (response.ok && data.status) {
         setStatus({ type: 'success', message: `Executed command: ${command}` })
       } else {
@@ -87,10 +93,10 @@ export default function RemoteControlModal({
           message: data.message || `Error code ${response.status}`,
         })
       }
-    } catch (e: any) {
+    } catch (e: unknown) {
       setStatus({
         type: 'error',
-        message: e.message || 'Network connection failed',
+        message: e instanceof Error ? e.message : 'Network connection failed',
       })
     }
   }
@@ -126,6 +132,7 @@ export default function RemoteControlModal({
           {/* Virtual TV Screen Preview */}
           <div className="w-full aspect-video bg-slate-950 border-2 border-slate-850 rounded-2xl shadow-inner relative overflow-hidden flex items-center justify-center">
             {screenshot ? (
+              // eslint-disable-next-line @next/next/no-img-element
               <img
                 src={`data:image/jpeg;base64,${screenshot}`}
                 alt="Device Screen Preview"

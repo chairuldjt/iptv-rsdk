@@ -30,11 +30,8 @@ export default function ChannelPreviewButton({
     const video = videoRef.current
     let hls: Hls | null = null
     if (mode === 'direct' && directUnsupported) {
-      setStatus('Direct UDP streams cannot be played in this browser.')
       return
     }
-
-    setStatus(mode === 'relay' ? 'Loading through server relay...' : 'Loading direct stream...')
 
     if (video.canPlayType('application/vnd.apple.mpegurl')) {
       video.src = activeUrl

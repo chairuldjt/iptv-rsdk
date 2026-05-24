@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { deviceScreens } from '@/lib/remoteQueue'
+import { getErrorMessage } from '@/lib/errors'
 
 export async function POST(request: Request) {
   try {
@@ -25,10 +26,10 @@ export async function POST(request: Request) {
       { status: false, message: 'Invalid payload: must contain image' },
       { status: 400 }
     )
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Remote Screenshot Upload POST Error:', error)
     return NextResponse.json(
-      { status: false, message: 'Server error: ' + error.message },
+      { status: false, message: 'Server error: ' + getErrorMessage(error) },
       { status: 500 }
     )
   }

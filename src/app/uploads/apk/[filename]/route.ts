@@ -1,6 +1,11 @@
 import { NextResponse } from 'next/server'
+import { getErrorMessage } from '@/lib/errors'
 import { readFile } from 'fs/promises'
 import path from 'path'
+
+function isNodeFileError(error: unknown): error is NodeJS.ErrnoException {
+  return error instanceof Error && 'code' in error
+}
 
 export async function GET(
   request: Request,
@@ -16,8 +21,8 @@ export async function GET(
     let fileBuffer: Buffer
     try {
       fileBuffer = await readFile(filePath)
-    } catch (e: any) {
-      if (e.code === 'ENOENT') {
+    } catch (e: unknown) {
+      if (isNodeFileError(e) && e.code === 'ENOENT') {
         console.warn(`[APK DOWNLOAD] File not found on disk: ${filePath}`)
         return new NextResponse('APK File Not Found', { status: 404 })
       }
@@ -35,10 +40,10 @@ export async function GET(
         'Cache-Control': 'public, max-age=3600', // Cache for 1 hour
       },
     })
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('[APK DOWNLOAD ERROR]:', error)
     return NextResponse.json(
-      { status: false, message: 'Server error: ' + error.message },
+      { status: false, message: 'Server error: ' + getErrorMessage(error) },
       { status: 500 }
     )
   }

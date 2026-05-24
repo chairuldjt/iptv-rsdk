@@ -1,169 +1,188 @@
 # RSDK IPTV Player - Backend Database & Web Admin Specifications
 
-Dokumen ini mendokumentasikan desain database relasional (SQL) serta spesifikasi fungsional untuk sistem **Web Admin Panel & API Backend** (berbasis PHP/Laravel, Node.js, atau platform backend lainnya).
+Dokumen ini menjelaskan skema database aktual yang dipakai backend Next.js + Prisma. Database production memakai MySQL/MariaDB sesuai `prisma/schema.prisma`.
 
 ---
 
-## 🗄️ 1. Desain Skema Database (ERD & SQL Tables)
+## 1. Ringkasan Relasi
 
-Database menggunakan mesin **MySQL/MariaDB** yang sangat kompatibel dengan server lokal (misalnya XAMPP).
+```text
+playlists
+  ├─ categories
+  └─ channels
 
-```
-  ┌───────────────┐          ┌─────────────────┐
-  │   playlists   │◄─────────┤   categories    │
-  └───────┬───────┘          └────────┬────────┘
-          │                           │
-          │     ┌──────────────┐      │
-          └────►│   channels   │◄─────┘
-                └──────────────┘
-                       ▲
-                       │ stream_url/logo details
-  ┌───────────────┐    │
-  │    devices    │◄───┘ (reference key)
-  └───────┬───────┘
-          ├─────────────────────────┐
-          ▼                         ▼
-  ┌───────────────┐         ┌───────────────┐
-  │device_configs │         │  device_logs  │
-  └───────────────┘         └───────────────┘
+devices
+  ├─ device_configs
+  └─ device_logs
+
+app_settings
+app_updates
+users
 ```
 
-### 1.1. Tabel `playlists`
-Menyimpan file playlist M3U yang diunggah oleh admin untuk di-parse.
-```sql
-CREATE TABLE `playlists` (
-  `id` INT AUTO_INCREMENT PRIMARY KEY,
-  `name` VARCHAR(150) NOT NULL,
-  `file_path` VARCHAR(255) DEFAULT NULL, -- Path file lokal jika diunggah
-  `source_url` VARCHAR(255) DEFAULT NULL, -- URL eksternal jika di-sync dari web lain
-  `total_channels` INT DEFAULT 0,
-  `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  `updated_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
-);
-```
-
-### 1.2. Tabel `categories`
-Kategori/Group TV yang didapatkan dari hasil parsing file M3U (tag `group-title`).
-```sql
-CREATE TABLE `categories` (
-  `id` INT AUTO_INCREMENT PRIMARY KEY,
-  `playlist_id` INT NOT NULL,
-  `name` VARCHAR(100) NOT NULL,
-  `sort_order` INT DEFAULT 0,
-  `is_active` TINYINT(1) DEFAULT 1,
-  `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  `updated_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  FOREIGN KEY (`playlist_id`) REFERENCES `playlists`(`id`) ON DELETE CASCADE
-);
-```
-
-### 1.3. Tabel `channels`
-Detail channel siaran TV yang diekstrak dari playlist M3U.
-```sql
-CREATE TABLE `channels` (
-  `id` INT AUTO_INCREMENT PRIMARY KEY,
-  `playlist_id` INT NOT NULL,
-  `category_id` INT DEFAULT NULL,
-  `name` VARCHAR(150) NOT NULL,
-  `logo_url` VARCHAR(255) DEFAULT NULL, -- Tag tvg-logo
-  `stream_url` VARCHAR(255) NOT NULL,
-  `sort_order` INT DEFAULT 0,
-  `is_active` TINYINT(1) DEFAULT 1,
-  `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  `updated_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  FOREIGN KEY (`playlist_id`) REFERENCES `playlists`(`id`) ON DELETE CASCADE,
-  FOREIGN KEY (`category_id`) REFERENCES `categories`(`id`) ON DELETE SET NULL
-);
-```
-
-### 1.4. Tabel `devices`
-Data perangkat STB yang terdaftar secara otomatis saat aplikasi dibuka.
-```sql
-CREATE TABLE `devices` (
-  `id` INT AUTO_INCREMENT PRIMARY KEY,
-  `device_id` VARCHAR(100) UNIQUE NOT NULL, -- UUID bentukan client
-  `device_name` VARCHAR(100) DEFAULT 'Android STB',
-  `is_active` TINYINT(1) DEFAULT 1, -- Default 1 (Auto-Active)
-  `playlist_id` INT DEFAULT NULL, -- Null berarti memakai playlist default sistem
-  `app_version` VARCHAR(20) DEFAULT NULL,
-  `android_version` VARCHAR(15) DEFAULT NULL,
-  `last_ip` VARCHAR(45) DEFAULT NULL,
-  `mac_address` VARCHAR(50) DEFAULT NULL,
-  `last_online` TIMESTAMP NULL DEFAULT NULL,
-  `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  `updated_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  FOREIGN KEY (`playlist_id`) REFERENCES `playlists`(`id`) ON DELETE SET NULL
-);
-```
-
-### 1.5. Tabel `device_configs`
-Pengaturan khusus per perangkat. Jika entry perangkat tidak ditemukan, sistem API akan menggunakan profil konfigurasi "Global Default" (record dengan `device_id = NULL`).
-```sql
-CREATE TABLE `device_configs` (
-  `id` INT AUTO_INCREMENT PRIMARY KEY,
-  `device_id` VARCHAR(100) UNIQUE DEFAULT NULL, -- NULL = Default Global
-  `default_category` VARCHAR(100) DEFAULT 'National TV',
-  `default_channel_id` INT DEFAULT NULL,
-  `aspect_ratio` ENUM('fit', 'stretch', 'zoom', '16_9', '4_3') DEFAULT 'fit',
-  `sync_interval` INT DEFAULT 1800, -- Satuan detik
-  `start_screen` ENUM('live_tv', 'category_list', 'home_screen') DEFAULT 'live_tv',
-  `lock_settings` TINYINT(1) DEFAULT 1, -- Default Terkunci untuk keamanan
-  `force_sync` TINYINT(1) DEFAULT 0,
-  `auto_start_on_boot` TINYINT(1) DEFAULT 0,
-  `technician_pin` VARCHAR(10) DEFAULT '2468',
-  `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  `updated_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  FOREIGN KEY (`device_id`) REFERENCES `devices`(`device_id`) ON DELETE CASCADE
-);
-```
-
-### 1.6. Tabel `device_logs`
-Tempat menampung log error playback dan kendala sistem dari client untuk remote troubleshooting.
-```sql
-CREATE TABLE `device_logs` (
-  `id` INT AUTO_INCREMENT PRIMARY KEY,
-  `device_id` VARCHAR(100) NOT NULL,
-  `error_type` VARCHAR(50) NOT NULL,
-  `error_message` TEXT NOT NULL,
-  `channel_id` INT DEFAULT NULL,
-  `stream_url` VARCHAR(255) DEFAULT NULL,
-  `android_sdk` INT DEFAULT NULL,
-  `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  FOREIGN KEY (`device_id`) REFERENCES `devices`(`device_id`) ON DELETE CASCADE
-);
-```
+`playlists`, `categories`, dan `channels` menyimpan hasil parsing M3U. `devices` dan `device_configs` menyimpan status serta konfigurasi per STB. `app_settings` menyimpan konfigurasi global berbasis key/value seperti default setup device baru dan runtime relay. `app_updates` menyimpan metadata APK yang di-upload dari dashboard.
 
 ---
 
-## 🖥️ 2. Fitur Fungsional Web Admin Panel
+## 2. Tabel Konten IPTV
 
-Web Admin Panel dirancang dengan antarmuka berbasis web responsif modern untuk memudahkan operator mengontrol seluruh armada STB.
+### `playlists`
+Menyimpan sumber playlist M3U.
 
-### 2.1. Parsing Playlist M3U Otomatis
-*   **Fungsi**: Admin mengunggah file `.m3u` atau menempelkan link eksternal.
-*   **Algoritma Parser**:
-    1. Membaca tag `#EXTM3U` sebagai tanda file valid.
-    2. Mencari tag `#EXTINF` untuk mengekstrak data channel:
-       *   `tvg-logo="..."` -> Logo Channel.
-       *   `group-title="..."` -> Nama Kategori.
-       *   Nama Channel (teks setelah koma `,`).
-    3. Baris berikutnya dibaca sebagai `stream_url`.
-    4. **Proses Penyimpanan**: Kategori baru akan otomatis dibuat jika belum ada di tabel `categories`, lalu channel akan dimasukkan ke tabel `channels` dan dihubungkan ke kategori tersebut.
+| Kolom | Tipe | Catatan |
+| --- | --- | --- |
+| `id` | Int | Primary key autoincrement. |
+| `name` | String | Nama playlist. |
+| `filePath` | String/null | Path file upload lokal bila ada. |
+| `sourceUrl` | Text/null | URL M3U eksternal bila playlist berasal dari URL. |
+| `totalChannels` | Int | Jumlah channel hasil parse. |
+| `isGlobal` | Boolean/null | Playlist global aktif untuk mode `api` dan `api_relay`. |
+| `createdAt` / `updatedAt` | DateTime | Timestamp Prisma. |
 
-### 2.2. Panel Manajemen Perangkat (Device Management)
-*   **Daftar Perangkat**: Menampilkan seluruh STB dalam bentuk tabel dengan indikator status online/offline/disabled real-time.
-    *   *Status Online*: Jika `last_online` masih dalam threshold online dashboard.
-    *   *Status Offline*: Jika API device aktif tetapi `last_online` sudah melewati threshold online dashboard.
-    *   *Status Disabled*: Jika admin mematikan koneksi API device tanpa menghapus record/config.
-*   **Filter Status**: Admin dapat memfilter perangkat berdasarkan `All`, `Online`, `Offline`, dan `Disabled`.
-*   **Aktivasi / Deaktivasi API**: Satu klik tombol toggle untuk menonaktifkan perangkat (`is_active = 0`) tanpa menghapus konfigurasi. STB yang dideaktivasi akan menampilkan layar blokir saat *handshake* atau *heartbeat* berikutnya.
-*   **Auto-delete Offline**: Admin dapat mengatur threshold hari untuk menghapus otomatis device aktif yang offline terlalu lama. Nilai `0` berarti fitur mati. Device yang sengaja `Disabled` tidak ikut dihapus.
-*   **Custom Override Config**: Admin dapat memilih perangkat tertentu dan menimpa (override) konfigurasinya berbeda dengan setelan global (misal: memberikan aspek rasio `stretch` hanya untuk STB tipe lama, atau mengubah PIN teknisi khusus perangkat tertentu).
+Index penting: `isGlobal`, `updatedAt`.
 
-### 2.3. Manajemen Channel & Kategori
-*   **Toggle Status**: Menonaktifkan channel rusak secara instan agar hilang dari daftar TV pengguna tanpa harus mengunggah ulang playlist M3U.
-*   **Urutan Tontonan (Sort Order)**: Mengatur urutan nomor urut channel dengan mudah (drag-and-drop atau input nomor) agar siaran favorit selalu tampil paling atas.
+### `categories`
+Kategori dari tag M3U `group-title`.
 
-### 2.4. Remote Monitoring & Log Viewer
-*   **Live Error Monitor**: Menampilkan tabel log error dari seluruh STB. Admin dapat dengan mudah melihat pesan error ExoPlayer seperti `BehindLiveWindowException` (siaran putus) atau `Source Error` (URL mati) beserta info channel dan IP STB pelapor.
-*   **IP Tracker**: Memantau alamat IP terakhir STB untuk mencocokkan segmen jaringan area distribusi lokal.
+| Kolom | Tipe | Catatan |
+| --- | --- | --- |
+| `id` | Int | Primary key. |
+| `playlistId` | Int | Foreign key ke `playlists`, cascade delete. |
+| `name` | String | Nama kategori. |
+| `sortOrder` | Int | Urutan tampilan. |
+| `isActive` | Boolean | Status kategori. |
+
+Index penting: `(playlistId, sortOrder)`.
+
+### `channels`
+Daftar channel hasil parsing.
+
+| Kolom | Tipe | Catatan |
+| --- | --- | --- |
+| `id` | Int | Primary key. |
+| `playlistId` | Int | Foreign key ke `playlists`, cascade delete. |
+| `categoryId` | Int/null | Foreign key ke `categories`, set null saat kategori dihapus. |
+| `name` | String | Nama channel. |
+| `logoUrl` | Text/null | URL logo dari `tvg-logo`. |
+| `streamUrl` | Text | URL stream asli, termasuk HTTP/HLS/UDP. |
+| `sortOrder` | Int | Urutan tampilan. |
+| `isActive` | Boolean | Hanya channel aktif dikirim ke client. |
+
+Index penting: `(playlistId, isActive, sortOrder)`, `categoryId`.
+
+---
+
+## 3. Tabel Device
+
+### `devices`
+Record STB yang register otomatis dari Android.
+
+| Kolom | Tipe | Catatan |
+| --- | --- | --- |
+| `id` | Int | Primary key. |
+| `deviceId` | String unique | UUID dari client, contoh `STB-RSDK-...`. |
+| `deviceName` | String | Default `Android STB`. |
+| `isActive` | Boolean | Default `true`; dipakai untuk blokir device. |
+| `playlistId` | Int/null | Relasi lama/opsional; channel aktif saat ini memakai global playlist. |
+| `appVersion` | String/null | Versi APK yang dilaporkan Android. |
+| `androidVersion` | String/null | Versi Android device. |
+| `lastIp` | String/null | IP lokal terakhir dari register/heartbeat. |
+| `macAddress` | String/null | Dipakai juga untuk mencocokkan device setelah reinstall. |
+| `lastOnline` | DateTime/null | Basis status online/offline dashboard. |
+
+Index penting: `(isActive, lastOnline)`, `lastOnline`, `macAddress`.
+
+### `device_configs`
+Konfigurasi per device. Setiap device baru dibuatkan config dari default global saat register.
+
+| Kolom | Tipe | Catatan |
+| --- | --- | --- |
+| `deviceId` | String unique/null | Relasi ke `devices.deviceId`, cascade delete. |
+| `defaultCategory` | String | Default `National TV`. |
+| `defaultChannelId` | Int/null | Channel awal opsional. |
+| `aspectRatio` | String | `fit`, `stretch`, `zoom`, `16_9`, `4_3`. |
+| `syncInterval` | Int | Detik, default 1800. |
+| `syncMode` | String/null | `custom`, `api`, atau `api_relay`; default `custom`. |
+| `customM3uUrl` | Text/null | URL M3U untuk mode custom. |
+| `startScreen` | String | `live_tv`, `category_list`, `home_screen`. |
+| `lockSettings` | Boolean | Mengunci Settings Android. |
+| `forceSync` | Boolean | Trigger sync channel sekali pakai. |
+| `clearCacheTrigger` | Boolean/null | Trigger clear cache channel sekali pakai. |
+| `autoStartOnBoot` | Boolean | Autostart Android. |
+| `technicianPin` | String | Default `2468`. |
+| `educationVideoPath` | String | SMB path video edukasi. |
+| `educationSmbUsername` | String | Username SMB. |
+| `educationSmbPassword` | String | Password SMB. |
+| `educationSmbDomain` | String | Domain/workgroup SMB. |
+| `educationRepeatMode` | String | `all`, `one`, `none`. |
+| `educationPlayOrder` | String | `alphabetical`, `random`, `shuffle`. |
+| `educationForceSync` | Boolean | Trigger sync edukasi sekali pakai. |
+
+Catatan: default global **tidak** lagi disimpan sebagai `device_configs.deviceId = NULL`. Default global disimpan di `app_settings` dengan key `device.defaultConfig`, lalu disalin ke `device_configs` saat device baru register.
+
+### `device_logs`
+Log error dari Android.
+
+| Kolom | Tipe | Catatan |
+| --- | --- | --- |
+| `deviceId` | String | Relasi ke `devices.deviceId`, cascade delete. |
+| `errorType` | String | Kategori error. |
+| `errorMessage` | String | Detail error. |
+| `channelId` | Int/null | Channel terkait bila ada. |
+| `streamUrl` | Text/null | URL yang gagal diputar. |
+| `androidSdk` | Int/null | SDK Android client. |
+| `createdAt` | DateTime | Timestamp server. |
+
+---
+
+## 4. Tabel Admin, Setting, dan Update
+
+### `users`
+Menyimpan akun Web Admin.
+
+| Kolom | Tipe | Catatan |
+| --- | --- | --- |
+| `username` | String unique | Username login. |
+| `password` | String | Password hash. |
+| `role` | String | Default `admin`. |
+
+### `app_settings`
+Key/value untuk konfigurasi global runtime.
+
+Key yang dipakai kode saat ini:
+
+| Key | Isi |
+| --- | --- |
+| `device.defaultConfig` | JSON default config untuk device baru. |
+| `dashboard.offlineAutoDeleteDays` | Threshold auto-delete device offline. |
+| `stream.hlsRelayBaseUrl` | Base URL segment HLS relay. |
+| `app.publicOrigin` | Origin publik untuk URL absolut yang dikirim ke client. |
+| `stream.onDemandHlsRelayConfig` | JSON runtime ffmpeg/on-demand relay. |
+
+Jika key belum ada, backend memakai fallback dari `.env` dan konstanta kode.
+
+### `app_updates`
+Metadata APK update dari dashboard Updates.
+
+| Kolom | Tipe | Catatan |
+| --- | --- | --- |
+| `versionCode` | Int unique | Dibandingkan dengan APK client. |
+| `versionName` | String | Nama versi tampil. |
+| `apkFileName` | String | File di `public/uploads/apk`. |
+| `changelog` | Text/null | Catatan rilis. |
+| `isMandatory` | Boolean | Update wajib atau opsional. |
+| `isDeployed` | Boolean | Hanya deployed update dipakai endpoint check. |
+
+---
+
+## 5. Fitur Web Admin Aktual
+
+- Dashboard device dengan status online/offline/disabled, filter, pagination, search, dan auto-delete offline.
+- Aktivasi/deaktivasi device tanpa menghapus config.
+- Edit config per device: sync mode, custom M3U, aspect ratio, sync interval, lock settings, PIN, autostart, dan edukasi SMB.
+- Clear cache, force sync channel, dan force sync edukasi dari dashboard.
+- Playlist upload/sync M3U, parse category/channel, global playlist.
+- Preview stream direct/relay dan konfigurasi HLS relay.
+- Upload, deploy, dan delete APK update.
+- Remote control device via polling command dan screenshot streaming.
+- Log viewer untuk error yang dikirim Android.

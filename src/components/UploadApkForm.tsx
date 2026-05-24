@@ -2,6 +2,16 @@
 
 import { useState, useRef } from 'react'
 
+type ApkInfo = {
+  versionCode?: number
+  versionName?: string
+}
+
+type UploadResponse = {
+  success?: boolean
+  message?: string
+}
+
 export default function UploadApkForm() {
   const [parsingState, setParsingState] = useState<'idle' | 'analyzing' | 'success' | 'error'>('idle')
   const [versionCode, setVersionCode] = useState<string>('')
@@ -37,7 +47,7 @@ export default function UploadApkForm() {
       const AppInfoParserModule = await import('app-info-parser')
       const AppInfoParser = AppInfoParserModule.default
       const parser = new AppInfoParser(file)
-      const result = await parser.parse()
+      const result = await parser.parse() as ApkInfo
 
       if (result && result.versionCode !== undefined && result.versionName) {
         setVersionCode(String(result.versionCode))
@@ -46,12 +56,12 @@ export default function UploadApkForm() {
       } else {
         throw new Error('Format APK tidak didukung atau Manifest tidak memiliki versionCode/versionName.')
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Error parsing APK client-side:', err)
       setParsingState('error')
       setVersionCode('')
       setVersionName('')
-      setErrorMsg(err.message || 'Gagal menganalisis berkas APK. Pastikan berkas valid.')
+      setErrorMsg(err instanceof Error ? err.message : 'Gagal menganalisis berkas APK. Pastikan berkas valid.')
     }
   }
 
@@ -91,8 +101,8 @@ export default function UploadApkForm() {
     xhr.onload = () => {
       setIsUploading(false)
       try {
-        const response = JSON.parse(xhr.responseText)
-        const isSuccess = xhr.status >= 200 && xhr.status < 300 && response.success
+        const response = JSON.parse(xhr.responseText) as UploadResponse
+        const isSuccess = xhr.status >= 200 && xhr.status < 300 && response.success === true
         
         setUploadResult({
           success: isSuccess,
@@ -117,7 +127,7 @@ export default function UploadApkForm() {
             window.location.reload()
           }, 1500)
         }
-      } catch (err) {
+      } catch {
         setUploadResult({
           success: false,
           message: `Gagal membaca respon server. Status HTTP: ${xhr.status}`
