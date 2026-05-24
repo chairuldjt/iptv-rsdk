@@ -1,5 +1,7 @@
 package com.example.rsdkiptvplayer.ui.splash
 
+import android.media.AudioAttributes
+import android.media.SoundPool
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Image
@@ -35,13 +37,36 @@ fun SplashScreen(
     val context = LocalContext.current
     val alpha = remember { Animatable(0f) }
     val scale = remember { Animatable(0.88f) }
+    val soundPool = remember {
+        SoundPool.Builder()
+            .setMaxStreams(1)
+            .setAudioAttributes(
+                AudioAttributes.Builder()
+                    .setUsage(AudioAttributes.USAGE_ASSISTANCE_SONIFICATION)
+                    .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
+                    .build()
+            )
+            .build()
+    }
 
     var currentVersionName by remember { mutableStateOf("") }
     var currentVersionCode by remember { mutableIntStateOf(0) }
+    var splashSoundId by remember { mutableIntStateOf(0) }
 
-    LaunchedEffect(Unit) {
+    DisposableEffect(Unit) {
+        splashSoundId = soundPool.load(context, R.raw.splash_opening_chime, 1)
+        onDispose {
+            soundPool.release()
+        }
+    }
+
+    LaunchedEffect(splashSoundId) {
         currentVersionCode = UpdateManager.getCurrentVersionCode(context)
         currentVersionName = UpdateManager.getCurrentVersionName(context)
+
+        if (splashSoundId != 0) {
+            soundPool.play(splashSoundId, 0.38f, 0.42f, 1, 0, 1.0f)
+        }
 
         // Animate splash in
         alpha.animateTo(
@@ -59,8 +84,8 @@ fun SplashScreen(
 
     Box(modifier = Modifier.fillMaxSize()) {
         Image(
-            painter = painterResource(id = R.drawable.kariadi_home_bg),
-            contentDescription = "RSUP Dr. Kariadi",
+            painter = painterResource(id = R.drawable.global_home_bg),
+            contentDescription = "Hospitality IPTV background",
             modifier = Modifier.fillMaxSize(),
             contentScale = ContentScale.Crop
         )
@@ -71,9 +96,9 @@ fun SplashScreen(
                 .background(
                     Brush.verticalGradient(
                         colors = listOf(
-                            Color.Black.copy(alpha = 0.48f),
-                            Color(0xFF06363B).copy(alpha = 0.30f),
-                            Color.Black.copy(alpha = 0.82f)
+                            Color.Black.copy(alpha = 0.42f),
+                            Color(0xFF092A2A).copy(alpha = 0.24f),
+                            Color.Black.copy(alpha = 0.84f)
                         )
                     )
                 )
@@ -94,17 +119,17 @@ fun SplashScreen(
                     .shadow(
                         elevation = 28.dp,
                         shape = CircleShape,
-                        ambientColor = Color(0xFF2EBEC6).copy(alpha = 0.35f),
-                        spotColor = Color(0xFFC6E618).copy(alpha = 0.28f)
+                        ambientColor = Color(0xFF2EE6C6).copy(alpha = 0.34f),
+                        spotColor = Color(0xFFFFD166).copy(alpha = 0.30f)
                     )
-                    .background(Color.White, CircleShape)
-                    .border(3.dp, Color.White.copy(alpha = 0.88f), CircleShape)
-                    .padding(8.dp),
+                    .background(Color(0xFF071217), CircleShape)
+                    .border(2.dp, Color.White.copy(alpha = 0.24f), CircleShape)
+                    .padding(14.dp),
                 contentAlignment = Alignment.Center
             ) {
                 Image(
-                    painter = painterResource(id = R.drawable.ic_kemenkes_rs_kariadi),
-                    contentDescription = "Kemenkes RS Kariadi",
+                    painter = painterResource(id = R.drawable.ic_global_iptv),
+                    contentDescription = "Hospitality IPTV",
                     modifier = Modifier.fillMaxSize()
                 )
             }
@@ -112,7 +137,7 @@ fun SplashScreen(
             Spacer(modifier = Modifier.height(26.dp))
 
             Text(
-                text = "RSUP Dr. Kariadi",
+                text = "Hospitality IPTV",
                 color = Color.White,
                 fontSize = 32.sp,
                 fontWeight = FontWeight.ExtraBold,
@@ -123,7 +148,7 @@ fun SplashScreen(
             Spacer(modifier = Modifier.height(8.dp))
 
             Text(
-                text = "Rujukan Nasional • Kelas A • Pendidikan",
+                text = "Live TV • Guest Services • Education",
                 color = Color(0xFFE9F7F6),
                 fontSize = 14.sp,
                 fontWeight = FontWeight.SemiBold,
@@ -134,13 +159,13 @@ fun SplashScreen(
             Spacer(modifier = Modifier.height(42.dp))
 
             CircularProgressIndicator(
-                color = Color(0xFF2EBEC6),
+                color = Color(0xFF2EE6C6),
                 strokeWidth = 3.dp,
                 modifier = Modifier.size(38.dp)
             )
             Spacer(modifier = Modifier.height(12.dp))
             Text(
-                text = "Memulai aplikasi...",
+                text = "Preparing your experience...",
                 color = Color.White.copy(alpha = 0.6f),
                 fontSize = 12.sp
             )
@@ -154,7 +179,7 @@ fun SplashScreen(
                 .alpha(alpha.value)
         ) {
             Text(
-                text = "Hospital IPTV Service",
+                text = "PREMIUM IPTV PLATFORM",
                 color = Color.White.copy(alpha = 0.70f),
                 fontSize = 12.sp,
                 fontWeight = FontWeight.Bold,

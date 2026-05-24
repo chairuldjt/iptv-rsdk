@@ -85,9 +85,9 @@ fun PinGridDialog(
             modifier = Modifier
                 .width(360.dp)
                 .wrapContentHeight()
-                .border(1.dp, Color(0xFF334155), RoundedCornerShape(24.dp)),
+                .border(1.dp, Color(0xFFFFE9A6).copy(alpha = 0.28f), RoundedCornerShape(24.dp)),
             shape = RoundedCornerShape(24.dp),
-            colors = CardDefaults.cardColors(containerColor = Color(0xEC0F172A)) // Semi-transparent Slate Dark
+            colors = CardDefaults.cardColors(containerColor = Color(0xEE07111D))
         ) {
             Column(
                 modifier = Modifier
@@ -96,7 +96,7 @@ fun PinGridDialog(
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
                 Text(
-                    text = "Technician Authentication",
+                    text = "Akses Teknisi",
                     fontSize = 18.sp,
                     fontWeight = FontWeight.Bold,
                     color = Color.White
@@ -104,7 +104,7 @@ fun PinGridDialog(
                 Text(
                     text = "Masukkan PIN untuk membuka Pengaturan",
                     fontSize = 12.sp,
-                    color = Color.Gray,
+                    color = Color.White.copy(alpha = 0.62f),
                     textAlign = TextAlign.Center,
                     modifier = Modifier.padding(top = 4.dp, bottom = 20.dp)
                 )
@@ -118,11 +118,11 @@ fun PinGridDialog(
                             modifier = Modifier
                                 .size(44.dp)
                                 .clip(RoundedCornerShape(10.dp))
-                                .background(Color(0xFF0F172A))
+                                .background(Color.Black.copy(alpha = 0.30f))
                                 .border(
                                     BorderStroke(
                                         2.dp,
-                                        if (index == enteredPin.length) Color(0xFF6366F1) else Color(0xFF334155)
+                                        if (index == enteredPin.length) Color(0xFFFFE9A6) else Color.White.copy(alpha = 0.16f)
                                     ),
                                     RoundedCornerShape(10.dp)
                                 ),
@@ -206,11 +206,11 @@ fun PinGridButton(
     Surface(
         onClick = onClick,
         shape = RoundedCornerShape(12.dp),
-        color = if (isFocused) Color(0xFF6366F1) else Color(0xFF1E293B),
-        contentColor = Color.White,
+        color = if (isFocused) Color(0xFFFFE9A6) else Color.Black.copy(alpha = 0.36f),
+        contentColor = if (isFocused) Color.Black else Color.White,
         border = BorderStroke(
             width = if (isFocused) 4.dp else 1.dp,
-            color = if (isFocused) Color.White else Color(0xFF334155)
+            color = if (isFocused) Color.White else Color.White.copy(alpha = 0.18f)
         ),
         modifier = Modifier
             .height(54.dp)
@@ -241,7 +241,7 @@ fun PinGridButton(
                 fontSize = if (text.length == 1) 18.sp else 13.sp,
                 fontWeight = FontWeight.Bold,
                 textAlign = TextAlign.Center,
-                color = Color.White,
+                color = if (isFocused) Color.Black else Color.White,
                 maxLines = 1
             )
         }

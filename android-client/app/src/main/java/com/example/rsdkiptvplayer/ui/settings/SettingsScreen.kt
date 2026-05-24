@@ -2,6 +2,7 @@ package com.example.rsdkiptvplayer.ui.settings
 
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -18,6 +19,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.composed
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.draw.shadow
@@ -25,6 +27,7 @@ import androidx.compose.ui.focus.FocusDirection
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEventType
@@ -33,6 +36,8 @@ import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -40,6 +45,7 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.lifecycle.viewmodel.compose.viewModel
 import android.widget.Toast
+import com.example.rsdkiptvplayer.R
 import com.example.rsdkiptvplayer.util.AutostartPermissionHelper
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
@@ -80,6 +86,10 @@ private fun Modifier.settingsFocusGlow(
         )
         .onFocusChanged { isFocused = it.isFocused }
 }
+
+private val SettingsAccent = Color(0xFFFFE9A6)
+private val SettingsCyan = Color(0xFF7DD3FC)
+private val SettingsPanel = Color.Black.copy(alpha = 0.42f)
 
 @Composable
 private fun SettingsTextFieldFrame(
@@ -531,9 +541,30 @@ fun SettingsScreen(
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color(0xFF0F172A))
+            .background(Color(0xFF050B12))
             .padding(horizontal = 22.dp, vertical = 14.dp)
     ) {
+        Image(
+            painter = painterResource(id = R.drawable.home_bg_settings),
+            contentDescription = null,
+            modifier = Modifier
+                .matchParentSize()
+                .alpha(0.42f),
+            contentScale = ContentScale.Crop
+        )
+        Box(
+            modifier = Modifier
+                .matchParentSize()
+                .background(
+                    Brush.verticalGradient(
+                        listOf(
+                            Color.Black.copy(alpha = 0.30f),
+                            Color(0xFF07131D).copy(alpha = 0.58f),
+                            Color.Black.copy(alpha = 0.82f)
+                        )
+                    )
+                )
+        )
         if (lockSettings && !isUnlockedSession) {
             var showPinKeypad by remember { mutableStateOf(false) }
 
@@ -548,9 +579,9 @@ fun SettingsScreen(
                     modifier = Modifier
                         .width(420.dp)
                         .wrapContentHeight()
-                        .border(1.dp, Color(0xFF334155), RoundedCornerShape(28.dp)),
+                        .border(1.dp, SettingsAccent.copy(alpha = 0.30f), RoundedCornerShape(28.dp)),
                     shape = RoundedCornerShape(28.dp),
-                    colors = CardDefaults.cardColors(containerColor = Color(0xEC1E293B))
+                    colors = CardDefaults.cardColors(containerColor = Color(0xE607111D))
                 ) {
                     Column(
                         modifier = Modifier
@@ -559,20 +590,30 @@ fun SettingsScreen(
                         horizontalAlignment = Alignment.CenterHorizontally
                     ) {
                         if (!showPinKeypad) {
-                            // Padlock Overlay UI
+                            Box(
+                                modifier = Modifier
+                                    .size(86.dp)
+                                    .clip(RoundedCornerShape(22.dp))
+                                    .background(SettingsAccent.copy(alpha = 0.12f))
+                                    .border(1.dp, SettingsAccent.copy(alpha = 0.36f), RoundedCornerShape(22.dp)),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(
+                                    painter = painterResource(id = R.drawable.ic_home_settings),
+                                    contentDescription = null,
+                                    tint = Color.White,
+                                    modifier = Modifier.size(42.dp)
+                                )
+                            }
+                            Spacer(modifier = Modifier.height(18.dp))
                             Text(
-                                text = "🔒",
-                                fontSize = 80.sp,
-                                modifier = Modifier.padding(bottom = 16.dp)
-                            )
-                            Text(
-                                text = "PENGATURAN TERKUNCI",
+                                text = "AKSES TEKNISI",
                                 fontSize = 22.sp,
                                 fontWeight = FontWeight.ExtraBold,
                                 color = Color.White
                             )
                             Text(
-                                text = "Setting hanya bisa dibuka oleh SIMRS",
+                                text = "Masukkan PIN untuk membuka konfigurasi perangkat.",
                                 fontSize = 14.sp,
                                 color = Color(0xFF94A3B8),
                                 textAlign = TextAlign.Center,
@@ -581,7 +622,7 @@ fun SettingsScreen(
 
                             Button(
                                 onClick = { showPinKeypad = true },
-                                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF6366F1)),
+                                colors = ButtonDefaults.buttonColors(containerColor = SettingsAccent, contentColor = Color.Black),
                                 shape = RoundedCornerShape(12.dp),
                                 modifier = Modifier
                                     .fillMaxWidth()
@@ -589,7 +630,7 @@ fun SettingsScreen(
                                     .settingsFocusGlow(RoundedCornerShape(12.dp))
                                     .focusRequester(firstButtonFocusRequester)
                             ) {
-                                Text("🔓 BUKA KUNCI", fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                                Text("BUKA KUNCI", fontWeight = FontWeight.Bold, fontSize = 16.sp)
                             }
 
                             Spacer(modifier = Modifier.height(12.dp))
@@ -604,7 +645,7 @@ fun SettingsScreen(
                                     .height(54.dp)
                                     .settingsFocusGlow(RoundedCornerShape(12.dp))
                             ) {
-                                Text("← Kembali ke Player")
+                                Text("Kembali")
                             }
                         } else {
                             // PIN Input UI
@@ -640,7 +681,7 @@ fun SettingsScreen(
                                             .border(
                                                 BorderStroke(
                                                     2.dp,
-                                                    if (index == enteredPin.length) Color.White else Color(0xFF334155)
+                                                    if (index == enteredPin.length) SettingsAccent else Color.White.copy(alpha = 0.18f)
                                                 ),
                                                 RoundedCornerShape(10.dp)
                                             ),
@@ -725,7 +766,7 @@ fun SettingsScreen(
                 ) {
                     Column {
                     Text(
-                        text = "RSDK IPTV Player — Mode Teknisi",
+                        text = "Hospitality IPTV - Mode Teknisi",
                         fontSize = 18.sp,
                         fontWeight = FontWeight.ExtraBold,
                         color = Color.White
@@ -734,7 +775,7 @@ fun SettingsScreen(
                         text = "UUID: $deviceId",
                         fontSize = 11.sp,
                         fontFamily = FontFamily.Monospace,
-                        color = Color(0xFF818CF8)
+                        color = SettingsAccent.copy(alpha = 0.82f)
                     )
                 }
                 
@@ -747,12 +788,12 @@ fun SettingsScreen(
                         .height(42.dp)
                         .settingsFocusGlow(RoundedCornerShape(8.dp))
                 ) {
-                    Text("← Kembali ke Player")
+                    Text("Kembali")
                 }
             }
 
             // Separator line
-            HorizontalDivider(color = Color(0xFF1E293B), modifier = Modifier.padding(bottom = 12.dp))
+            HorizontalDivider(color = Color.White.copy(alpha = 0.08f), modifier = Modifier.padding(bottom = 12.dp))
 
             // Body Area (Split pane)
             Row(
@@ -766,9 +807,9 @@ fun SettingsScreen(
                     modifier = Modifier
                         .weight(1f)
                         .fillMaxHeight(),
-                    colors = CardDefaults.cardColors(containerColor = Color(0xFF1E293B)),
+                    colors = CardDefaults.cardColors(containerColor = SettingsPanel),
                     shape = RoundedCornerShape(16.dp),
-                    border = BorderStroke(1.dp, Color(0xFF334155))
+                    border = BorderStroke(1.dp, Color.White.copy(alpha = 0.12f))
                 ) {
                     LazyColumn(
                         modifier = Modifier
@@ -813,7 +854,7 @@ fun SettingsScreen(
                                         spotColor = Color.White.copy(alpha = if (isFocused) 1f else 0f)
                                     )
                                     .clip(RoundedCornerShape(14.dp))
-                                    .background(if (isFocused) Color(0xFF7DD3FC).copy(alpha = 0.16f) else Color.Transparent)
+                                    .background(if (isFocused) SettingsAccent.copy(alpha = 0.14f) else Color.Transparent)
                                     .border(
                                         BorderStroke(
                                             if (isFocused) 4.dp else 0.dp,
@@ -828,8 +869,8 @@ fun SettingsScreen(
                                         .fillMaxWidth()
                                         .clip(RoundedCornerShape(10.dp))
                                         .background(
-                                            if (isFocused) Color(0xFF38BDF8).copy(alpha = 0.32f)
-                                            else if (isSelected) Color(0xFF312E81)
+                                            if (isFocused) SettingsAccent.copy(alpha = 0.24f)
+                                            else if (isSelected) SettingsCyan.copy(alpha = 0.18f)
                                             else Color.Transparent
                                         )
                                         .border(
@@ -875,9 +916,9 @@ fun SettingsScreen(
                     modifier = Modifier
                         .weight(2f)
                         .fillMaxHeight(),
-                    colors = CardDefaults.cardColors(containerColor = Color(0xFF1E293B)),
+                    colors = CardDefaults.cardColors(containerColor = SettingsPanel),
                     shape = RoundedCornerShape(16.dp),
-                    border = BorderStroke(1.dp, Color(0xFF334155))
+                    border = BorderStroke(1.dp, Color.White.copy(alpha = 0.12f))
                 ) {
                     Box(
                         modifier = Modifier

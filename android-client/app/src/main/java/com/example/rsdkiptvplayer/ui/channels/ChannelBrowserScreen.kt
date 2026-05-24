@@ -24,6 +24,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.draw.shadow
@@ -52,6 +53,15 @@ import com.example.rsdkiptvplayer.R
 import com.example.rsdkiptvplayer.data.cache.ChannelEntity
 import com.example.rsdkiptvplayer.ui.player.PlayerViewModel
 
+private fun isFallbackCategoryName(category: String): Boolean {
+    val normalized = category.trim().lowercase()
+    return normalized.isBlank() ||
+        normalized == "uncategorized" ||
+        normalized == "uncategorised" ||
+        normalized == "lainnya" ||
+        normalized == "other"
+}
+
 @Composable
 fun ChannelBrowserScreen(
     onChannelSelected: (Int) -> Unit,
@@ -62,6 +72,7 @@ fun ChannelBrowserScreen(
     val channels by playerViewModel.channels.collectAsState()
     val categories by playerViewModel.categories.collectAsState()
     val isLoading by playerViewModel.isLoading.collectAsState()
+    val selectedChannel by playerViewModel.selectedChannel.collectAsState()
 
     var selectedCategory by remember { mutableStateOf("ALL") }
     val backFocusRequester = remember { FocusRequester() }
@@ -71,9 +82,23 @@ fun ChannelBrowserScreen(
     var focusedChannelIndex by remember { mutableIntStateOf(0) }
     val categoryListState = rememberLazyListState()
     val channelGridState = rememberLazyGridState()
+    val visibleCategories = remember(categories) {
+        categories.filterNot { isFallbackCategoryName(it) }
+    }
+    val showCategoryFilter = visibleCategories.isNotEmpty()
 
     LaunchedEffect(Unit) {
         screenFocusRequester.requestFocus()
+    }
+
+    LaunchedEffect(showCategoryFilter) {
+        if (!showCategoryFilter) {
+            selectedCategory = "ALL"
+            focusSection = 2
+            focusedCategoryIndex = 0
+        } else if (focusSection == 2 && focusedChannelIndex == 0) {
+            focusSection = 1
+        }
     }
 
     // Responsive grid column count based on screen width
@@ -86,20 +111,27 @@ fun ChannelBrowserScreen(
         else -> 2
     }
 
-    val filteredChannels = if (selectedCategory == "ALL") {
+    val filteredChannels = if (!showCategoryFilter || selectedCategory == "ALL") {
         channels
     } else {
         channels.filter { it.groupName == selectedCategory }
     }
-    val categoryOptions = listOf("ALL") + categories
+    val categoryOptions = if (showCategoryFilter) listOf("ALL") + visibleCategories else emptyList()
+    val channelNumbers = remember(channels) {
+        channels.mapIndexed { index, channel -> channel.id to (index + 1) }.toMap()
+    }
 
-    LaunchedEffect(selectedCategory, filteredChannels.size) {
-        focusedCategoryIndex = categoryOptions.indexOf(selectedCategory).coerceAtLeast(0)
+    LaunchedEffect(selectedCategory, filteredChannels.size, showCategoryFilter) {
+        focusedCategoryIndex = if (showCategoryFilter) {
+            categoryOptions.indexOf(selectedCategory).coerceAtLeast(0)
+        } else {
+            0
+        }
         focusedChannelIndex = focusedChannelIndex.coerceIn(0, filteredChannels.lastIndex.coerceAtLeast(0))
     }
 
-    LaunchedEffect(focusedCategoryIndex) {
-        if (categoryOptions.isNotEmpty()) {
+    LaunchedEffect(focusedCategoryIndex, showCategoryFilter) {
+        if (showCategoryFilter && categoryOptions.isNotEmpty()) {
             categoryListState.animateScrollToItem(focusedCategoryIndex.coerceIn(categoryOptions.indices))
         }
     }
@@ -129,7 +161,10 @@ fun ChannelBrowserScreen(
 
                 when (keyEvent.key) {
                     Key.DirectionLeft -> {
-                        if (focusSection == 1) {
+                        if (focusSection == 0) {
+                            focusSection = if (showCategoryFilter) 1 else 2
+                            focusedChannelIndex = focusedChannelIndex.coerceAtLeast(0)
+                        } else if (showCategoryFilter && focusSection == 1) {
                             focusedCategoryIndex = (focusedCategoryIndex - 1).coerceAtLeast(0)
                         } else {
                             focusedChannelIndex = (focusedChannelIndex - 1).coerceAtLeast(0)
@@ -137,7 +172,10 @@ fun ChannelBrowserScreen(
                         true
                     }
                     Key.DirectionRight -> {
-                        if (focusSection == 1) {
+                        if (focusSection == 0) {
+                            focusSection = if (showCategoryFilter) 1 else 2
+                            focusedChannelIndex = focusedChannelIndex.coerceAtLeast(0)
+                        } else if (showCategoryFilter && focusSection == 1) {
                             focusedCategoryIndex = (focusedCategoryIndex + 1)
                                 .coerceAtMost(categoryOptions.lastIndex.coerceAtLeast(0))
                         } else {
@@ -147,17 +185,23 @@ fun ChannelBrowserScreen(
                         true
                     }
                     Key.DirectionUp -> {
-                        if (focusSection == 2) {
+                        if (showCategoryFilter && focusSection == 1) {
+                            focusSection = 0
+                        } else if (focusSection == 2) {
                             if (focusedChannelIndex - gridColumns >= 0) {
                                 focusedChannelIndex -= gridColumns
-                            } else {
+                            } else if (showCategoryFilter) {
                                 focusSection = 1
+                            } else {
+                                focusSection = 0
                             }
                         }
                         true
                     }
                     Key.DirectionDown -> {
-                        if (focusSection == 1) {
+                        if (focusSection == 0) {
+                            focusSection = if (showCategoryFilter) 1 else 2
+                        } else if (showCategoryFilter && focusSection == 1) {
                             selectFocusedCategory()
                             focusSection = 2
                         } else {
@@ -167,7 +211,9 @@ fun ChannelBrowserScreen(
                         true
                     }
                     Key.DirectionCenter, Key.Enter, Key.NumPadEnter -> {
-                        if (focusSection == 1) {
+                        if (focusSection == 0) {
+                            onBack()
+                        } else if (showCategoryFilter && focusSection == 1) {
                             selectFocusedCategory()
                             focusSection = 2
                         } else {
@@ -179,14 +225,30 @@ fun ChannelBrowserScreen(
                 }
             }
             .background(
-                Brush.verticalGradient(
-                    colors = listOf(
-                        Color(0xFF0F172A),
-                        Color(0xFF020617)
-                    )
-                )
+                Color(0xFF050B12)
             )
     ) {
+        Image(
+            painter = painterResource(id = R.drawable.home_bg_tv),
+            contentDescription = null,
+            modifier = Modifier
+                .fillMaxSize()
+                .alpha(0.46f),
+            contentScale = ContentScale.Crop
+        )
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(
+                    Brush.verticalGradient(
+                        colors = listOf(
+                            Color.Black.copy(alpha = 0.26f),
+                            Color(0xFF06111C).copy(alpha = 0.42f),
+                            Color.Black.copy(alpha = 0.78f)
+                        )
+                    )
+                )
+        )
         Column(modifier = Modifier.fillMaxSize()) {
 
             // ─── Top Header Bar ───
@@ -196,8 +258,8 @@ fun ChannelBrowserScreen(
                     .background(
                         Brush.horizontalGradient(
                             colors = listOf(
-                                Color(0xFF1E293B).copy(alpha = 0.9f),
-                                Color(0xFF0F172A).copy(alpha = 0.9f)
+                                Color.Black.copy(alpha = 0.52f),
+                                Color(0xFF07131D).copy(alpha = 0.66f)
                             )
                         )
                     )
@@ -211,36 +273,43 @@ fun ChannelBrowserScreen(
                 ) {
                     // Back Button
                     var isBackFocused by remember { mutableStateOf(false) }
+                    val isBackExplicitlyFocused = focusSection == 0
+                    val shouldHighlightBack = isBackFocused || isBackExplicitlyFocused
                     IconButton(
                         onClick = onBack,
                         modifier = Modifier
                             .size(40.dp)
                             .focusRequester(backFocusRequester)
                             .shadow(
-                                elevation = if (isBackFocused) 18.dp else 0.dp,
+                                elevation = if (shouldHighlightBack) 18.dp else 0.dp,
                                 shape = CircleShape,
-                                ambientColor = Color.White.copy(alpha = if (isBackFocused) 0.9f else 0f),
-                                spotColor = Color.White.copy(alpha = if (isBackFocused) 0.9f else 0f)
+                                ambientColor = Color.White.copy(alpha = if (shouldHighlightBack) 0.9f else 0f),
+                                spotColor = Color.White.copy(alpha = if (shouldHighlightBack) 0.9f else 0f)
                             )
                             .clip(CircleShape)
                             .background(
-                                if (isBackFocused) Color(0xFF7DD3FC).copy(alpha = 0.28f)
+                                if (shouldHighlightBack) Color(0xFF7DD3FC).copy(alpha = 0.28f)
                                 else Color(0xFF334155).copy(alpha = 0.5f)
                             )
                             .border(
-                                if (isBackFocused) 3.dp else 1.dp,
-                                if (isBackFocused) Color.White else Color(0xFF475569),
+                                if (shouldHighlightBack) 3.dp else 1.dp,
+                                if (shouldHighlightBack) Color.White else Color(0xFF475569),
                                 CircleShape
                             )
                             .focusable()
-                            .onFocusChanged { isBackFocused = it.isFocused }
+                            .onFocusChanged {
+                                isBackFocused = it.isFocused
+                                if (it.isFocused) {
+                                    focusSection = 0
+                                }
+                            }
                     ) {
                         Text("←", color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.Bold)
                     }
 
                     Image(
-                        painter = painterResource(id = R.drawable.ic_kemenkes_rs_kariadi),
-                        contentDescription = "Logo RSDK",
+                        painter = painterResource(id = R.drawable.ic_global_iptv),
+                        contentDescription = "Hospitality IPTV",
                         modifier = Modifier
                             .size(38.dp)
                             .clip(RoundedCornerShape(8.dp))
@@ -248,7 +317,7 @@ fun ChannelBrowserScreen(
 
                     Column {
                         Text(
-                            text = "PILIH SALURAN",
+                            text = "DAFTAR SALURAN",
                             fontSize = 18.sp,
                             fontWeight = FontWeight.ExtraBold,
                             color = Color.White,
@@ -266,45 +335,46 @@ fun ChannelBrowserScreen(
                 Spacer(modifier = Modifier.width(1.dp))
             }
 
-            // ─── Category Filter Bar ───
-            LazyRow(
-                state = categoryListState,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .background(Color(0xFF0F172A).copy(alpha = 0.8f))
-                    .padding(horizontal = 20.dp, vertical = 10.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                // "ALL" tab
-                item {
-                    CategoryChip(
-                        label = "Semua (${channels.size})",
-                        isSelected = selectedCategory == "ALL",
-                        isExplicitlyFocused = focusSection == 1 && focusedCategoryIndex == 0,
-                        accentColor = Color(0xFF6366F1),
-                        onClick = {
-                            focusedCategoryIndex = 0
-                            selectedCategory = "ALL"
-                        }
-                    )
+            if (showCategoryFilter) {
+                // ─── Category Filter Bar ───
+                LazyRow(
+                    state = categoryListState,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(Color.Black.copy(alpha = 0.34f))
+                        .padding(horizontal = 20.dp, vertical = 10.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    item {
+                        CategoryChip(
+                            label = "Semua (${channels.size})",
+                            isSelected = selectedCategory == "ALL",
+                            isExplicitlyFocused = focusSection == 1 && focusedCategoryIndex == 0,
+                            accentColor = Color(0xFFFFE9A6),
+                            onClick = {
+                                focusedCategoryIndex = 0
+                                selectedCategory = "ALL"
+                            }
+                        )
+                    }
+                    itemsIndexed(visibleCategories) { index, cat ->
+                        val count = channels.count { it.groupName == cat }
+                        CategoryChip(
+                            label = "$cat ($count)",
+                            isSelected = selectedCategory == cat,
+                            isExplicitlyFocused = focusSection == 1 && focusedCategoryIndex == index + 1,
+                            accentColor = Color(0xFFFFE9A6),
+                            onClick = {
+                                focusedCategoryIndex = index + 1
+                                selectedCategory = cat
+                            }
+                        )
+                    }
                 }
-                // Per-category tabs
-                itemsIndexed(categories) { index, cat ->
-                    val count = channels.count { it.groupName == cat }
-                    CategoryChip(
-                        label = "$cat ($count)",
-                        isSelected = selectedCategory == cat,
-                        isExplicitlyFocused = focusSection == 1 && focusedCategoryIndex == index + 1,
-                        accentColor = Color(0xFF6366F1),
-                        onClick = {
-                            focusedCategoryIndex = index + 1
-                            selectedCategory = cat
-                        }
-                    )
-                }
+                HorizontalDivider(color = Color.White.copy(alpha = 0.08f), thickness = 1.dp)
+            } else {
+                HorizontalDivider(color = Color.White.copy(alpha = 0.06f), thickness = 1.dp)
             }
-
-            HorizontalDivider(color = Color(0xFF1E293B), thickness = 1.dp)
 
             // ─── Channel Grid ───
             if (isLoading) {
@@ -315,7 +385,7 @@ fun ChannelBrowserScreen(
                     contentAlignment = Alignment.Center
                 ) {
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        CircularProgressIndicator(color = Color(0xFF6366F1))
+                        CircularProgressIndicator(color = Color(0xFFFFE9A6))
                         Spacer(modifier = Modifier.height(16.dp))
                         Text(
                             "Memuat daftar saluran...",
@@ -339,11 +409,16 @@ fun ChannelBrowserScreen(
                             modifier = Modifier
                                 .size(80.dp)
                                 .clip(CircleShape)
-                                .background(Color(0xFFF59E0B).copy(alpha = 0.1f))
-                                .border(2.dp, Color(0xFFF59E0B).copy(alpha = 0.3f), CircleShape),
+                                .background(Color(0xFFFFE9A6).copy(alpha = 0.12f))
+                                .border(2.dp, Color(0xFFFFE9A6).copy(alpha = 0.32f), CircleShape),
                             contentAlignment = Alignment.Center
                         ) {
-                            Text("📺", fontSize = 36.sp)
+                            Icon(
+                                painter = painterResource(id = R.drawable.ic_home_tv),
+                                contentDescription = null,
+                                tint = Color.White,
+                                modifier = Modifier.size(34.dp)
+                            )
                         }
                         Spacer(modifier = Modifier.height(20.dp))
                         Text(
@@ -391,7 +466,10 @@ fun ChannelBrowserScreen(
                     itemsIndexed(filteredChannels) { index, channel ->
                         ChannelGridCard(
                             channel = channel,
+                            channelNumber = channelNumbers[channel.id] ?: (index + 1),
                             isExplicitlyFocused = focusSection == 2 && focusedChannelIndex == index,
+                            isCurrent = channel.id == selectedChannel?.id,
+                            showCategory = showCategoryFilter,
                             onClick = { onChannelSelected(channel.id) }
                         )
                     }
@@ -414,8 +492,8 @@ fun CategoryChip(
     val bgColor by animateColorAsState(
         targetValue = when {
             isSelected -> accentColor
-            isFocused -> Color(0xFF7DD3FC).copy(alpha = 0.30f)
-            else -> Color(0xFF1E293B)
+            isFocused -> Color(0xFFFFE9A6).copy(alpha = 0.24f)
+            else -> Color.Black.copy(alpha = 0.34f)
         },
         animationSpec = tween(200),
         label = "chip_bg"
@@ -424,7 +502,7 @@ fun CategoryChip(
         targetValue = when {
             isSelected -> accentColor
             isFocused -> Color.White
-            else -> Color(0xFF334155)
+            else -> Color.White.copy(alpha = 0.18f)
         },
         animationSpec = tween(200),
         label = "chip_border"
@@ -448,7 +526,7 @@ fun CategoryChip(
     ) {
         Text(
             text = label,
-            color = if (isSelected || isFocused) Color.White else Color(0xFF94A3B8),
+            color = if (isSelected) Color.Black else if (isFocused) Color.White else Color.White.copy(alpha = 0.66f),
             fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
             fontSize = 12.sp
         )
@@ -458,7 +536,10 @@ fun CategoryChip(
 @Composable
 fun ChannelGridCard(
     channel: ChannelEntity,
+    channelNumber: Int,
     isExplicitlyFocused: Boolean = false,
+    isCurrent: Boolean = false,
+    showCategory: Boolean = true,
     onClick: () -> Unit
 ) {
     var hasRealFocus by remember { mutableStateOf(false) }
@@ -469,12 +550,16 @@ fun ChannelGridCard(
         label = "card_scale"
     )
     val borderColor by animateColorAsState(
-        targetValue = if (isFocused) Color.White else Color(0xFF334155),
+        targetValue = if (isFocused) Color.White else Color.White.copy(alpha = 0.16f),
         animationSpec = tween(200),
         label = "card_border"
     )
     val bgColor by animateColorAsState(
-        targetValue = if (isFocused) Color(0xFF7DD3FC).copy(alpha = 0.18f) else Color(0xFF0F172A).copy(alpha = 0.9f),
+        targetValue = when {
+            isFocused -> Color(0xFFFFE9A6).copy(alpha = 0.16f)
+            isCurrent -> Color(0xFF7DD3FC).copy(alpha = 0.14f)
+            else -> Color.Black.copy(alpha = 0.36f)
+        },
         animationSpec = tween(200),
         label = "card_bg"
     )
@@ -498,7 +583,7 @@ fun ChannelGridCard(
         shape = RoundedCornerShape(14.dp),
         border = BorderStroke(
             width = if (isFocused) 3.dp else 1.dp,
-            color = borderColor
+            color = if (isCurrent && !isFocused) Color(0xFFFFE9A6).copy(alpha = 0.28f) else borderColor
         )
     ) {
         Column(
@@ -508,6 +593,25 @@ fun ChannelGridCard(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center
         ) {
+            Box(
+                modifier = Modifier
+                    .align(Alignment.End)
+                    .clip(RoundedCornerShape(999.dp))
+                    .background(Color.Black.copy(alpha = 0.34f))
+                    .border(1.dp, Color.White.copy(alpha = 0.14f), RoundedCornerShape(999.dp))
+                    .padding(horizontal = 8.dp, vertical = 3.dp)
+            ) {
+                Text(
+                    text = channelNumber.toString().padStart(2, '0'),
+                    color = Color(0xFFFFE9A6),
+                    fontSize = 10.sp,
+                    fontWeight = FontWeight.ExtraBold,
+                    maxLines = 1
+                )
+            }
+
+            Spacer(modifier = Modifier.height(2.dp))
+
             // Channel Logo
             if (!channel.logo.isNullOrEmpty()) {
                 Card(
@@ -532,12 +636,12 @@ fun ChannelGridCard(
                         .background(
                             Brush.linearGradient(
                                 colors = listOf(
-                                    Color(0xFF6366F1).copy(alpha = 0.3f),
-                                    Color(0xFF8B5CF6).copy(alpha = 0.3f)
+                                    Color(0xFFFFE9A6).copy(alpha = 0.24f),
+                                    Color(0xFF7DD3FC).copy(alpha = 0.18f)
                                 )
                             )
                         )
-                        .border(1.dp, Color(0xFF6366F1).copy(alpha = 0.4f), RoundedCornerShape(10.dp)),
+                        .border(1.dp, Color.White.copy(alpha = 0.22f), RoundedCornerShape(10.dp)),
                     contentAlignment = Alignment.Center
                 ) {
                     Text(
@@ -563,23 +667,43 @@ fun ChannelGridCard(
                 lineHeight = 16.sp
             )
 
-            Spacer(modifier = Modifier.height(4.dp))
+            if (showCategory) {
+                Spacer(modifier = Modifier.height(4.dp))
 
-            // Category Badge
-            Box(
-                modifier = Modifier
-                    .clip(RoundedCornerShape(6.dp))
-                    .background(Color(0xFF6366F1).copy(alpha = 0.12f))
-                    .padding(horizontal = 8.dp, vertical = 3.dp)
-            ) {
-                Text(
-                    text = channel.groupName,
-                    color = Color(0xFF818CF8),
-                    fontSize = 9.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
+                // Category Badge
+                Box(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(6.dp))
+                        .background(Color(0xFFFFE9A6).copy(alpha = 0.11f))
+                        .padding(horizontal = 8.dp, vertical = 3.dp)
+                ) {
+                    Text(
+                        text = channel.groupName,
+                        color = Color(0xFFFFE9A6),
+                        fontSize = 9.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+            }
+
+            if (isCurrent) {
+                Spacer(modifier = Modifier.height(5.dp))
+                Box(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(999.dp))
+                        .background(Color(0xFFFFE9A6).copy(alpha = 0.14f))
+                        .padding(horizontal = 8.dp, vertical = 3.dp)
+                ) {
+                    Text(
+                        text = "SEDANG DIPUTAR",
+                        color = Color(0xFFFFE9A6),
+                        fontSize = 8.sp,
+                        fontWeight = FontWeight.ExtraBold,
+                        maxLines = 1
+                    )
+                }
             }
         }
     }

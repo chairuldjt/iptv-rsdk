@@ -1,8 +1,12 @@
 package com.example.rsdkiptvplayer.ui.home
 
+import android.media.AudioAttributes
+import android.media.SoundPool
 import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.Crossfade
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.ui.draw.alpha
 import androidx.compose.foundation.Image
@@ -23,6 +27,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.zIndex
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
@@ -83,6 +88,7 @@ fun HomeScreen(
     var currentVersionName by remember { mutableStateOf("") }
     var currentVersionCode by remember { mutableIntStateOf(0) }
     var showInfoDialog by remember { mutableStateOf(false) }
+    var selectedHomeBackground by remember { mutableIntStateOf(R.drawable.home_bg_tv) }
 
     LaunchedEffect(Unit) {
         resolvedDeviceId = dataStoreManager.getDeviceId()
@@ -103,12 +109,18 @@ fun HomeScreen(
     }
 
     Box(modifier = Modifier.fillMaxSize()) {
-        Image(
-            painter = painterResource(id = R.drawable.kariadi_home_bg),
-            contentDescription = "RSUP Dr. Kariadi",
-            modifier = Modifier.fillMaxSize(),
-            contentScale = ContentScale.Crop
-        )
+        Crossfade(
+            targetState = selectedHomeBackground,
+            animationSpec = tween(durationMillis = 520),
+            label = "home_selection_background"
+        ) { backgroundRes ->
+            Image(
+                painter = painterResource(id = backgroundRes),
+                contentDescription = "Hospitality menu background",
+                modifier = Modifier.fillMaxSize(),
+                contentScale = ContentScale.Crop
+            )
+        }
 
         Box(
             modifier = Modifier
@@ -177,7 +189,10 @@ fun HomeScreen(
                         Toast.makeText(context, "YouTube belum tersedia.", Toast.LENGTH_SHORT).show()
                     },
                     onSettingsClick = { onNavigateToSettings(0) },
-                    onInfoClick = { showInfoDialog = true }
+                    onInfoClick = { showInfoDialog = true },
+                    onSelectionChanged = { item ->
+                        selectedHomeBackground = item.backgroundRes
+                    }
                 )
         }
 
@@ -218,18 +233,11 @@ private fun HospitalityHeader(
                 fontWeight = FontWeight.Bold
             )
             Text(
-                text = "RSUP Dr. Kariadi Semarang",
+                text = "Premium IPTV Hospitality",
                 color = Color(0xFFE7D8A0),
                 fontSize = if (isSmallScreen) 9.sp else 12.sp,
                 fontWeight = FontWeight.SemiBold
             )
-            Spacer(modifier = Modifier.height(if (isSmallScreen) 3.dp else 6.dp))
-            InfoChip("IP $ipAddress", isSmallScreen)
-            InfoChip("${channelCount} saluran", isSmallScreen)
-            InfoChip("ID ${deviceId.takeLast(12)}", isSmallScreen)
-            if (version.isNotBlank()) {
-                InfoChip("Ver $version", isSmallScreen)
-            }
         }
 
         if (!isSmallScreen) {
@@ -238,22 +246,22 @@ private fun HospitalityHeader(
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
                 Image(
-                    painter = painterResource(id = R.drawable.ic_kariadi_hospitality_logo),
-                    contentDescription = "Kariadi IPTV",
+                    painter = painterResource(id = R.drawable.ic_global_iptv),
+                    contentDescription = "Hospitality IPTV",
                     modifier = Modifier
                         .size(72.dp)
                         .shadow(12.dp, RoundedCornerShape(16.dp))
                 )
                 Spacer(modifier = Modifier.height(8.dp))
                 Text(
-                    text = "RSUP Dr. Kariadi",
+                    text = "Hospitality IPTV",
                     color = Color(0xFFFFE9A6),
                     fontSize = 22.sp,
                     fontWeight = FontWeight.ExtraBold,
                     letterSpacing = 0.5.sp
                 )
                 Text(
-                    text = "Rujukan Nasional • Kelas A • Pendidikan",
+                    text = "Live TV • Education • Guest Services",
                     color = Color.White.copy(alpha = 0.88f),
                     fontSize = 11.sp,
                     fontWeight = FontWeight.SemiBold,
@@ -315,17 +323,32 @@ private fun HospitalityMenuBar(
     onServiceClick: () -> Unit,
     onYoutubeClick: () -> Unit,
     onSettingsClick: () -> Unit,
-    onInfoClick: () -> Unit
+    onInfoClick: () -> Unit,
+    onSelectionChanged: (HospitalityCarouselItem) -> Unit
 ) {
+    val context = LocalContext.current
     val configuration = androidx.compose.ui.platform.LocalConfiguration.current
     val isSmallScreen = configuration.screenWidthDp < 760 || configuration.screenHeightDp < 500
 
     var selectedIndex by remember { mutableIntStateOf(2) }
     var dragAmount by remember { mutableFloatStateOf(0f) }
+    var hasPlayedSelectionSound by remember { mutableStateOf(false) }
     val carouselFocusRequester = remember { FocusRequester() }
+    val soundPool = remember {
+        SoundPool.Builder()
+            .setMaxStreams(2)
+            .setAudioAttributes(
+                AudioAttributes.Builder()
+                    .setUsage(AudioAttributes.USAGE_ASSISTANCE_SONIFICATION)
+                    .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
+                    .build()
+            )
+            .build()
+    }
+    var selectionSoundId by remember { mutableIntStateOf(0) }
     val menuItems = listOf(
         HospitalityCarouselItem(
-            icon = "EDU",
+            iconRes = R.drawable.ic_home_education,
             title = "EDUKASI",
             subtitle = when {
                 educationPath == null -> "Memuat..."
@@ -333,47 +356,71 @@ private fun HospitalityMenuBar(
                 else -> "Video RS"
             },
             accent = Color(0xFF86EFAC),
+            backgroundRes = R.drawable.home_bg_education,
             action = onEducationClick
         ),
         HospitalityCarouselItem(
-            icon = "✚",
+            iconRes = R.drawable.ic_home_services,
             title = "LAYANAN",
             subtitle = "Informasi RS",
             accent = Color(0xFFE7D8A0),
+            backgroundRes = R.drawable.home_bg_services,
             action = onServiceClick
         ),
         HospitalityCarouselItem(
-            icon = "TV",
+            iconRes = R.drawable.ic_home_tv,
             title = "TV CHANNEL",
             subtitle = "$channelsCount saluran",
             accent = Color(0xFFFFE9A6),
+            backgroundRes = R.drawable.home_bg_tv,
             action = onTvClick
         ),
         HospitalityCarouselItem(
-            icon = "YT",
-            title = "YOUTUBE",
-            subtitle = "Dikunci",
-            accent = Color(0xFFFF4444),
+            iconRes = R.drawable.ic_home_media,
+            title = "MEDIA",
+            subtitle = "YouTube",
+            accent = Color(0xFFFF9A76),
+            backgroundRes = R.drawable.home_bg_youtube,
             action = onYoutubeClick
         ),
         HospitalityCarouselItem(
-            icon = "ℹ",
+            iconRes = R.drawable.ic_home_info,
             title = "INFO APLIKASI",
             subtitle = "Cek Pembaruan",
             accent = Color(0xFFC084FC),
+            backgroundRes = R.drawable.home_bg_info,
             action = onInfoClick
         ),
         HospitalityCarouselItem(
-            icon = "⚙",
+            iconRes = R.drawable.ic_home_settings,
             title = "SETTING",
             subtitle = "Sistem",
             accent = Color(0xFF7DD3FC),
+            backgroundRes = R.drawable.home_bg_settings,
             action = onSettingsClick
         )
     )
 
+    DisposableEffect(Unit) {
+        selectionSoundId = soundPool.load(context, R.raw.home_selection_chime, 1)
+        onDispose {
+            soundPool.release()
+        }
+    }
+
     LaunchedEffect(Unit) {
         carouselFocusRequester.requestFocus()
+    }
+
+    LaunchedEffect(selectedIndex, selectionSoundId) {
+        onSelectionChanged(menuItems[selectedIndex])
+        if (!hasPlayedSelectionSound) {
+            hasPlayedSelectionSound = true
+            return@LaunchedEffect
+        }
+        if (selectionSoundId != 0) {
+            soundPool.play(selectionSoundId, 0.38f, 0.42f, 1, 0, 1.0f)
+        }
     }
 
     fun moveSelection(delta: Int) {
@@ -435,6 +482,25 @@ private fun HospitalityMenuBar(
                 ),
             contentAlignment = Alignment.Center
         ) {
+            CarouselTouchButton(
+                direction = -1,
+                isSmallScreen = isSmallScreen,
+                accent = menuItems[selectedIndex].accent,
+                onClick = { moveSelection(-1) },
+                modifier = Modifier
+                    .align(Alignment.CenterStart)
+                    .zIndex(4f)
+            )
+            CarouselTouchButton(
+                direction = 1,
+                isSmallScreen = isSmallScreen,
+                accent = menuItems[selectedIndex].accent,
+                onClick = { moveSelection(1) },
+                modifier = Modifier
+                    .align(Alignment.CenterEnd)
+                    .zIndex(4f)
+            )
+
             val offsets = if (isSmallScreen) listOf(-1, 0, 1) else listOf(-2, -1, 0, 1, 2)
             Row(
                 horizontalArrangement = Arrangement.spacedBy(
@@ -464,7 +530,12 @@ private fun HospitalityMenuBar(
             }
         }
 
-        Spacer(modifier = Modifier.height(0.dp))
+        Spacer(modifier = Modifier.height(if (isSmallScreen) 4.dp else 8.dp))
+        SelectedMenuLabel(
+            item = menuItems[selectedIndex],
+            isSmallScreen = isSmallScreen
+        )
+        Spacer(modifier = Modifier.height(if (isSmallScreen) 8.dp else 12.dp))
         Row(
             horizontalArrangement = Arrangement.spacedBy(7.dp),
             verticalAlignment = Alignment.CenterVertically
@@ -493,15 +564,103 @@ private fun HospitalityMenuBar(
 }
 
 private data class HospitalityCarouselItem(
-    val icon: String,
+    val iconRes: Int,
     val title: String,
     val subtitle: String,
     val accent: Color,
+    val backgroundRes: Int,
     val action: () -> Unit
 )
 
 private fun wrapCarouselIndex(index: Int, size: Int): Int {
     return ((index % size) + size) % size
+}
+
+@Composable
+private fun SelectedMenuLabel(
+    item: HospitalityCarouselItem,
+    isSmallScreen: Boolean
+) {
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        modifier = Modifier
+            .clip(RoundedCornerShape(if (isSmallScreen) 10.dp else 14.dp))
+            .background(Color.Black.copy(alpha = 0.42f))
+            .border(
+                BorderStroke(1.dp, item.accent.copy(alpha = 0.34f)),
+                RoundedCornerShape(if (isSmallScreen) 10.dp else 14.dp)
+            )
+            .padding(
+                horizontal = if (isSmallScreen) 14.dp else 20.dp,
+                vertical = if (isSmallScreen) 4.dp else 7.dp
+            )
+    ) {
+        Text(
+            text = item.title,
+            color = item.accent,
+            fontSize = if (isSmallScreen) 12.sp else 17.sp,
+            fontWeight = FontWeight.ExtraBold,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            style = TextStyle(
+                shadow = Shadow(
+                    color = Color.Black.copy(alpha = 0.95f),
+                    offset = TextOffset(0f, 1.5f),
+                    blurRadius = 6f
+                )
+            )
+        )
+        Text(
+            text = item.subtitle,
+            color = Color.White.copy(alpha = 0.84f),
+            fontSize = if (isSmallScreen) 8.sp else 10.sp,
+            fontWeight = FontWeight.SemiBold,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            style = TextStyle(
+                shadow = Shadow(
+                    color = Color.Black.copy(alpha = 0.88f),
+                    offset = TextOffset(0f, 1.2f),
+                    blurRadius = 4f
+                )
+            )
+        )
+    }
+}
+
+@Composable
+private fun CarouselTouchButton(
+    direction: Int,
+    isSmallScreen: Boolean,
+    accent: Color,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val size = if (isSmallScreen) 42.dp else 54.dp
+    Box(
+        modifier = modifier
+            .size(size)
+            .clip(CircleShape)
+            .background(Color.Black.copy(alpha = 0.34f))
+            .border(1.dp, accent.copy(alpha = 0.42f), CircleShape)
+            .clickable(onClick = onClick),
+        contentAlignment = Alignment.Center
+    ) {
+        Text(
+            text = if (direction < 0) "‹" else "›",
+            color = Color.White,
+            fontSize = if (isSmallScreen) 30.sp else 40.sp,
+            fontWeight = FontWeight.Light,
+            lineHeight = if (isSmallScreen) 30.sp else 40.sp,
+            style = TextStyle(
+                shadow = Shadow(
+                    color = accent.copy(alpha = 0.75f),
+                    offset = TextOffset(0f, 0f),
+                    blurRadius = 12f
+                )
+            )
+        )
+    }
 }
 
 @Composable
@@ -515,15 +674,19 @@ private fun HospitalityCarouselCard(
     val distance = abs(offset)
     val scale by animateFloatAsState(
         targetValue = when (distance) {
-            0 -> 1.12f
-            1 -> 0.88f
-            else -> 0.72f
+            0 -> 1.22f
+            1 -> 0.90f
+            else -> 0.66f
         },
         label = "hospitality_carousel_scale"
     )
+    val glowAlpha by animateFloatAsState(
+        targetValue = if (isActive) 0.84f else 0.18f,
+        label = "hospitality_carousel_glow_alpha"
+    )
     val cardWidth by animateDpAsState(
         targetValue = when (distance) {
-            0 -> if (isSmallScreen) 120.dp else 150.dp
+            0 -> if (isSmallScreen) 126.dp else 164.dp
             1 -> if (isSmallScreen) 92.dp else 112.dp
             else -> if (isSmallScreen) 68.dp else 82.dp
         },
@@ -531,14 +694,14 @@ private fun HospitalityCarouselCard(
     )
     val iconBoxSize by animateDpAsState(
         targetValue = when (distance) {
-            0 -> if (isSmallScreen) 80.dp else 102.dp
+            0 -> if (isSmallScreen) 88.dp else 116.dp
             1 -> if (isSmallScreen) 56.dp else 72.dp
             else -> if (isSmallScreen) 40.dp else 50.dp
         },
         label = "hospitality_carousel_box_size"
     )
     val offsetY by animateDpAsState(
-        targetValue = if (isActive) (if (isSmallScreen) (-10).dp else (-18).dp) else (if (isSmallScreen) 10.dp else 14.dp),
+        targetValue = if (isActive) (if (isSmallScreen) (-16).dp else (-28).dp) else (if (isSmallScreen) 10.dp else 16.dp),
         label = "hospitality_carousel_offset_y"
     )
     val borderWidth by animateDpAsState(
@@ -565,11 +728,6 @@ private fun HospitalityCarouselCard(
         label = "hospitality_carousel_content_alpha"
     )
 
-    val iconSize = when (distance) {
-        0 -> if (isSmallScreen) 24.sp else 32.sp
-        1 -> if (isSmallScreen) 18.sp else 22.sp
-        else -> if (isSmallScreen) 12.sp else 16.sp
-    }
     val interactionSource = remember { MutableInteractionSource() }
 
     Column(
@@ -577,6 +735,7 @@ private fun HospitalityCarouselCard(
             .width(cardWidth)
             .offset(y = offsetY)
             .scale(scale)
+            .zIndex(if (isActive) 3f else 1f / (distance + 1))
             .clickable(
                 interactionSource = interactionSource,
                 indication = null
@@ -587,12 +746,12 @@ private fun HospitalityCarouselCard(
             if (isActive) {
                 Box(
                     modifier = Modifier
-                        .size(iconBoxSize + (if (isSmallScreen) 28.dp else 44.dp))
+                        .size(iconBoxSize + (if (isSmallScreen) 54.dp else 78.dp))
                         .background(
                             Brush.radialGradient(
                                 colors = listOf(
-                                    item.accent.copy(alpha = 0.54f),
-                                    item.accent.copy(alpha = 0.16f),
+                                    item.accent.copy(alpha = glowAlpha),
+                                    item.accent.copy(alpha = 0.26f),
                                     Color.Transparent
                                 )
                             )
@@ -605,21 +764,12 @@ private fun HospitalityCarouselCard(
                     .size(iconBoxSize)
                     .clip(cardShape)
                     .background(
-                        if (isActive) {
-                            Brush.verticalGradient(
-                                listOf(
-                                    item.accent.copy(alpha = 0.34f),
-                                    Color.Black.copy(alpha = 0.56f)
-                                )
+                        Brush.verticalGradient(
+                            listOf(
+                                item.accent.copy(alpha = if (isActive) 0.42f else 0.12f),
+                                Color.Black.copy(alpha = if (isActive) 0.64f else 0.34f)
                             )
-                        } else {
-                            Brush.verticalGradient(
-                                listOf(
-                                    Color.Black.copy(alpha = 0.20f),
-                                    Color.Black.copy(alpha = 0.30f)
-                                )
-                            )
-                        }
+                        )
                     )
                     .border(
                         BorderStroke(
@@ -636,31 +786,36 @@ private fun HospitalityCarouselCard(
                     ),
                 contentAlignment = Alignment.Center
             ) {
-                Text(
-                    text = item.icon,
-                    color = Color.White.copy(alpha = if (isActive) 1f else 0.72f),
-                    fontSize = when {
-                        item.icon.length >= 3 -> when (distance) { 
-                            0 -> if (isSmallScreen) 14.sp else 20.sp
-                            1 -> if (isSmallScreen) 10.sp else 14.sp
-                            else -> if (isSmallScreen) 8.sp else 10.sp 
-                        }
-                        item.icon.length == 2 -> when (distance) { 
-                            0 -> if (isSmallScreen) 20.sp else 26.sp
-                            1 -> if (isSmallScreen) 14.sp else 18.sp
-                            else -> if (isSmallScreen) 10.sp else 13.sp 
-                        }
-                        else -> iconSize
-                    },
-                    letterSpacing = if (item.icon.length >= 2) (-0.5).sp else 0.sp,
-                    fontWeight = FontWeight.ExtraBold,
-                    textAlign = TextAlign.Center,
-                    style = TextStyle(
-                        shadow = Shadow(
-                            color = Color.Black.copy(alpha = 0.85f),
-                            offset = TextOffset(0f, 2f),
-                            blurRadius = 6f
+                Image(
+                    painter = painterResource(id = item.backgroundRes),
+                    contentDescription = null,
+                    modifier = Modifier
+                        .matchParentSize()
+                        .alpha(if (isActive) 0.42f else 0.18f),
+                    contentScale = ContentScale.Crop
+                )
+                Box(
+                    modifier = Modifier
+                        .matchParentSize()
+                        .background(
+                            Brush.verticalGradient(
+                                listOf(
+                                    Color.White.copy(alpha = if (isActive) 0.14f else 0.05f),
+                                    Color.Black.copy(alpha = if (isActive) 0.46f else 0.58f)
+                                )
+                            )
                         )
+                )
+                Icon(
+                    painter = painterResource(id = item.iconRes),
+                    contentDescription = item.title,
+                    tint = Color.White.copy(alpha = if (isActive) 1f else 0.76f),
+                    modifier = Modifier.size(
+                        when (distance) {
+                            0 -> if (isSmallScreen) 34.dp else 48.dp
+                            1 -> if (isSmallScreen) 24.dp else 32.dp
+                            else -> if (isSmallScreen) 18.dp else 24.dp
+                        }
                     )
                 )
             }
@@ -671,10 +826,11 @@ private fun HospitalityCarouselCard(
         )
         Spacer(modifier = Modifier.height(textSpacerHeight))
         
-        Column(
-            horizontalAlignment = Alignment.CenterHorizontally,
-            modifier = Modifier.alpha(contentAlpha)
-        ) {
+        if (!isActive) {
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                modifier = Modifier.alpha(contentAlpha)
+            ) {
             val titleBgAlpha by animateFloatAsState(
                 targetValue = if (isActive) 0.58f else 0.20f,
                 label = "hospitality_carousel_title_bg_alpha"
@@ -740,6 +896,7 @@ private fun HospitalityCarouselCard(
                     )
                 )
             )
+            }
         }
     }
 }
@@ -988,11 +1145,11 @@ private fun InfoAplikasiDialog(
         contentAlignment = Alignment.Center
     ) {
         Card(
-            colors = CardDefaults.cardColors(containerColor = Color(0xF20B1725)),
-            border = BorderStroke(1.dp, Color(0xFFC084FC).copy(alpha = 0.35f)),
-            shape = RoundedCornerShape(20.dp),
+            colors = CardDefaults.cardColors(containerColor = Color(0xF207111D)),
+            border = BorderStroke(1.dp, Color(0xFFFFE9A6).copy(alpha = 0.30f)),
+            shape = RoundedCornerShape(24.dp),
             modifier = Modifier
-                .width(if (isSmallScreen) 400.dp else 460.dp)
+                .width(if (isSmallScreen) 400.dp else 500.dp)
                 .padding(if (isSmallScreen) 8.dp else 16.dp)
         ) {
             Column(
@@ -1005,22 +1162,22 @@ private fun InfoAplikasiDialog(
                 Box(
                     modifier = Modifier
                         .size(if (isSmallScreen) 44.dp else 58.dp)
-                        .clip(CircleShape)
-                        .background(Color(0xFFC084FC).copy(alpha = 0.16f))
-                        .border(1.dp, Color(0xFFC084FC).copy(alpha = 0.45f), CircleShape),
+                        .clip(RoundedCornerShape(if (isSmallScreen) 14.dp else 18.dp))
+                        .background(Color(0xFFFFE9A6).copy(alpha = 0.13f))
+                        .border(1.dp, Color(0xFFFFE9A6).copy(alpha = 0.40f), RoundedCornerShape(if (isSmallScreen) 14.dp else 18.dp)),
                     contentAlignment = Alignment.Center
                 ) {
-                    Text(
-                        text = "ℹ",
-                        fontSize = if (isSmallScreen) 18.sp else 24.sp,
-                        color = Color.White,
-                        fontWeight = FontWeight.Bold
+                    Icon(
+                        painter = painterResource(id = R.drawable.ic_home_info),
+                        contentDescription = null,
+                        tint = Color.White,
+                        modifier = Modifier.size(if (isSmallScreen) 22.dp else 30.dp)
                     )
                 }
                 
                 Spacer(modifier = Modifier.height(if (isSmallScreen) 10.dp else 16.dp))
                 Text(
-                    text = "Informasi & Pembaruan Aplikasi",
+                    text = "Informasi Aplikasi",
                     fontSize = if (isSmallScreen) 15.sp else 18.sp,
                     fontWeight = FontWeight.Bold,
                     color = Color.White
@@ -1031,8 +1188,8 @@ private fun InfoAplikasiDialog(
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .background(Color.Black.copy(alpha = 0.25f), RoundedCornerShape(12.dp))
-                        .border(1.dp, Color.White.copy(alpha = 0.08f), RoundedCornerShape(12.dp))
+                        .background(Color.Black.copy(alpha = 0.32f), RoundedCornerShape(14.dp))
+                        .border(1.dp, Color.White.copy(alpha = 0.10f), RoundedCornerShape(14.dp))
                         .padding(if (isSmallScreen) 10.dp else 14.dp),
                     verticalArrangement = Arrangement.spacedBy(if (isSmallScreen) 6.dp else 8.dp)
                 ) {
@@ -1048,7 +1205,7 @@ private fun InfoAplikasiDialog(
                 if (checkingState == "checking") {
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
                         CircularProgressIndicator(
-                            color = Color(0xFFC084FC),
+                            color = Color(0xFFFFE9A6),
                             strokeWidth = 2.dp,
                             modifier = Modifier.size(24.dp)
                         )
@@ -1098,7 +1255,7 @@ private fun InfoAplikasiDialog(
                             ) {
                                 LinearProgressIndicator(
                                     progress = { downloadProgress },
-                                    color = Color(0xFFC084FC),
+                                    color = Color(0xFFFFE9A6),
                                     trackColor = Color.White.copy(alpha = 0.15f),
                                     modifier = Modifier
                                         .fillMaxWidth()
@@ -1221,8 +1378,8 @@ private fun InfoDialogButton(
 ) {
     var isFocused by remember { mutableStateOf(false) }
     val background = when {
-        primary -> Color(0xFFC084FC)
-        isFocused -> Color(0xFF6366F1)
+        primary -> Color(0xFFFFE9A6)
+        isFocused -> Color(0xFF7DD3FC).copy(alpha = 0.24f)
         else -> Color.Transparent
     }
     val textColor = if (primary && !isFocused) Color.Black else Color.White
