@@ -42,6 +42,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
@@ -293,12 +294,26 @@ private fun ExitDialogButton(
     onClick: () -> Unit
 ) {
     var isFocused by remember { mutableStateOf(false) }
+    
+    // Focused state uses Cyan, primary defaults to Yellow, others transparent
     val background = when {
+        isFocused -> Color(0xFF2EE6C6)
         primary -> Color(0xFFFFE9A6)
-        isFocused -> Color(0xFF7DD3FC).copy(alpha = 0.24f)
         else -> Color.Transparent
     }
-    val textColor = if (primary && !isFocused) Color.Black else Color.White
+    
+    // Focused state and primary use Black text for high readability, others use White
+    val textColor = when {
+        isFocused -> Color.Black
+        primary -> Color.Black
+        else -> Color.White
+    }
+    
+    val borderStroke = if (isFocused) {
+        BorderStroke(3.dp, Color(0xFF2EE6C6))
+    } else {
+        BorderStroke(1.dp, Color.White.copy(alpha = 0.22f))
+    }
 
     Box(
         modifier = modifier
@@ -316,15 +331,15 @@ private fun ExitDialogButton(
             }
             .focusable()
             .scale(if (isFocused) 1.03f else 1f)
+            .shadow(
+                elevation = if (isFocused) 16.dp else 0.dp,
+                shape = RoundedCornerShape(10.dp),
+                ambientColor = Color(0xFF2EE6C6).copy(alpha = if (isFocused) 0.8f else 0f),
+                spotColor = Color(0xFF2EE6C6).copy(alpha = if (isFocused) 0.8f else 0f)
+            )
             .clip(RoundedCornerShape(10.dp))
             .background(background)
-            .border(
-                BorderStroke(
-                    if (isFocused) 4.dp else 1.dp,
-                    if (isFocused) Color.White else Color.White.copy(alpha = 0.22f)
-                ),
-                RoundedCornerShape(10.dp)
-            )
+            .border(borderStroke, RoundedCornerShape(10.dp))
             .clickable(onClick = onClick),
         contentAlignment = Alignment.Center
     ) {
