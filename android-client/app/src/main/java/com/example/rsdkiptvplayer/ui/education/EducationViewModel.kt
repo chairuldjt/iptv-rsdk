@@ -63,6 +63,12 @@ class EducationViewModel(application: Application) : AndroidViewModel(applicatio
     private val _password = MutableStateFlow("")
     private val _domain = MutableStateFlow("")
 
+    private val _educationSource = MutableStateFlow("smb")
+    val educationSource: StateFlow<String> = _educationSource.asStateFlow()
+
+    private val _educationPlaybackMode = MutableStateFlow("copy")
+    val educationPlaybackMode: StateFlow<String> = _educationPlaybackMode.asStateFlow()
+
     private val _videoCount = MutableStateFlow(0)
     val videoCount: StateFlow<Int> = _videoCount.asStateFlow()
 
@@ -97,6 +103,18 @@ class EducationViewModel(application: Application) : AndroidViewModel(applicatio
         viewModelScope.launch {
             dataStoreManager.educationSmbDomainFlow.collectLatest { domain ->
                 _domain.value = domain
+            }
+        }
+
+        viewModelScope.launch {
+            dataStoreManager.educationSourceFlow.collectLatest { source ->
+                _educationSource.value = source
+            }
+        }
+
+        viewModelScope.launch {
+            dataStoreManager.educationPlaybackModeFlow.collectLatest { mode ->
+                _educationPlaybackMode.value = mode
             }
         }
 

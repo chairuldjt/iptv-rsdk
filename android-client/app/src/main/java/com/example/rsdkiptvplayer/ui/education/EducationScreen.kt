@@ -31,6 +31,8 @@ fun EducationScreen(
     viewModel: EducationViewModel = viewModel()
 ) {
     val folderPath by viewModel.folderPath.collectAsState()
+    val educationSource by viewModel.educationSource.collectAsState()
+    val educationPlaybackMode by viewModel.educationPlaybackMode.collectAsState()
     val videoCount by viewModel.videoCount.collectAsState()
     val currentTitle by viewModel.currentTitle.collectAsState()
     val isLoading by viewModel.isLoading.collectAsState()
@@ -38,7 +40,7 @@ fun EducationScreen(
     val syncState by com.example.rsdkiptvplayer.util.EducationSyncManager.syncState.collectAsState()
     val settingsFocusRequester = remember { FocusRequester() }
 
-    LaunchedEffect(folderPath) {
+    LaunchedEffect(folderPath, educationSource, educationPlaybackMode) {
         viewModel.loadAndPlay()
     }
 
@@ -160,7 +162,7 @@ fun EducationScreen(
                         )
                         Spacer(modifier = Modifier.height(8.dp))
                         Text(
-                            text = buildEducationErrorDetail(folderPath, syncState),
+                            text = buildEducationErrorDetail(educationSource, folderPath, syncState),
                             color = Color(0xFF94A3B8),
                             fontSize = 12.sp,
                             textAlign = TextAlign.Center
@@ -174,7 +176,10 @@ fun EducationScreen(
                                     .focusRequester(settingsFocusRequester)
                                     .focusable()
                             ) {
-                                Text("Set Path Edukasi", fontWeight = FontWeight.Bold)
+                                Text(
+                                    if (educationSource == "web") "Cek Repository" else "Set Path Edukasi",
+                                    fontWeight = FontWeight.Bold
+                                )
                             }
                             OutlinedButton(
                                 onClick = onBack,
@@ -265,12 +270,17 @@ private fun SyncStatusPanel(
 }
 
 private fun buildEducationErrorDetail(
+    source: String,
     folderPath: String,
     syncState: com.example.rsdkiptvplayer.util.EducationSyncManager.SyncState
 ): String {
     val syncDetail = (syncState as? com.example.rsdkiptvplayer.util.EducationSyncManager.SyncState.Error)?.detail
     if (!syncDetail.isNullOrBlank()) {
         return syncDetail
+    }
+
+    if (source == "web") {
+        return "Cek Video Repository di dashboard web, pastikan ada video aktif dan server URL STB sudah benar."
     }
 
     return if (folderPath.isEmpty()) {

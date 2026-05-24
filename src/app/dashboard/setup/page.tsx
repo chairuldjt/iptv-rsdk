@@ -13,6 +13,7 @@ import {
   setAppPublicOrigin,
   setOnDemandHlsRelayConfig,
 } from '@/lib/settings'
+import EducationSettingsFields from '@/components/EducationSettingsFields'
 
 export const revalidate = 0
 
@@ -364,67 +365,14 @@ export default async function SetupPage({
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-              <Field label="Sumber Video Edukasi">
-                <select
-                  name="educationSource"
-                  defaultValue={config.educationSource}
-                  className="w-full px-4 py-2 bg-slate-900 border border-slate-800 rounded-xl text-white text-sm focus:outline-none focus:border-primary"
-                >
-                  <option value="smb">SMB / Windows Share (Lokal)</option>
-                  <option value="web">Web Repository (Terpusat)</option>
-                </select>
-              </Field>
-
-              <Field label="Mode Playback Edukasi">
-                <select
-                  name="educationPlaybackMode"
-                  defaultValue={config.educationPlaybackMode}
-                  className="w-full px-4 py-2 bg-slate-900 border border-slate-800 rounded-xl text-white text-sm focus:outline-none focus:border-primary"
-                >
-                  <option value="copy">Salin ke Lokal (Unduh Dulu)</option>
-                  <option value="stream">Alirkan Langsung (Streaming)</option>
-                </select>
-              </Field>
-
-              <Field label="SMB Video Folder" wide>
-                <input
-                  type="text"
-                  name="educationVideoPath"
-                  defaultValue={config.educationVideoPath}
-                  placeholder="Contoh: \\10.45.128.129\edukasi"
-                  className="w-full px-4 py-2 bg-slate-900 border border-slate-800 rounded-xl text-white text-sm focus:outline-none focus:border-primary font-mono"
-                />
-              </Field>
-
-              <Field label="SMB Username">
-                <input
-                  type="text"
-                  name="educationSmbUsername"
-                  defaultValue={config.educationSmbUsername}
-                  placeholder="Guest jika kosong"
-                  className="w-full px-4 py-2 bg-slate-900 border border-slate-800 rounded-xl text-white text-sm focus:outline-none focus:border-primary"
-                />
-              </Field>
-
-              <Field label="SMB Domain">
-                <input
-                  type="text"
-                  name="educationSmbDomain"
-                  defaultValue={config.educationSmbDomain}
-                  placeholder="Opsional"
-                  className="w-full px-4 py-2 bg-slate-900 border border-slate-800 rounded-xl text-white text-sm focus:outline-none focus:border-primary"
-                />
-              </Field>
-
-              <Field label="SMB Password" wide>
-                <input
-                  type="password"
-                  name="educationSmbPassword"
-                  defaultValue={config.educationSmbPassword}
-                  placeholder="Kosongkan jika tanpa password"
-                  className="w-full px-4 py-2 bg-slate-900 border border-slate-800 rounded-xl text-white text-sm focus:outline-none focus:border-primary"
-                />
-              </Field>
+              <EducationSettingsFields
+                source={config.educationSource}
+                playbackMode={config.educationPlaybackMode}
+                videoPath={config.educationVideoPath}
+                username={config.educationSmbUsername}
+                password={config.educationSmbPassword}
+                domain={config.educationSmbDomain}
+              />
 
               <Field label="Repeat Mode">
                 <select

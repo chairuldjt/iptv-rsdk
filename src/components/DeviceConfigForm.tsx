@@ -4,6 +4,7 @@ import React, { useState } from 'react'
 import type { Device, DeviceConfig } from '@prisma/client'
 import ConfirmForm from './ConfirmForm'
 import { DEFAULT_CUSTOM_M3U_URL, DEFAULT_SYNC_MODE } from '@/lib/defaults'
+import EducationSettingsFields from './EducationSettingsFields'
 
 interface DeviceConfigFormProps {
   editingDevice: Device & { config: DeviceConfig | null }
@@ -107,7 +108,7 @@ export default function DeviceConfigForm({
           </div>
         </div>
 
-        {/* SMB Education Settings Block */}
+        {/* Education Settings Block */}
         <div className="pt-4 border-t border-border/60 space-y-4">
           <div className="flex items-center gap-2 text-indigo-400">
             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -117,72 +118,14 @@ export default function DeviceConfigForm({
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-1">Sumber Video Edukasi</label>
-              <select
-                name="educationSource"
-                defaultValue={editingDevice.config?.educationSource || 'smb'}
-                className="w-full px-4 py-2 bg-slate-900 border border-slate-800 rounded-xl text-white text-sm focus:outline-none focus:border-primary"
-              >
-                <option value="smb">SMB / Windows Share (Lokal)</option>
-                <option value="web">Web Repository (Terpusat)</option>
-              </select>
-            </div>
-
-            <div>
-              <label className="block text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-1">Mode Playback Edukasi</label>
-              <select
-                name="educationPlaybackMode"
-                defaultValue={editingDevice.config?.educationPlaybackMode || 'copy'}
-                className="w-full px-4 py-2 bg-slate-900 border border-slate-800 rounded-xl text-white text-sm focus:outline-none focus:border-primary"
-              >
-                <option value="copy">Salin ke Lokal (Unduh Dulu)</option>
-                <option value="stream">Alirkan Langsung (Streaming)</option>
-              </select>
-            </div>
-
-            <div className="md:col-span-2">
-              <label className="block text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-1">Jalur Folder Video (SMB Share)</label>
-              <input
-                type="text"
-                name="educationVideoPath"
-                defaultValue={editingDevice.config?.educationVideoPath || ''}
-                placeholder="Contoh: \\10.45.128.129\edukasi"
-                className="w-full px-4 py-2 bg-slate-900 border border-slate-800 rounded-xl text-white text-sm focus:outline-none focus:border-primary font-mono"
-              />
-            </div>
-
-            <div>
-              <label className="block text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-1">Username SMB</label>
-              <input
-                type="text"
-                name="educationSmbUsername"
-                defaultValue={editingDevice.config?.educationSmbUsername || ''}
-                placeholder="Guest jika kosong"
-                className="w-full px-4 py-2 bg-slate-900 border border-slate-800 rounded-xl text-white text-sm focus:outline-none focus:border-primary"
-              />
-            </div>
-            <div>
-              <label className="block text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-1">Domain SMB</label>
-              <input
-                type="text"
-                name="educationSmbDomain"
-                defaultValue={editingDevice.config?.educationSmbDomain || ''}
-                placeholder="Opsional"
-                className="w-full px-4 py-2 bg-slate-900 border border-slate-800 rounded-xl text-white text-sm focus:outline-none focus:border-primary"
-              />
-            </div>
-
-            <div className="md:col-span-2">
-              <label className="block text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-1">Password SMB</label>
-              <input
-                type="password"
-                name="educationSmbPassword"
-                defaultValue={editingDevice.config?.educationSmbPassword || ''}
-                placeholder="Kosongkan jika tanpa password"
-                className="w-full px-4 py-2 bg-slate-900 border border-slate-800 rounded-xl text-white text-sm focus:outline-none focus:border-primary"
-              />
-            </div>
+            <EducationSettingsFields
+              source={editingDevice.config?.educationSource || 'smb'}
+              playbackMode={editingDevice.config?.educationPlaybackMode || 'copy'}
+              videoPath={editingDevice.config?.educationVideoPath || ''}
+              username={editingDevice.config?.educationSmbUsername || ''}
+              password={editingDevice.config?.educationSmbPassword || ''}
+              domain={editingDevice.config?.educationSmbDomain || ''}
+            />
 
             <div>
               <label className="block text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-1">Mode Pengulangan Video</label>
@@ -264,7 +207,7 @@ export default function DeviceConfigForm({
             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 1121.21 8H18.5" />
             </svg>
-            Paksa Salin Ulang SMB ke STB
+            Paksa Sync Edukasi ke STB
           </button>
           <button
             type="submit"

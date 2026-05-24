@@ -81,6 +81,8 @@ fun HomeScreen(
     val channelsLoading by playerViewModel.isLoading.collectAsState()
     val serverUrl by dataStoreManager.serverUrlFlow.collectAsState(initial = "")
     val educationPath by dataStoreManager.educationVideoPathFlow.collectAsState(initial = null)
+    val educationSource by dataStoreManager.educationSourceFlow.collectAsState(initial = null)
+    val educationPlaybackMode by dataStoreManager.educationPlaybackModeFlow.collectAsState(initial = null)
 
     var resolvedDeviceId by remember { mutableStateOf("STB-RSDK-DEVICE") }
     var macAddress by remember { mutableStateOf("Tidak tersedia") }
@@ -178,12 +180,21 @@ fun HomeScreen(
                 channelsCount = channels.size,
                 serverUrl = serverUrl,
                 educationPath = educationPath,
+                educationSource = educationSource,
+                educationPlaybackMode = educationPlaybackMode,
                 onEducationClick = {
                     val currentEducationPath = educationPath
-                    if (currentEducationPath == null) {
+                    val currentEducationSource = educationSource
+                    if (currentEducationSource == null || currentEducationPath == null) {
                         Toast.makeText(context, "Memuat pengaturan edukasi...", Toast.LENGTH_SHORT).show()
+                    } else if (currentEducationSource == "web") {
+                        if (serverUrl.isBlank()) {
+                            Toast.makeText(context, "Server belum disetting.", Toast.LENGTH_SHORT).show()
+                        } else {
+                            onNavigateToEducation()
+                        }
                     } else if (currentEducationPath.isBlank()) {
-                        Toast.makeText(context, "Video edukasi belum disetting.", Toast.LENGTH_SHORT).show()
+                        Toast.makeText(context, "Path SMB edukasi belum disetting.", Toast.LENGTH_SHORT).show()
                     } else {
                         onNavigateToEducation()
                     }
@@ -332,6 +343,8 @@ private fun HospitalityMenuBar(
     channelsCount: Int,
     serverUrl: String,
     educationPath: String?,
+    educationSource: String?,
+    educationPlaybackMode: String?,
     onEducationClick: () -> Unit,
     onTvClick: () -> Unit,
     onServiceClick: () -> Unit,
@@ -366,8 +379,10 @@ private fun HospitalityMenuBar(
             iconRes = R.drawable.ic_home_education,
             title = "EDUKASI",
             subtitle = when {
+                educationSource == null -> "Memuat..."
+                educationSource == "web" -> if (educationPlaybackMode == "stream") "Web Streaming" else "Web Repository"
                 educationPath == null -> "Memuat..."
-                educationPath.isBlank() -> "Video Edukasi Pasien"
+                educationPath.isBlank() -> "SMB belum disetting"
                 else -> "Video RS"
             },
             accent = Color(0xFF86EFAC),
