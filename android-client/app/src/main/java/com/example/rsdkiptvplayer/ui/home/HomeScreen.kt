@@ -63,6 +63,11 @@ import android.widget.Toast
 import com.example.rsdkiptvplayer.util.UpdateManager
 import com.example.rsdkiptvplayer.data.api.RetrofitClient
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+import okhttp3.OkHttpClient
+import okhttp3.Request
+import org.json.JSONObject
 import java.net.URI
 
 @Composable
@@ -125,6 +130,74 @@ fun HomeScreen(
         }
     }
 
+    var weatherText by remember { mutableStateOf("Memuat cuaca...") }
+
+    LaunchedEffect(Unit) {
+        while (true) {
+            try {
+                withContext(Dispatchers.IO) {
+                    val client = OkHttpClient()
+                    var lat = -6.99
+                    var lon = 110.42
+                    var city = "Semarang"
+                    
+                    try {
+                        val locRequest = Request.Builder().url("https://freeipapi.com/api/json").build()
+                        client.newCall(locRequest).execute().use { response ->
+                            if (response.isSuccessful) {
+                                val bodyStr = response.body?.string()
+                                if (!bodyStr.isNullOrBlank()) {
+                                    val json = JSONObject(bodyStr)
+                                    lat = json.optDouble("latitude", -6.99)
+                                    lon = json.optDouble("longitude", 110.42)
+                                    city = json.optString("cityName", "Semarang")
+                                }
+                            }
+                        }
+                    } catch (e: Exception) {
+                        e.printStackTrace()
+                    }
+
+                    val weatherUrl = "https://api.open-meteo.com/v1/forecast?latitude=$lat&longitude=$lon&current=temperature_2m,weather_code"
+                    val weatherRequest = Request.Builder().url(weatherUrl).build()
+                    client.newCall(weatherRequest).execute().use { response ->
+                        if (response.isSuccessful) {
+                            val bodyStr = response.body?.string()
+                            if (!bodyStr.isNullOrBlank()) {
+                                val json = JSONObject(bodyStr)
+                                val current = json.getJSONObject("current")
+                                val temp = current.getDouble("temperature_2m")
+                                val weatherCode = current.getInt("weather_code")
+                                val (emoji, desc) = when (weatherCode) {
+                                    0 -> Pair("☀️", "Cerah")
+                                    1, 2 -> Pair("🌤️", "Cerah Berawan")
+                                    3 -> Pair("☁️", "Berawan")
+                                    45, 48 -> Pair("🌫️", "Kabut")
+                                    51, 53, 55 -> Pair("🌧️", "Gerimis")
+                                    61, 63, 65 -> Pair("🌧️", "Hujan")
+                                    80, 81, 82 -> Pair("🌦️", "Hujan Ringan")
+                                    95, 96, 99 -> Pair("⛈️", "Hujan Badai")
+                                    else -> Pair("🌤️", "Cerah Berawan")
+                                }
+                                withContext(Dispatchers.Main) {
+                                    weatherText = "$emoji $city • ${temp.toInt()}°C $desc"
+                                }
+                            }
+                        }
+                    }
+                }
+            } catch (e: Exception) {
+                e.printStackTrace()
+                withContext(Dispatchers.Main) {
+                    if (weatherText == "Memuat cuaca...") {
+                        weatherText = "🌤️ Semarang • 29°C Cerah Berawan"
+                    }
+                }
+            }
+            delay(15 * 60 * 1000L)
+        }
+    }
+
     Box(modifier = Modifier.fillMaxSize()) {
         Crossfade(
             targetState = selectedHomeBackground,
@@ -171,7 +244,8 @@ fun HomeScreen(
                 channelCount = channels.size,
                 time = timeString,
                 date = dateString,
-                version = versionText
+                version = versionText,
+                weather = weatherText
             )
 
             Spacer(modifier = Modifier.weight(1f))
@@ -241,75 +315,106 @@ private fun HospitalityHeader(
     channelCount: Int,
     time: String,
     date: String,
-    version: String
+    version: String,
+    weather: String
 ) {
     val configuration = androidx.compose.ui.platform.LocalConfiguration.current
     val isSmallScreen = configuration.screenWidthDp < 760 || configuration.screenHeightDp < 500
 
-    Box(modifier = Modifier.fillMaxWidth()) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.Top
+    ) {
+        // Left column
         Column(
-            modifier = Modifier.align(Alignment.TopStart),
+            modifier = Modifier.weight(1f),
+            horizontalAlignment = Alignment.Start,
             verticalArrangement = Arrangement.spacedBy(if (isSmallScreen) 2.dp else 4.dp)
         ) {
             Text(
                 text = "Selamat Datang",
                 color = Color.White,
                 fontSize = if (isSmallScreen) 13.sp else 17.sp,
-                fontWeight = FontWeight.Bold
+                fontWeight = FontWeight.Bold,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
             )
             Text(
                 text = "Premium IPTV Hospitality",
                 color = Color(0xFFE7D8A0),
                 fontSize = if (isSmallScreen) 9.sp else 12.sp,
-                fontWeight = FontWeight.SemiBold
+                fontWeight = FontWeight.SemiBold,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
             )
         }
 
+        // Center column (only if not small screen)
         if (!isSmallScreen) {
+            val isMediumHeight = configuration.screenHeightDp < 600
             Column(
-                modifier = Modifier.align(Alignment.TopCenter),
+                modifier = Modifier.weight(1.2f),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
                 Image(
                     painter = painterResource(id = R.drawable.ic_global_iptv),
                     contentDescription = "Hospitality IPTV",
                     modifier = Modifier
-                        .size(72.dp)
+                        .size(if (isMediumHeight) 48.dp else 72.dp)
                         .shadow(12.dp, RoundedCornerShape(16.dp))
                 )
-                Spacer(modifier = Modifier.height(8.dp))
+                Spacer(modifier = Modifier.height(if (isMediumHeight) 4.dp else 8.dp))
                 Text(
                     text = "Hospitality IPTV",
                     color = Color(0xFFFFE9A6),
-                    fontSize = 22.sp,
+                    fontSize = if (isMediumHeight) 16.sp else 22.sp,
                     fontWeight = FontWeight.ExtraBold,
-                    letterSpacing = 0.5.sp
+                    letterSpacing = 0.5.sp,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
                 )
                 Text(
                     text = "Live TV • Education • Guest Services",
                     color = Color.White.copy(alpha = 0.88f),
-                    fontSize = 11.sp,
+                    fontSize = if (isMediumHeight) 9.sp else 11.sp,
                     fontWeight = FontWeight.SemiBold,
-                    letterSpacing = 1.4.sp
+                    letterSpacing = 1.2.sp,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
                 )
             }
         }
 
+        // Right column
         Column(
-            modifier = Modifier.align(Alignment.TopEnd),
+            modifier = Modifier.weight(1f),
             horizontalAlignment = Alignment.End
         ) {
             Text(
                 text = time,
                 color = Color.White,
                 fontSize = if (isSmallScreen) 22.sp else 30.sp,
-                fontWeight = FontWeight.ExtraBold
+                fontWeight = FontWeight.ExtraBold,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
             )
             Text(
                 text = date,
                 color = Color.White.copy(alpha = 0.82f),
                 fontSize = if (isSmallScreen) 8.sp else 11.sp,
-                fontWeight = FontWeight.SemiBold
+                fontWeight = FontWeight.SemiBold,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+            Spacer(modifier = Modifier.height(if (isSmallScreen) 2.dp else 4.dp))
+            Text(
+                text = weather,
+                color = Color(0xFFFFE9A6),
+                fontSize = if (isSmallScreen) 8.sp else 10.sp,
+                fontWeight = FontWeight.Bold,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
             )
         }
     }

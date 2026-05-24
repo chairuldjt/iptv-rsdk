@@ -22,6 +22,25 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.media3.common.util.UnstableApi
 import com.example.rsdkiptvplayer.ui.components.AspectRatioPlayer
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.graphics.vector.path
+import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.type
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.ui.text.style.TextOverflow
+import kotlinx.coroutines.delay
 
 @OptIn(UnstableApi::class)
 @Composable
@@ -62,10 +81,119 @@ fun EducationScreen(
             .background(Color.Black)
     ) {
         if (errorMessage == null && videoCount > 0) {
-            AspectRatioPlayer(
-                exoPlayer = viewModel.exoPlayer,
-                aspectRatio = "fit"
-            )
+            var controlsVisible by remember { mutableStateOf(true) }
+            var isPlaying by remember { mutableStateOf(true) }
+            var currentPosition by remember { mutableStateOf(0L) }
+            var duration by remember { mutableStateOf(0L) }
+            val playerFocusRequester = remember { FocusRequester() }
+
+            LaunchedEffect(Unit) {
+                delay(150)
+                runCatching { playerFocusRequester.requestFocus() }
+            }
+
+            LaunchedEffect(controlsVisible) {
+                if (controlsVisible) {
+                    delay(4000)
+                    controlsVisible = false
+                }
+            }
+
+            LaunchedEffect(Unit) {
+                while (true) {
+                    currentPosition = viewModel.exoPlayer.currentPosition
+                    duration = viewModel.exoPlayer.duration.coerceAtLeast(0L)
+                    isPlaying = viewModel.exoPlayer.isPlaying
+                    delay(100)
+                }
+            }
+
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(Color.Black)
+                    .border(2.dp, Color.White.copy(alpha = 0.12f))
+                    .shadow(elevation = 12.dp, shape = RoundedCornerShape(0.dp))
+                    .focusRequester(playerFocusRequester)
+                    .focusable()
+                    .onPreviewKeyEvent { keyEvent ->
+                        if (keyEvent.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
+
+                        when (keyEvent.key) {
+                            Key.DirectionCenter, Key.Enter, Key.NumPadEnter -> {
+                                if (controlsVisible) {
+                                    if (viewModel.exoPlayer.isPlaying) {
+                                        viewModel.exoPlayer.pause()
+                                        isPlaying = false
+                                    } else {
+                                        viewModel.exoPlayer.play()
+                                        isPlaying = true
+                                    }
+                                    controlsVisible = true
+                                } else {
+                                    controlsVisible = true
+                                }
+                                true
+                            }
+                            Key.DirectionLeft -> {
+                                if (controlsVisible) {
+                                    viewModel.exoPlayer.seekTo((viewModel.exoPlayer.currentPosition - 10_000L).coerceAtLeast(0L))
+                                }
+                                controlsVisible = true
+                                true
+                            }
+                            Key.DirectionRight -> {
+                                if (controlsVisible) {
+                                    val target = viewModel.exoPlayer.currentPosition + 10_000L
+                                    val dur = viewModel.exoPlayer.duration.takeIf { it > 0 }
+                                    viewModel.exoPlayer.seekTo(if (dur != null) target.coerceAtMost(dur) else target)
+                                }
+                                controlsVisible = true
+                                true
+                            }
+                            Key.Back -> {
+                                if (controlsVisible) {
+                                    onBack()
+                                } else {
+                                    controlsVisible = true
+                                }
+                                true
+                            }
+                            else -> false
+                        }
+                    }
+            ) {
+                AspectRatioPlayer(
+                    exoPlayer = viewModel.exoPlayer,
+                    aspectRatio = "fit"
+                )
+
+                AnimatedVisibility(
+                    visible = controlsVisible,
+                    enter = fadeIn(),
+                    exit = fadeOut(),
+                    modifier = Modifier.align(Alignment.TopStart)
+                ) {
+                    DetailChrome(title = currentTitle, subtitle = "Edukasi Pasien")
+                }
+
+                if (controlsVisible) {
+                    Box(modifier = Modifier.fillMaxSize()) {
+                        CenterPlayButton(
+                            isPlaying = isPlaying,
+                            modifier = Modifier.align(Alignment.Center)
+                        )
+                        BottomControlBar(
+                            currentPosition = currentPosition,
+                            duration = duration,
+                            isPlaying = isPlaying,
+                            modifier = Modifier
+                                .align(Alignment.BottomCenter)
+                                .fillMaxWidth()
+                        )
+                    }
+                }
+            }
         }
 
         if (syncState is com.example.rsdkiptvplayer.util.EducationSyncManager.SyncState.Syncing) {
@@ -287,5 +415,177 @@ private fun buildEducationErrorDetail(
         "Isi path seperti \\\\10.45.128.129\\NamaShare\\folder di menu Setting."
     } else {
         folderPath
+    }
+}
+
+private var _pauseIcon: ImageVector? = null
+private val CustomPauseIcon: ImageVector
+    get() {
+        _pauseIcon?.let { return it }
+        return ImageVector.Builder(
+            name = "CustomPause",
+            defaultWidth = 24.dp,
+            defaultHeight = 24.dp,
+            viewportWidth = 24f,
+            viewportHeight = 24f
+        ).apply {
+            path(fill = SolidColor(Color.White)) {
+                moveTo(6f, 19f)
+                horizontalLineTo(10f)
+                verticalLineTo(5f)
+                horizontalLineTo(6f)
+                verticalLineTo(19f)
+                close()
+                moveTo(14f, 5f)
+                verticalLineTo(19f)
+                horizontalLineTo(18f)
+                verticalLineTo(5f)
+                horizontalLineTo(14f)
+                close()
+            }
+        }.build().also { _pauseIcon = it }
+    }
+
+@Composable
+private fun DetailChrome(title: String, subtitle: String) {
+    Column(
+        modifier = Modifier
+            .padding(26.dp)
+            .clip(RoundedCornerShape(14.dp))
+            .background(
+                Brush.verticalGradient(
+                    colors = listOf(
+                        Color(0xCC0F172A),
+                        Color(0xDD1E293B)
+                    )
+                )
+            )
+            .border(1.5.dp, Color.White.copy(alpha = 0.16f), RoundedCornerShape(14.dp))
+            .shadow(
+                elevation = 8.dp,
+                shape = RoundedCornerShape(14.dp),
+                ambientColor = Color.Black.copy(alpha = 0.4f)
+            )
+            .padding(horizontal = 18.dp, vertical = 14.dp)
+    ) {
+        Text(
+            text = title.uppercase(),
+            color = Color(0xFFFFE9A6),
+            fontSize = 16.sp,
+            fontWeight = FontWeight.ExtraBold,
+            letterSpacing = 1.2.sp,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
+        )
+        Spacer(modifier = Modifier.height(4.dp))
+        Text(
+            text = subtitle,
+            color = Color(0xFFCBD5E1),
+            fontSize = 12.sp,
+            fontWeight = FontWeight.Medium,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
+        )
+    }
+}
+
+@Composable
+private fun CenterPlayButton(isPlaying: Boolean, modifier: Modifier = Modifier) {
+    Box(
+        modifier = modifier
+            .size(80.dp)
+            .clip(CircleShape)
+            .background(Color.Black.copy(alpha = 0.55f))
+            .border(2.dp, Color.White.copy(alpha = 0.24f), CircleShape),
+        contentAlignment = Alignment.Center
+    ) {
+        Icon(
+            imageVector = if (isPlaying) CustomPauseIcon else Icons.Default.PlayArrow,
+            contentDescription = if (isPlaying) "Pause" else "Play",
+            modifier = Modifier.size(42.dp),
+            tint = Color.White
+        )
+    }
+}
+
+@Composable
+private fun BottomControlBar(
+    currentPosition: Long,
+    duration: Long,
+    isPlaying: Boolean,
+    modifier: Modifier = Modifier
+) {
+    Column(modifier = modifier) {
+        ProgressBar(currentPosition = currentPosition, duration = duration)
+        
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(
+                    Brush.verticalGradient(
+                        colors = listOf(
+                            Color(0xFFB8BCC4).copy(alpha = 0.86f),
+                            Color(0xFF7A8084).copy(alpha = 0.72f)
+                        )
+                    )
+                )
+                .border(1.dp, Color.White.copy(alpha = 0.12f))
+                .padding(horizontal = 20.dp, vertical = 12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(20.dp)
+        ) {
+            Text(
+                text = formatTime(currentPosition),
+                color = Color.Black.copy(alpha = 0.72f),
+                fontSize = 11.sp,
+                fontWeight = FontWeight.SemiBold
+            )
+            
+            Text(
+                text = if (isPlaying) "⏸ PAUSE" else "▶ PLAY",
+                color = Color(0xFF1F2937),
+                fontSize = 12.sp,
+                fontWeight = FontWeight.ExtraBold,
+                modifier = Modifier.weight(1f),
+                textAlign = TextAlign.Center
+            )
+            
+            Text(
+                text = formatTime(duration),
+                color = Color.Black.copy(alpha = 0.72f),
+                fontSize = 11.sp,
+                fontWeight = FontWeight.SemiBold
+            )
+        }
+    }
+}
+
+@Composable
+private fun ProgressBar(currentPosition: Long, duration: Long) {
+    val progress = if (duration > 0) currentPosition.toFloat() / duration else 0f
+    
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(6.dp)
+            .background(Color.Black.copy(alpha = 0.4f))
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxHeight()
+                .fillMaxWidth(progress)
+                .background(Color(0xFF10B981))
+        )
+    }
+}
+
+private fun formatTime(ms: Long): String {
+    val seconds = (ms / 1000) % 60
+    val minutes = (ms / 1000 / 60) % 60
+    val hours = ms / 1000 / 60 / 60
+    return if (hours > 0) {
+        String.format("%02d:%02d:%02d", hours, minutes, seconds)
+    } else {
+        String.format("%02d:%02d", minutes, seconds)
     }
 }

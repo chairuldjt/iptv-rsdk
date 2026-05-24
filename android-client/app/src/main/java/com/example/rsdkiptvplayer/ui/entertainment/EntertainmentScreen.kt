@@ -7,7 +7,17 @@ import android.webkit.WebView
 import android.webkit.WebViewClient
 import androidx.activity.compose.BackHandler
 import androidx.annotation.OptIn
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material3.Icon
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.graphics.vector.path
+import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -37,6 +47,8 @@ import androidx.compose.ui.input.key.type
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.offset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
@@ -333,8 +345,10 @@ private fun EntertainmentPlayer(option: EntertainmentOption, onBack: () -> Unit)
     val context = LocalContext.current
     var resolvedUrl by remember(option.url, option.contentType) { mutableStateOf<String?>(null) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
-    var controlsVisible by remember { mutableStateOf(false) }
+    var controlsVisible by remember { mutableStateOf(true) }
     var isPlaying by remember { mutableStateOf(true) }
+    var currentPosition by remember { mutableStateOf(0L) }
+    var duration by remember { mutableStateOf(0L) }
     val playerFocusRequester = remember { FocusRequester() }
     val player = remember {
         ExoPlayer.Builder(context).build().apply {
@@ -343,7 +357,13 @@ private fun EntertainmentPlayer(option: EntertainmentOption, onBack: () -> Unit)
         }
     }
 
-    BackHandler { onBack() }
+    BackHandler {
+        if (controlsVisible) {
+            onBack()
+        } else {
+            controlsVisible = true
+        }
+    }
 
     LaunchedEffect(Unit) {
         delay(150)
@@ -366,8 +386,16 @@ private fun EntertainmentPlayer(option: EntertainmentOption, onBack: () -> Unit)
 
     LaunchedEffect(controlsVisible) {
         if (controlsVisible) {
-            delay(4500)
+            delay(4000)
             controlsVisible = false
+        }
+    }
+
+    LaunchedEffect(Unit) {
+        while (true) {
+            currentPosition = player.currentPosition
+            duration = player.duration.takeIf { it > 0 } ?: 0L
+            delay(100)
         }
     }
 
@@ -375,6 +403,8 @@ private fun EntertainmentPlayer(option: EntertainmentOption, onBack: () -> Unit)
         Modifier
             .fillMaxSize()
             .background(Color.Black)
+            .border(2.dp, Color.White.copy(alpha = 0.12f))
+            .shadow(elevation = 12.dp, shape = RoundedCornerShape(0.dp))
             .focusRequester(playerFocusRequester)
             .focusable()
             .onPreviewKeyEvent { keyEvent ->
@@ -390,6 +420,7 @@ private fun EntertainmentPlayer(option: EntertainmentOption, onBack: () -> Unit)
                                 player.play()
                                 isPlaying = true
                             }
+                            controlsVisible = true
                         } else {
                             controlsVisible = true
                         }
@@ -398,20 +429,26 @@ private fun EntertainmentPlayer(option: EntertainmentOption, onBack: () -> Unit)
                     Key.DirectionLeft -> {
                         if (controlsVisible) {
                             player.seekTo((player.currentPosition - 10_000L).coerceAtLeast(0L))
-                            true
-                        } else {
-                            false
                         }
+                        controlsVisible = true
+                        true
                     }
                     Key.DirectionRight -> {
                         if (controlsVisible) {
                             val target = player.currentPosition + 10_000L
                             val duration = player.duration.takeIf { it > 0 }
                             player.seekTo(if (duration != null) target.coerceAtMost(duration) else target)
-                            true
-                        } else {
-                            false
                         }
+                        controlsVisible = true
+                        true
+                    }
+                    Key.Back -> {
+                        if (controlsVisible) {
+                            onBack()
+                        } else {
+                            controlsVisible = true
+                        }
+                        true
                     }
                     else -> false
                 }
@@ -429,19 +466,62 @@ private fun EntertainmentPlayer(option: EntertainmentOption, onBack: () -> Unit)
         )
 
         if (resolvedUrl == null && errorMessage == null) {
-            CircularProgressIndicator(color = Color(0xFFFFE9A6), modifier = Modifier.align(Alignment.Center))
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(
+                        Brush.radialGradient(
+                            colors = listOf(Color(0xFF1F2937), Color(0xFF050914)),
+                            radius = 900f
+                        )
+                    ),
+                contentAlignment = Alignment.Center
+            ) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    CircularProgressIndicator(
+                        color = Color(0xFFFFE9A6),
+                        strokeWidth = 3.dp,
+                        modifier = Modifier.size(44.dp)
+                    )
+                    Spacer(modifier = Modifier.height(18.dp))
+                    Text(
+                        text = "Memuat konten...",
+                        color = Color.White.copy(alpha = 0.72f),
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                }
+            }
         }
         errorMessage?.let {
             Text(it, color = Color.White, fontSize = 16.sp, fontWeight = FontWeight.Bold, modifier = Modifier.align(Alignment.Center))
         }
 
-        DetailChrome(title = option.title, subtitle = option.subtitle)
+        AnimatedVisibility(
+            visible = controlsVisible,
+            enter = fadeIn(),
+            exit = fadeOut(),
+            modifier = Modifier.align(Alignment.TopStart)
+        ) {
+            DetailChrome(title = option.title, subtitle = option.subtitle)
+        }
 
         if (controlsVisible) {
-            SimplePlayerControls(
-                isPlaying = isPlaying,
-                modifier = Modifier.align(Alignment.Center)
-            )
+            Box(modifier = Modifier.fillMaxSize()) {
+                CenterPlayButton(
+                    isPlaying = isPlaying,
+                    modifier = Modifier.align(Alignment.Center)
+                )
+                
+                BottomControlBar(
+                    currentPosition = currentPosition,
+                    duration = duration,
+                    isPlaying = isPlaying,
+                    modifier = Modifier
+                        .align(Alignment.BottomCenter)
+                        .fillMaxWidth()
+                )
+            }
         }
     }
 
@@ -452,43 +532,173 @@ private fun EntertainmentPlayer(option: EntertainmentOption, onBack: () -> Unit)
 
 @Composable
 private fun DetailChrome(title: String, subtitle: String) {
-    Row(
+    Column(
         modifier = Modifier
-            .padding(18.dp)
+            .padding(26.dp)
             .clip(RoundedCornerShape(14.dp))
-            .background(Color(0xDD111827))
-            .border(1.dp, Color(0xFF334155), RoundedCornerShape(14.dp))
-            .padding(horizontal = 10.dp, vertical = 8.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(10.dp)
+            .background(
+                Brush.verticalGradient(
+                    colors = listOf(
+                        Color(0xCC0F172A),
+                        Color(0xDD1E293B)
+                    )
+                )
+            )
+            .border(1.5.dp, Color.White.copy(alpha = 0.16f), RoundedCornerShape(14.dp))
+            .shadow(
+                elevation = 8.dp,
+                shape = RoundedCornerShape(14.dp),
+                ambientColor = Color.Black.copy(alpha = 0.4f)
+            )
+            .padding(horizontal = 18.dp, vertical = 14.dp)
     ) {
-        Column {
-            Text(title.uppercase(), color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.ExtraBold, letterSpacing = 1.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            Text(subtitle, color = Color(0xFFCBD5E1), fontSize = 10.sp, fontWeight = FontWeight.Medium, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        Text(
+            text = title.uppercase(),
+            color = Color(0xFFFFE9A6),
+            fontSize = 16.sp,
+            fontWeight = FontWeight.ExtraBold,
+            letterSpacing = 1.2.sp,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
+        )
+        Spacer(modifier = Modifier.height(4.dp))
+        Text(
+            text = subtitle,
+            color = Color(0xFFCBD5E1),
+            fontSize = 12.sp,
+            fontWeight = FontWeight.Medium,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
+        )
+    }
+}
+
+private var _pauseIcon: ImageVector? = null
+private val CustomPauseIcon: ImageVector
+    get() {
+        _pauseIcon?.let { return it }
+        return ImageVector.Builder(
+            name = "CustomPause",
+            defaultWidth = 24.dp,
+            defaultHeight = 24.dp,
+            viewportWidth = 24f,
+            viewportHeight = 24f
+        ).apply {
+            path(fill = SolidColor(Color.White)) {
+                moveTo(6f, 19f)
+                horizontalLineTo(10f)
+                verticalLineTo(5f)
+                horizontalLineTo(6f)
+                verticalLineTo(19f)
+                close()
+                moveTo(14f, 5f)
+                verticalLineTo(19f)
+                horizontalLineTo(18f)
+                verticalLineTo(5f)
+                horizontalLineTo(14f)
+                close()
+            }
+        }.build().also { _pauseIcon = it }
+    }
+
+@Composable
+private fun CenterPlayButton(isPlaying: Boolean, modifier: Modifier = Modifier) {
+    Box(
+        modifier = modifier
+            .size(80.dp)
+            .clip(CircleShape)
+            .background(Color.Black.copy(alpha = 0.55f))
+            .border(2.dp, Color.White.copy(alpha = 0.24f), CircleShape),
+        contentAlignment = Alignment.Center
+    ) {
+        Icon(
+            imageVector = if (isPlaying) CustomPauseIcon else Icons.Default.PlayArrow,
+            contentDescription = if (isPlaying) "Pause" else "Play",
+            modifier = Modifier.size(42.dp),
+            tint = Color.White
+        )
+    }
+}
+
+@Composable
+private fun BottomControlBar(
+    currentPosition: Long,
+    duration: Long,
+    isPlaying: Boolean,
+    modifier: Modifier = Modifier
+) {
+    Column(modifier = modifier) {
+        ProgressBar(currentPosition = currentPosition, duration = duration)
+        
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(
+                    Brush.verticalGradient(
+                        colors = listOf(
+                            Color(0xFFB8BCC4).copy(alpha = 0.86f),
+                            Color(0xFF7A8084).copy(alpha = 0.72f)
+                        )
+                    )
+                )
+                .border(1.dp, Color.White.copy(alpha = 0.12f))
+                .padding(horizontal = 20.dp, vertical = 12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(20.dp)
+        ) {
+            Text(
+                text = formatTime(currentPosition),
+                color = Color.Black.copy(alpha = 0.72f),
+                fontSize = 11.sp,
+                fontWeight = FontWeight.SemiBold
+            )
+            
+            Text(
+                text = if (isPlaying) "⏸ PAUSE" else "▶ PLAY",
+                color = Color(0xFF1F2937),
+                fontSize = 12.sp,
+                fontWeight = FontWeight.ExtraBold,
+                modifier = Modifier.weight(1f),
+                textAlign = androidx.compose.ui.text.style.TextAlign.Center
+            )
+            
+            Text(
+                text = formatTime(duration),
+                color = Color.Black.copy(alpha = 0.72f),
+                fontSize = 11.sp,
+                fontWeight = FontWeight.SemiBold
+            )
         }
     }
 }
 
 @Composable
-private fun SimplePlayerControls(isPlaying: Boolean, modifier: Modifier = Modifier) {
-    Row(
-        modifier = modifier
-            .clip(RoundedCornerShape(999.dp))
-            .background(Color.Black.copy(alpha = 0.72f))
-            .border(1.dp, Color.White.copy(alpha = 0.22f), RoundedCornerShape(999.dp))
-            .padding(horizontal = 22.dp, vertical = 14.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(24.dp)
+private fun ProgressBar(currentPosition: Long, duration: Long) {
+    val progress = if (duration > 0) currentPosition.toFloat() / duration else 0f
+    
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(6.dp)
+            .background(Color.Black.copy(alpha = 0.4f))
     ) {
-        Text("<<", color = Color.White, fontSize = 24.sp, fontWeight = FontWeight.ExtraBold)
-        Text(
-            if (isPlaying) "PAUSE" else "PLAY",
-            color = Color(0xFFFFE9A6),
-            fontSize = 18.sp,
-            fontWeight = FontWeight.ExtraBold,
-            letterSpacing = 1.sp
+        Box(
+            modifier = Modifier
+                .fillMaxHeight()
+                .fillMaxWidth(progress)
+                .background(Color(0xFF10B981))
         )
-        Text(">>", color = Color.White, fontSize = 24.sp, fontWeight = FontWeight.ExtraBold)
+    }
+}
+
+private fun formatTime(ms: Long): String {
+    val seconds = (ms / 1000) % 60
+    val minutes = (ms / 1000 / 60) % 60
+    val hours = ms / 1000 / 60 / 60
+    return if (hours > 0) {
+        String.format("%02d:%02d:%02d", hours, minutes, seconds)
+    } else {
+        String.format("%02d:%02d", minutes, seconds)
     }
 }
 
