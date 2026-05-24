@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import prisma from '@/lib/db'
 import { getErrorMessage } from '@/lib/errors'
 import { DEFAULT_CUSTOM_M3U_URL, DEFAULT_SYNC_MODE } from '@/lib/defaults'
+import { createDeviceConfigData, getDefaultDeviceConfig } from '@/lib/defaultDeviceConfig'
 
 export async function GET(
   request: Request,
@@ -33,27 +34,9 @@ export async function GET(
     // Create a config if it somehow doesn't exist yet
     let config = device.config
     if (!config) {
+      const defaultConfig = await getDefaultDeviceConfig()
       config = await prisma.deviceConfig.create({
-        data: {
-          deviceId,
-          defaultCategory: 'National TV',
-          aspectRatio: 'fit',
-          syncInterval: 1800,
-          syncMode: DEFAULT_SYNC_MODE,
-          customM3uUrl: DEFAULT_CUSTOM_M3U_URL,
-          startScreen: 'live_tv',
-          lockSettings: true,
-          forceSync: false,
-          autoStartOnBoot: false,
-          technicianPin: '2468',
-          educationVideoPath: '',
-          educationSmbUsername: '',
-          educationSmbPassword: '',
-          educationSmbDomain: '',
-          educationRepeatMode: 'all',
-          educationPlayOrder: 'alphabetical',
-          educationForceSync: false,
-        },
+        data: createDeviceConfigData(deviceId, defaultConfig),
       })
     }
 

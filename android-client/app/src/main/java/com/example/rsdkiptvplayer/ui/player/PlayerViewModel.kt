@@ -226,7 +226,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         }
     }
 
-    private suspend fun selectLastOrFirstChannel() {
+    suspend fun playLastOrFirstChannel() {
         val lastId = dataStoreManager.lastSelectedChannelIdFlow.first()
         val match = _channels.value.find { it.id == lastId }
         if (match != null) {
@@ -291,13 +291,9 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         } else {
             // Channel not found yet — wait for channels to load, then try again
             viewModelScope.launch {
-                _channels.collectLatest { list ->
-                    val found = list.find { it.id == channelId }
-                    if (found != null) {
-                        playChannel(found)
-                        return@collectLatest
-                    }
-                }
+                val found = _channels.first { list -> list.any { it.id == channelId } }
+                    .first { it.id == channelId }
+                playChannel(found)
             }
         }
     }

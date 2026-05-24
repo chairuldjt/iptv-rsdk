@@ -74,6 +74,7 @@ fun PlayerScreen(
     var drawerFocusPane by remember { mutableIntStateOf(0) }
     var drawerFocusedCategoryIndex by remember { mutableIntStateOf(0) }
     var drawerFocusedChannelIndex by remember { mutableIntStateOf(0) }
+    var hasAutoPlayedDefault by remember { mutableStateOf(false) }
     val drawerCategoryListState = rememberLazyListState()
     val drawerChannelListState = rememberLazyListState()
     val rootFocusRequester = remember { FocusRequester() }
@@ -176,6 +177,14 @@ fun PlayerScreen(
         if (initialChannelId != null && !hasAutoPlayed && channels.isNotEmpty()) {
             viewModel.playChannelById(initialChannelId)
             hasAutoPlayed = true
+            showMenu = false
+        }
+    }
+
+    LaunchedEffect(initialChannelId, channels, selectedChannel) {
+        if (initialChannelId == null && !hasAutoPlayedDefault && selectedChannel == null && channels.isNotEmpty()) {
+            viewModel.playLastOrFirstChannel()
+            hasAutoPlayedDefault = true
             showMenu = false
         }
     }

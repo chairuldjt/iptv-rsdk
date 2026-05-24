@@ -161,31 +161,33 @@ object EducationSyncManager {
                     _syncState.value = SyncState.Syncing(index + 1, filesToDownload.size, remoteFile.name, 0f)
 
                     try {
-                        val inputStream = SmbFileInputStream(remoteFile)
-                        val outputStream = FileOutputStream(tempFile)
-
                         val buffer = ByteArray(64 * 1024)
-                        var bytesRead: Int
                         var totalBytesRead: Long = 0
                         val totalLength = remoteFile.length()
 
-                        while (inputStream.read(buffer).also { bytesRead = it } != -1) {
-                            outputStream.write(buffer, 0, bytesRead)
-                            totalBytesRead += bytesRead
-                            if (totalLength > 0) {
-                                val progress = totalBytesRead.toFloat() / totalLength.toFloat()
-                                _syncState.value = SyncState.Syncing(index + 1, filesToDownload.size, remoteFile.name, progress)
+                        SmbFileInputStream(remoteFile).use { inputStream ->
+                            FileOutputStream(tempFile).use { outputStream ->
+                                while (true) {
+                                    val bytesRead = inputStream.read(buffer)
+                                    if (bytesRead == -1) break
+
+                                    outputStream.write(buffer, 0, bytesRead)
+                                    totalBytesRead += bytesRead
+                                    if (totalLength > 0) {
+                                        val progress = totalBytesRead.toFloat() / totalLength.toFloat()
+                                        _syncState.value = SyncState.Syncing(index + 1, filesToDownload.size, remoteFile.name, progress)
+                                    }
+                                }
+                                outputStream.flush()
                             }
                         }
-
-                        outputStream.flush()
-                        outputStream.close()
-                        inputStream.close()
 
                         if (localFile.exists()) {
                             localFile.delete()
                         }
-                        tempFile.renameTo(localFile)
+                        if (!tempFile.renameTo(localFile)) {
+                            throw IllegalStateException("Gagal menyimpan file edukasi lokal: ${remoteFile.name}")
+                        }
                     } catch (e: Exception) {
                         if (tempFile.exists()) {
                             tempFile.delete()

@@ -20,13 +20,11 @@ export default function DeviceConfigForm({
   const [syncMode, setSyncMode] = useState(editingDevice.config?.syncMode || DEFAULT_SYNC_MODE)
   const [lockSettings, setLockSettings] = useState(editingDevice.config?.lockSettings ?? true)
   const [autoStart, setAutoStart] = useState(editingDevice.config?.autoStartOnBoot ?? false)
-  const [forceSyncTriggered, setForceSyncTriggered] = useState(false)
 
   return (
     <div className="space-y-6">
       <form action={saveDeviceConfigAction} className="space-y-6">
         <input type="hidden" name="deviceId" value={editingDevice.deviceId} />
-        <input type="hidden" name="educationForceSyncTrigger" value={forceSyncTriggered ? 'true' : 'false'} />
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <div>
@@ -235,7 +233,8 @@ export default function DeviceConfigForm({
         <div className="flex flex-col sm:flex-row gap-4">
           <button
             type="submit"
-            onClick={() => setForceSyncTriggered(true)}
+            name="educationForceSyncTrigger"
+            value="true"
             className="py-3 px-4 rounded-xl border border-indigo-500/20 bg-indigo-500/5 text-indigo-400 hover:bg-indigo-500 hover:text-white font-bold text-xs transition-all duration-200 cursor-pointer flex items-center justify-center gap-2"
           >
             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -245,7 +244,6 @@ export default function DeviceConfigForm({
           </button>
           <button
             type="submit"
-            onClick={() => setForceSyncTriggered(false)}
             className="flex-1 py-3 rounded-xl bg-primary hover:bg-indigo-500 font-bold text-white text-sm transition-all duration-200 cursor-pointer text-center glow-indigo"
           >
             Save Configuration Override

@@ -81,7 +81,10 @@ class MainActivity : ComponentActivity() {
                         }
                         "home" -> {
                             HomeScreen(
-                                onNavigateToPlayer = { currentScreen = "channels" },
+                                onNavigateToPlayer = {
+                                    selectedChannelId = -1
+                                    currentScreen = "player"
+                                },
                                 onNavigateToEducation = { currentScreen = "education" },
                                 onNavigateToSettings = { tabIdx ->
                                     activeSettingsTab = tabIdx
@@ -176,4 +179,3 @@ class MainActivity : ComponentActivity() {
         }
     }
 }
-

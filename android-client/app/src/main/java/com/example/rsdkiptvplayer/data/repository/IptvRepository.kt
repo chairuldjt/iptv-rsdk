@@ -129,7 +129,6 @@ class IptvRepository(
 
                     if (config.force_sync == true) {
                         dataStoreManager.addLog("Remote trigger: FORCE SYNC enabled!")
-                        syncChannels()
                     }
 
                     if (config.clear_cache_trigger == true) {
@@ -292,9 +291,7 @@ class IptvRepository(
                     dataStoreManager.addLog("Heartbeat: Server returned lock_settings=${status.lock_settings}, active=${status.active}")
                     dataStoreManager.setLockSettings(status.lock_settings)
                     if (status.force_sync) {
-                        dataStoreManager.addLog("Heartbeat response trigger: Syncing config & channels now.")
-                        syncConfig() // Fetch latest syncMode, customUrl, etc.
-                        syncChannels()
+                        dataStoreManager.addLog("Heartbeat response trigger received.")
                     }
                     return status
                 }

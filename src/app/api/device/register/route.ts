@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import prisma from '@/lib/db'
 import { getErrorMessage } from '@/lib/errors'
-import { DEFAULT_CUSTOM_M3U_URL, DEFAULT_SYNC_MODE } from '@/lib/defaults'
+import { createDeviceConfigData, getDefaultDeviceConfig } from '@/lib/defaultDeviceConfig'
 
 export async function POST(request: Request) {
   try {
@@ -49,6 +49,7 @@ export async function POST(request: Request) {
  
     if (!device) {
       // Device does not exist (fully new device) -> Register it as Active by default
+      const defaultConfig = await getDefaultDeviceConfig()
       device = await prisma.$transaction(async (tx) => {
         const newDevice = await tx.device.create({
           data: {
@@ -65,19 +66,7 @@ export async function POST(request: Request) {
  
         // Create default config for this new device
         const newConfig = await tx.deviceConfig.create({
-          data: {
-            deviceId: device_id,
-            defaultCategory: 'National TV',
-            aspectRatio: 'fit',
-            syncInterval: 1800,
-            syncMode: DEFAULT_SYNC_MODE,
-            customM3uUrl: DEFAULT_CUSTOM_M3U_URL,
-            startScreen: 'live_tv',
-            lockSettings: true,
-            forceSync: false,
-            autoStartOnBoot: false,
-            technicianPin: '2468',
-          },
+          data: createDeviceConfigData(device_id, defaultConfig),
         })
  
         return { ...newDevice, config: newConfig }
