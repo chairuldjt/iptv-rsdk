@@ -32,6 +32,8 @@ export default function VideoRepoForm({ folders, selectedFolderId, editingVideo 
 
   const isEdit = !!editingVideo
 
+  const sourceLabel = sourceType === 'url' ? 'URL eksternal' : 'File upload lokal'
+
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
     setIsSubmitting(true)
@@ -59,12 +61,20 @@ export default function VideoRepoForm({ folders, selectedFolderId, editingVideo 
   }
 
   return (
-    <div className="glass-panel border border-border rounded-2xl p-5 h-fit sticky top-6">
-      <div className="mb-5">
-        <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-indigo-300">Inspector</p>
-        <h3 className="font-bold text-white text-lg mt-1">
-          {isEdit ? 'Edit Video' : 'Upload Video'}
-        </h3>
+    <div className="rounded-2xl border border-border bg-card p-5 h-fit xl:sticky xl:top-20">
+      <div className="mb-5 flex items-start justify-between gap-3">
+        <div>
+          <p className="text-[10px] font-bold uppercase tracking-wider text-primary">Video Detail</p>
+          <h3 className="font-bold text-foreground text-lg mt-1">
+            {isEdit ? 'Edit Video' : 'Tambah Video'}
+          </h3>
+          <p className="text-xs text-muted-foreground mt-1 leading-relaxed">
+            {isEdit ? 'Perbarui metadata atau ganti sumber media.' : 'Masukkan URL video atau upload file lokal.'}
+          </p>
+        </div>
+        {isEdit && (
+          <span className="badge badge-primary shrink-0">Edit</span>
+        )}
       </div>
 
       {message && (
@@ -106,17 +116,17 @@ export default function VideoRepoForm({ folders, selectedFolderId, editingVideo 
         </Field>
 
         <div>
-          <span className="block text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-1">
+          <span className="block text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-2">
             Sumber Video
           </span>
-          <div className="grid grid-cols-2 gap-2">
+          <div className="grid grid-cols-2 gap-2 rounded-xl bg-background/50 border border-border p-1">
             <button
               type="button"
               onClick={() => setSourceType('url')}
-              className={`py-2 text-xs font-bold rounded-xl border transition-all ${
+              className={`py-2.5 text-xs font-bold rounded-lg transition-all ${
                 sourceType === 'url'
-                  ? 'bg-indigo-500/20 text-white border-indigo-500/40'
-                  : 'text-slate-400 border-slate-800 hover:text-white'
+                  ? 'bg-primary text-white shadow-sm'
+                  : 'text-muted-foreground hover:text-foreground hover:bg-accent/50'
               }`}
             >
               URL
@@ -124,15 +134,16 @@ export default function VideoRepoForm({ folders, selectedFolderId, editingVideo 
             <button
               type="button"
               onClick={() => setSourceType('file')}
-              className={`py-2 text-xs font-bold rounded-xl border transition-all ${
+              className={`py-2.5 text-xs font-bold rounded-lg transition-all ${
                 sourceType === 'file'
-                  ? 'bg-indigo-500/20 text-white border-indigo-500/40'
-                  : 'text-slate-400 border-slate-800 hover:text-white'
+                  ? 'bg-primary text-white shadow-sm'
+                  : 'text-muted-foreground hover:text-foreground hover:bg-accent/50'
               }`}
             >
               Upload
             </button>
           </div>
+          <p className="text-[10px] text-muted-foreground mt-2">{sourceLabel}</p>
         </div>
 
         {sourceType === 'url' ? (
@@ -148,7 +159,7 @@ export default function VideoRepoForm({ folders, selectedFolderId, editingVideo 
             />
           </Field>
         ) : (
-          <Field label="File Video">
+          <UploadField label="File Video" helper={isEdit ? 'Kosongkan jika tidak ingin mengganti file video.' : 'Pilih file video dari komputer.'}>
             <input
               type="file"
               id="videoFile"
@@ -157,7 +168,7 @@ export default function VideoRepoForm({ folders, selectedFolderId, editingVideo 
               required={sourceType === 'file' && !isEdit}
               className="file-input"
             />
-          </Field>
+          </UploadField>
         )}
 
         <Field label="Thumbnail URL">
@@ -171,7 +182,7 @@ export default function VideoRepoForm({ folders, selectedFolderId, editingVideo 
           />
         </Field>
 
-        <Field label="Upload Thumbnail">
+        <UploadField label="Upload Thumbnail" helper="Opsional. File upload akan menggantikan thumbnail URL.">
           <input
             type="file"
             id="thumbnailFile"
@@ -179,10 +190,10 @@ export default function VideoRepoForm({ folders, selectedFolderId, editingVideo 
             accept="image/*"
             className="file-input"
           />
-        </Field>
+        </UploadField>
 
         {isEdit && editingVideo.thumbnailUrl && (
-          <label className="flex items-center gap-2 text-xs text-slate-400">
+          <label className="flex items-center gap-2 text-xs text-muted-foreground rounded-xl border border-border bg-background/40 px-3 py-2">
             <input type="checkbox" name="removeThumbnail" className="accent-primary" />
             Hapus thumbnail saat disimpan
           </label>
@@ -199,7 +210,7 @@ export default function VideoRepoForm({ folders, selectedFolderId, editingVideo 
         {isEdit && (
           <a
             href="/dashboard/videos"
-            className="block text-center text-xs font-semibold text-slate-500 hover:text-white transition-colors"
+            className="block text-center text-xs font-semibold text-muted-foreground hover:text-foreground transition-colors"
           >
             Batal edit
           </a>
@@ -212,10 +223,22 @@ export default function VideoRepoForm({ folders, selectedFolderId, editingVideo 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <label>
-      <span className="block text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-1">
+      <span className="block text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-1.5">
         {label}
       </span>
       {children}
+    </label>
+  )
+}
+
+function UploadField({ label, helper, children }: { label: string; helper: string; children: React.ReactNode }) {
+  return (
+    <label className="block rounded-xl border border-border bg-background/40 p-3">
+      <span className="block text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-2">
+        {label}
+      </span>
+      {children}
+      <span className="block text-[10px] text-muted-foreground mt-2 leading-relaxed">{helper}</span>
     </label>
   )
 }

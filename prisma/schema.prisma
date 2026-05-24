@@ -114,19 +114,24 @@ model EducationVideo {
   title        String
   videoUrl     String           @db.Text
   thumbnailUrl String?          @db.Text
+  isPublished  Boolean          @default(true)
   createdAt    DateTime         @default(now())
   updatedAt    DateTime         @updatedAt
 
   @@index([folderId])
+  @@index([isPublished])
   @@index([updatedAt])
 }
 
 model EducationFolder {
   id        Int              @id @default(autoincrement())
   name      String           @unique
+  isPublished Boolean        @default(true)
   createdAt DateTime         @default(now())
   updatedAt DateTime         @updatedAt
   videos    EducationVideo[]
+
+  @@index([isPublished])
 }
 
 model EntertainmentItem {

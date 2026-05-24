@@ -51,6 +51,26 @@ export async function renameFolderAction(formData: FormData) {
   redirect(`/dashboard/videos?folder=${folderId}&saved=1`)
 }
 
+export async function toggleFolderPublishedAction(formData: FormData) {
+  const folderId = parseInt(formData.get('folderId') as string, 10)
+  const currentStatus = formData.get('currentStatus') === 'true'
+
+  if (!Number.isFinite(folderId)) return
+
+  try {
+    await prisma.educationFolder.update({
+      where: { id: folderId },
+      data: { isPublished: !currentStatus },
+    })
+    revalidatePath('/dashboard/videos')
+    revalidatePath('/api/education/videos')
+  } catch (error) {
+    console.error('Toggle education folder publish error:', error)
+  }
+
+  redirect(`/dashboard/videos?folder=${folderId}&saved=1`)
+}
+
 export async function deleteFolderAction(formData: FormData) {
   const folderId = parseInt(formData.get('folderId') as string, 10)
   if (!Number.isFinite(folderId)) return
@@ -64,6 +84,30 @@ export async function deleteFolderAction(formData: FormData) {
     console.error('Delete education folder error:', error)
   }
 
+  redirect('/dashboard/videos?saved=1')
+}
+
+export async function toggleVideoPublishedAction(formData: FormData) {
+  const id = parseInt(formData.get('videoId') as string, 10)
+  const folderId = parseInt((formData.get('folderId') as string) || '', 10)
+  const currentStatus = formData.get('currentStatus') === 'true'
+
+  if (!Number.isFinite(id)) return
+
+  try {
+    await prisma.educationVideo.update({
+      where: { id },
+      data: { isPublished: !currentStatus },
+    })
+    revalidatePath('/dashboard/videos')
+    revalidatePath('/api/education/videos')
+  } catch (error) {
+    console.error('Toggle education video publish error:', error)
+  }
+
+  if (Number.isFinite(folderId)) {
+    redirect(`/dashboard/videos?folder=${folderId}&saved=1`)
+  }
   redirect('/dashboard/videos?saved=1')
 }
 

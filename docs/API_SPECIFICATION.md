@@ -319,7 +319,7 @@ Route `/dashboard/*` diproteksi oleh `src/proxy.ts` sesuai konvensi Next.js 16.
 
 ## 10. Education Videos Repository (Web)
 
-Endpoint CRUD untuk mengelola video edukasi yang disimpan di repository web (Next.js server).
+Endpoint CRUD untuk mengelola video edukasi yang disimpan di repository web (Next.js server). Response `GET` hanya berisi video yang di-link ke Video Edukasi: `EducationVideo.isPublished=true` dan, jika berada dalam folder, `EducationFolder.isPublished=true`.
 
 ### Get Video List
 **Endpoint:** `GET /api/education/videos`  

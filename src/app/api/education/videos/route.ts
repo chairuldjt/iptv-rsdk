@@ -15,10 +15,18 @@ export async function GET() {
   try {
     const [folders, videos] = await Promise.all([
       prisma.educationFolder.findMany({
+        where: { isPublished: true },
         orderBy: { name: 'asc' },
-        include: { _count: { select: { videos: true } } },
+        include: { _count: { select: { videos: { where: { isPublished: true } } } } },
       }),
       prisma.educationVideo.findMany({
+        where: {
+          isPublished: true,
+          OR: [
+            { folderId: null },
+            { folder: { isPublished: true } },
+          ],
+        },
         include: { folder: true },
         orderBy: [{ folder: { name: 'asc' } }, { title: 'asc' }],
       }),
@@ -106,6 +114,7 @@ export async function POST(request: Request) {
         videoUrl,
         thumbnailUrl,
         folderId,
+        isPublished: true,
       },
     })
 

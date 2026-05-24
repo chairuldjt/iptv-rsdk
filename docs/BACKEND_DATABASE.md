@@ -79,6 +79,7 @@ Daftar video edukasi di repository web terpusat.
 | `id` | Int | Primary key autoincrement. |
 | `title` | String | Judul video. |
 | `videoUrl` | Text | URL eksternal atau path file terunggah ke server lokal (misal: `/uploads/videos/...`). |
+| `isPublished` | Boolean | Jika `true`, video bisa dikirim ke playlist Video Edukasi Web Repository. |
 | `createdAt` / `updatedAt` | DateTime | Timestamp Prisma. |
 
 ---
@@ -140,6 +141,7 @@ Folder galeri untuk mengelompokkan video edukasi Web Repository.
 | --- | --- | --- |
 | `id` | Int | Primary key autoincrement. |
 | `name` | String unique | Nama folder yang tampil di dashboard. |
+| `isPublished` | Boolean | Jika `false`, semua video dalam folder ini disembunyikan dari playlist Video Edukasi. |
 | `createdAt` | DateTime | Timestamp pembuatan. |
 | `updatedAt` | DateTime | Timestamp perubahan terakhir. |
 
@@ -153,6 +155,7 @@ Daftar video edukasi Web Repository yang dapat diputar client Android saat `educ
 | `title` | String | Judul video. |
 | `videoUrl` | Text | URL eksternal atau path lokal `/uploads/videos/...`. |
 | `thumbnailUrl` | Text/null | URL eksternal atau path lokal `/uploads/video-thumbnails/...`. |
+| `isPublished` | Boolean | Toggle link video ke playlist Video Edukasi Web Repository. Video juga tidak dikirim jika foldernya nonaktif. |
 | `createdAt` | DateTime | Timestamp pembuatan. |
 | `updatedAt` | DateTime | Timestamp perubahan terakhir. |
 
