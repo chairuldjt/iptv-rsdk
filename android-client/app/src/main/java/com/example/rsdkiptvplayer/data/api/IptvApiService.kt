@@ -72,7 +72,10 @@ data class EducationVideoResponse(
 data class EducationVideoData(
     val id: Int,
     val title: String,
-    val video_url: String
+    val video_url: String,
+    val thumbnail_url: String? = null,
+    val folder_id: Int? = null,
+    val folder_name: String? = null
 )
 
 data class ChannelResponse(

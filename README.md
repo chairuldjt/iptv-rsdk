@@ -92,7 +92,7 @@ Untuk mempermudah pengembangan backend (Web Admin & API) serta frontend (Android
 ### Sisi Web Admin Backend:
 *   [ ] **Dashboard Device**: Memantau status perangkat (*Online*, *Offline*, *Disabled*, *Last IP*, *App Version*) dengan filter status.
 *   [ ] **M3U Playlist Parser**: Parsing link/file M3U menjadi database kategori dan channel terstruktur.
-*   [ ] **Web Video Repository (CRUD)**: Panel premium untuk mengelola data video edukasi (upload file MP4 atau direct URL stream) untuk didistribusikan ke STB.
+*   [ ] **Web Video Repository Gallery**: Galeri video edukasi dengan folder, rename folder, upload MP4, direct URL stream, dan thumbnail per video untuk didistribusikan ke STB.
 *   [ ] **Remote Management**: Mengubah aspek rasio, interval sinkronisasi, status aktif, dan reset setting dari jauh secara terpusat per perangkat atau global.
 *   [ ] **Remote Toggle Lock Settings**: Mengunci pengaturan lokal di STB agar pengguna biasa tidak bisa mengubah konfigurasi secara tidak sengaja.
 *   [ ] **Auto-Active Default Rule**: Pendaftaran perangkat baru otomatis diberi hak akses langsung aktif.
@@ -164,4 +164,3 @@ journalctl -u iptv-relay-all -f
 ```
 
 Jika menggunakan metode legacy ini, arahkan **HLS Relay Base URL** di dashboard Setup ke folder root output tersebut, misalnya: `http://10.55.1.5/relay`.
-

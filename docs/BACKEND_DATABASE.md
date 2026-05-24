@@ -132,6 +132,29 @@ Konfigurasi per device. Setiap device baru dibuatkan config dari default global 
 
 Catatan: default global **tidak** lagi disimpan sebagai `device_configs.deviceId = NULL`. Default global disimpan di `app_settings` dengan key `device.defaultConfig`, lalu disalin ke `device_configs` saat device baru register.
 
+### `EducationFolder`
+Folder galeri untuk mengelompokkan video edukasi Web Repository.
+
+| Kolom | Tipe | Catatan |
+| --- | --- | --- |
+| `id` | Int | Primary key autoincrement. |
+| `name` | String unique | Nama folder yang tampil di dashboard. |
+| `createdAt` | DateTime | Timestamp pembuatan. |
+| `updatedAt` | DateTime | Timestamp perubahan terakhir. |
+
+### `EducationVideo`
+Daftar video edukasi Web Repository yang dapat diputar client Android saat `educationSource=web`.
+
+| Kolom | Tipe | Catatan |
+| --- | --- | --- |
+| `id` | Int | Primary key autoincrement. |
+| `folderId` | Int/null | Relasi opsional ke `EducationFolder`, `SET NULL` saat folder dihapus. |
+| `title` | String | Judul video. |
+| `videoUrl` | Text | URL eksternal atau path lokal `/uploads/videos/...`. |
+| `thumbnailUrl` | Text/null | URL eksternal atau path lokal `/uploads/video-thumbnails/...`. |
+| `createdAt` | DateTime | Timestamp pembuatan. |
+| `updatedAt` | DateTime | Timestamp perubahan terakhir. |
+
 ### `device_logs`
 Log error dari Android.
 

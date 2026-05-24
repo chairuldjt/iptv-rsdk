@@ -54,3 +54,42 @@ body {
 .glow-indigo {
   box-shadow: 0 0 15px rgba(99, 102, 241, 0.15);
 }
+
+.field-input {
+  width: 100%;
+  border-radius: 0.75rem;
+  border: 1px solid rgb(30 41 59);
+  background: rgba(2, 6, 23, 0.72);
+  padding: 0.625rem 1rem;
+  color: white;
+  font-size: 0.875rem;
+  outline: none;
+  transition: border-color 0.2s ease, background-color 0.2s ease;
+}
+
+.field-input:focus {
+  border-color: var(--primary);
+  background: rgba(2, 6, 23, 0.9);
+}
+
+.field-input::placeholder {
+  color: rgb(100 116 139);
+}
+
+.file-input {
+  width: 100%;
+  cursor: pointer;
+  color: rgb(148 163 184);
+  font-size: 0.75rem;
+}
+
+.file-input::file-selector-button {
+  margin-right: 1rem;
+  border: 0;
+  border-radius: 0.75rem;
+  background: rgb(30 41 59);
+  padding: 0.5rem 1rem;
+  color: rgb(165 180 252);
+  font-size: 0.75rem;
+  font-weight: 700;
+}

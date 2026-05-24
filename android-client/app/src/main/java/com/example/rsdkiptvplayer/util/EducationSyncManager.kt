@@ -355,7 +355,7 @@ object EducationSyncManager {
         }
 
         // 1. Delete local files not present on web
-        val remoteNames = remoteVideos.map { getFileNameFromUrl(it.video_url, it.title) }.toSet()
+        val remoteNames = remoteVideos.map { getFileNameFromUrl(it.video_url, it.title, it.folder_name) }.toSet()
         val currentLocalFiles = localDir.listFiles() ?: emptyArray()
         currentLocalFiles.forEach { localFile ->
             if (localFile.name !in remoteNames) {
@@ -369,7 +369,7 @@ object EducationSyncManager {
         data class DownloadTask(val videoUrl: String, val fileName: String, val size: Long)
         
         val tasks = remoteVideos.map { video ->
-            val fileName = getFileNameFromUrl(video.video_url, video.title)
+            val fileName = getFileNameFromUrl(video.video_url, video.title, video.folder_name)
             val fullUrl = if (video.video_url.startsWith("http")) {
                 video.video_url
             } else {
@@ -456,13 +456,9 @@ object EducationSyncManager {
         dataStoreManager.addLog("Education web videos cached successfully: ${filesToDownload.size} files downloaded.")
     }
 
-    fun getFileNameFromUrl(url: String, title: String): String {
+    fun getFileNameFromUrl(url: String, title: String, folderName: String? = null): String {
         val cleanUrl = url.substringBefore('?').substringBefore('#')
-        val nameFromUrl = cleanUrl.substringAfterLast('/')
-        if (nameFromUrl.isNotBlank() && nameFromUrl.contains('.')) {
-            return nameFromUrl
-        }
-        // Fallback to title with extension
+        val nameFromUrl = cleanUrl.substringAfterLast('/').takeIf { it.isNotBlank() && it.contains('.') }
         val extension = when {
             url.endsWith(".mkv", ignoreCase = true) -> ".mkv"
             url.endsWith(".webm", ignoreCase = true) -> ".webm"
@@ -472,7 +468,16 @@ object EducationSyncManager {
             url.endsWith(".avi", ignoreCase = true) -> ".avi"
             else -> ".mp4"
         }
+        val safeFolderPrefix = folderName
+            ?.takeIf { it.isNotBlank() }
+            ?.replace(Regex("[\\\\/:*?\"<>|]"), "_")
+            ?.let { "$it - " }
+            ?: ""
         val safeTitle = title.replace(Regex("[\\\\/:*?\"<>|]"), "_")
-        return "$safeTitle$extension"
+        return if (nameFromUrl != null) {
+            "$safeFolderPrefix$nameFromUrl"
+        } else {
+            "$safeFolderPrefix$safeTitle$extension"
+        }
     }
 }

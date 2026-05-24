@@ -108,13 +108,26 @@ model DeviceConfig {
 }
 
 model EducationVideo {
-  id        Int      @id @default(autoincrement())
-  title     String
-  videoUrl  String   @db.Text
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id           Int              @id @default(autoincrement())
+  folderId     Int?
+  folder       EducationFolder? @relation(fields: [folderId], references: [id], onDelete: SetNull)
+  title        String
+  videoUrl     String           @db.Text
+  thumbnailUrl String?          @db.Text
+  createdAt    DateTime         @default(now())
+  updatedAt    DateTime         @updatedAt
+
+  @@index([folderId])
+  @@index([updatedAt])
 }
 
+model EducationFolder {
+  id        Int              @id @default(autoincrement())
+  name      String           @unique
+  createdAt DateTime         @default(now())
+  updatedAt DateTime         @updatedAt
+  videos    EducationVideo[]
+}
 
 model DeviceLog {
   id           Int      @id @default(autoincrement())

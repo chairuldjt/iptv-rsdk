@@ -310,11 +310,21 @@ Endpoint CRUD untuk mengelola video edukasi yang disimpan di repository web (Nex
 {
   "status": true,
   "message": "Videos loaded",
+  "folders": [
+    {
+      "id": 1,
+      "name": "Pencegahan Infeksi",
+      "video_count": 4
+    }
+  ],
   "data": [
     {
       "id": 1,
       "title": "Edukasi Kebersihan Gigi",
       "video_url": "/uploads/videos/1716301293_gigi.mp4",
+      "thumbnail_url": "/uploads/video-thumbnails/1716301293_gigi.jpg",
+      "folder_id": 1,
+      "folder_name": "Pencegahan Infeksi",
       "createdAt": "2026-05-24T06:50:00.000Z"
     }
   ]
@@ -326,13 +336,16 @@ Endpoint CRUD untuk mengelola video edukasi yang disimpan di repository web (Nex
 **Format:** `multipart/form-data`  
 **Payload:**
 - `title` (String): Judul video.
+- `folderId` (Int, opsional): Folder galeri tujuan.
 - `videoUrl` (String, opsional): Link URL video jika beraliran langsung eksternal.
 - `videoFile` (File, opsional): File MP4 video untuk diunggah ke server lokal.
+- `thumbnailUrl` (String, opsional): URL thumbnail eksternal.
+- `thumbnailFile` (File, opsional): Gambar thumbnail untuk diunggah ke server lokal.
 
 ### Update Video
 **Endpoint:** `PUT /api/education/videos/{id}`  
 **Format:** `multipart/form-data`  
-**Payload:** Sama dengan POST.
+**Payload:** Sama dengan POST, plus `removeThumbnail=on` untuk menghapus thumbnail.
 
 ### Delete Video
 **Endpoint:** `DELETE /api/education/videos/{id}`  
@@ -344,4 +357,3 @@ Endpoint CRUD untuk mengelola video edukasi yang disimpan di repository web (Nex
   "message": "Video berhasil dihapus dari repository!"
 }
 ```
-

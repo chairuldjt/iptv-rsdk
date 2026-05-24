@@ -181,7 +181,7 @@ class EducationViewModel(application: Application) : AndroidViewModel(applicatio
                                         val path = video.video_url.trimStart('/')
                                         "$base/$path"
                                     }
-                                    PlayItem(video.title, Uri.parse(fullUrl))
+                                    PlayItem(video.displayTitle(), Uri.parse(fullUrl))
                                 }
                             } else {
                                 throw IllegalStateException("Gagal memuat daftar video dari server web: HTTP ${response.code()}")
@@ -358,6 +358,11 @@ class EducationViewModel(application: Application) : AndroidViewModel(applicatio
         val domain = _domain.value.trim().ifBlank { null }
         return SingletonContext.getInstance()
             .withCredentials(NtlmPasswordAuthenticator(domain, username, password))
+    }
+
+    private fun com.example.rsdkiptvplayer.data.api.EducationVideoData.displayTitle(): String {
+        val folderName = folder_name?.takeIf { it.isNotBlank() }
+        return if (folderName == null) title else "$folderName / $title"
     }
 
     private fun String.isSupportedVideoName(): Boolean {
