@@ -56,6 +56,9 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
     private val _deviceId = MutableStateFlow("")
     val deviceId: StateFlow<String> = _deviceId.asStateFlow()
 
+    private val _serverUrl = MutableStateFlow("")
+    val serverUrl: StateFlow<String> = _serverUrl.asStateFlow()
+
     private val _aspectRatio = MutableStateFlow("fit")
     val aspectRatio: StateFlow<String> = _aspectRatio.asStateFlow()
 
@@ -72,6 +75,13 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         // Fetch device ID
         viewModelScope.launch {
             _deviceId.value = dataStoreManager.getDeviceId()
+        }
+
+        // Fetch server URL
+        viewModelScope.launch {
+            dataStoreManager.serverUrlFlow.collectLatest { url ->
+                _serverUrl.value = url
+            }
         }
 
         // Stop playback reactively when device is blocked

@@ -86,6 +86,7 @@ fun PlayerScreen(
     val isDeviceActive by viewModel.isDeviceActive.collectAsState()
     val aspectRatio by viewModel.aspectRatio.collectAsState()
     val technicianPin by viewModel.technicianPin.collectAsState()
+    val serverUrl by viewModel.serverUrl.collectAsState()
 
     DisposableEffect(Unit) {
         onDispose {
@@ -578,14 +579,19 @@ fun PlayerScreen(
                             horizontalArrangement = Arrangement.spacedBy(16.dp),
                             modifier = Modifier.fillMaxHeight()
                         ) {
-                            if (!ch.logo.isNullOrEmpty()) {
+                            val resolvedLogo = com.example.rsdkiptvplayer.util.LogoResolver.getEffectiveLogoUrl(
+                                channelLogo = ch.logo,
+                                channelName = ch.name,
+                                serverUrl = serverUrl
+                            )
+                            if (!resolvedLogo.isNullOrEmpty()) {
                                 Card(
                                     modifier = Modifier.size(54.dp),
                                     shape = RoundedCornerShape(8.dp),
                                     colors = CardDefaults.cardColors(containerColor = Color.White)
                                 ) {
                                     AsyncImage(
-                                        model = ch.logo,
+                                        model = resolvedLogo,
                                         contentDescription = ch.name,
                                         modifier = Modifier.fillMaxSize().padding(4.dp),
                                         contentScale = ContentScale.Fit
@@ -900,13 +906,18 @@ fun PlayerScreen(
                                                 )
                                             }
 
-                                            if (!ch.logo.isNullOrEmpty()) {
+                                            val resolvedLogo = com.example.rsdkiptvplayer.util.LogoResolver.getEffectiveLogoUrl(
+                                                channelLogo = ch.logo,
+                                                channelName = ch.name,
+                                                serverUrl = serverUrl
+                                            )
+                                            if (!resolvedLogo.isNullOrEmpty()) {
                                                 Card(
                                                     modifier = Modifier.size(34.dp),
                                                     colors = CardDefaults.cardColors(containerColor = Color.White)
                                                 ) {
                                                     AsyncImage(
-                                                        model = ch.logo,
+                                                        model = resolvedLogo,
                                                         contentDescription = ch.name,
                                                         modifier = Modifier.fillMaxSize().padding(2.dp),
                                                         contentScale = ContentScale.Fit

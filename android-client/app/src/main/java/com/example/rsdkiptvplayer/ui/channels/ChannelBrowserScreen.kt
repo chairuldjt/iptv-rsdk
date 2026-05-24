@@ -73,6 +73,7 @@ fun ChannelBrowserScreen(
     val categories by playerViewModel.categories.collectAsState()
     val isLoading by playerViewModel.isLoading.collectAsState()
     val selectedChannel by playerViewModel.selectedChannel.collectAsState()
+    val serverUrl by playerViewModel.serverUrl.collectAsState()
 
     var selectedCategory by remember { mutableStateOf("ALL") }
     val backFocusRequester = remember { FocusRequester() }
@@ -470,6 +471,7 @@ fun ChannelBrowserScreen(
                             isExplicitlyFocused = focusSection == 2 && focusedChannelIndex == index,
                             isCurrent = channel.id == selectedChannel?.id,
                             showCategory = showCategoryFilter,
+                            serverUrl = serverUrl,
                             onClick = { onChannelSelected(channel.id) }
                         )
                     }
@@ -540,6 +542,7 @@ fun ChannelGridCard(
     isExplicitlyFocused: Boolean = false,
     isCurrent: Boolean = false,
     showCategory: Boolean = true,
+    serverUrl: String,
     onClick: () -> Unit
 ) {
     var hasRealFocus by remember { mutableStateOf(false) }
@@ -613,14 +616,19 @@ fun ChannelGridCard(
             Spacer(modifier = Modifier.height(2.dp))
 
             // Channel Logo
-            if (!channel.logo.isNullOrEmpty()) {
+            val resolvedLogo = com.example.rsdkiptvplayer.util.LogoResolver.getEffectiveLogoUrl(
+                channelLogo = channel.logo,
+                channelName = channel.name,
+                serverUrl = serverUrl
+            )
+            if (!resolvedLogo.isNullOrEmpty()) {
                 Card(
                     modifier = Modifier.size(56.dp),
                     shape = RoundedCornerShape(10.dp),
                     colors = CardDefaults.cardColors(containerColor = Color.White)
                 ) {
                     AsyncImage(
-                        model = channel.logo,
+                        model = resolvedLogo,
                         contentDescription = channel.name,
                         modifier = Modifier
                             .fillMaxSize()
