@@ -6,7 +6,6 @@ import android.media.AudioAttributes
 import android.media.SoundPool
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.Crossfade
-import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
@@ -58,7 +57,6 @@ import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Offset as TextOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -122,9 +120,6 @@ fun HomeScreen(
         }
     }
     var selectedHomeBackground by remember { mutableIntStateOf(R.drawable.home_bg_tv) }
-    var selectedHomeAccent by remember { mutableStateOf(Color(0xFFFFE9A6)) }
-    val screenGlowPulse = remember { Animatable(0f) }
-    var hasTriggeredScreenGlow by remember { mutableStateOf(false) }
 
     LaunchedEffect(Unit) {
         resolvedDeviceId = dataStoreManager.getDeviceId()
@@ -252,42 +247,6 @@ fun HomeScreen(
                 )
         )
 
-        LaunchedEffect(selectedHomeBackground) {
-            if (!hasTriggeredScreenGlow) {
-                hasTriggeredScreenGlow = true
-                return@LaunchedEffect
-            }
-            screenGlowPulse.snapTo(0f)
-            screenGlowPulse.animateTo(
-                targetValue = if (BuildConfig.HOME_LOW_EFFECT_MODE) 0.58f else 0.66f,
-                animationSpec = tween(durationMillis = 120)
-            )
-            screenGlowPulse.animateTo(
-                targetValue = 0f,
-                animationSpec = tween(durationMillis = if (BuildConfig.HOME_LOW_EFFECT_MODE) 320 else 420)
-            )
-        }
-
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(
-                    Brush.radialGradient(
-                        colors = listOf(
-                            selectedHomeAccent.copy(alpha = screenGlowPulse.value),
-                            selectedHomeAccent.copy(alpha = screenGlowPulse.value * 0.58f),
-                            selectedHomeAccent.copy(alpha = screenGlowPulse.value * 0.18f),
-                            Color.Transparent
-                        ),
-                        center = Offset(
-                            x = if (isSmallScreen) 540f else 960f,
-                            y = if (isSmallScreen) 330f else 360f
-                        ),
-                        radius = if (isSmallScreen) 980f else 1680f
-                    )
-                )
-        )
-
         Column(
             modifier = Modifier
                 .fillMaxSize()
@@ -350,7 +309,6 @@ fun HomeScreen(
                 menuFocusRequester = menuFocusRequester,
                 onSelectionChanged = { item ->
                     selectedHomeBackground = item.backgroundRes
-                    selectedHomeAccent = item.accent
                 }
             )
         }
