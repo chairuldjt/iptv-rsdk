@@ -339,8 +339,8 @@ private fun HospitalityMenuBar(
             .setMaxStreams(2)
             .setAudioAttributes(
                 AudioAttributes.Builder()
-                    .setUsage(AudioAttributes.USAGE_ASSISTANCE_SONIFICATION)
-                    .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
+                    .setUsage(AudioAttributes.USAGE_MEDIA)
+                    .setContentType(AudioAttributes.CONTENT_TYPE_MUSIC)
                     .build()
             )
             .build()
@@ -352,7 +352,7 @@ private fun HospitalityMenuBar(
             title = "EDUKASI",
             subtitle = when {
                 educationPath == null -> "Memuat..."
-                educationPath.isBlank() -> "Set path"
+                educationPath.isBlank() -> "Video Edukasi Pasien"
                 else -> "Video RS"
             },
             accent = Color(0xFF86EFAC),
