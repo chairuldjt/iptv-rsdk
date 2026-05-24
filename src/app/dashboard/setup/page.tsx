@@ -355,12 +355,6 @@ export default async function SetupPage({
                 title="Auto Start on Boot"
                 description="STB baru otomatis membuka aplikasi setelah perangkat menyala."
               />
-              <Toggle
-                name="muteSelectionSound"
-                defaultChecked={config.muteSelectionSound}
-                title="Matikan Suara Navigasi Home"
-                description="STB baru akan menonaktifkan suara saat navigasi menu home."
-              />
             </div>
           </section>
 

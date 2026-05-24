@@ -43,7 +43,6 @@ class IptvRepository(
     val aspectRatioFlow: Flow<String> = dataStoreManager.aspectRatioFlow
     val diagnosticLogsFlow: Flow<List<String>> = dataStoreManager.diagnosticLogsFlow
     val technicianPinFlow: Flow<String> = dataStoreManager.technicianPinFlow
-    val muteSelectionSoundFlow: Flow<Boolean> = dataStoreManager.muteSelectionSoundFlow
 
     // Handshake & Self Register on boot/startup
     suspend fun registerDevice(): Boolean {
@@ -130,7 +129,6 @@ class IptvRepository(
                     dataStoreManager.setEducationSource(config.education_source ?: "smb")
                     dataStoreManager.setEducationPlaybackMode(config.education_playback_mode ?: "copy")
                     dataStoreManager.setAutoStartOnBoot(config.auto_start_on_boot ?: false)
-                    dataStoreManager.setMuteSelectionSound(config.mute_selection_sound ?: false)
 
                     if (config.force_sync == true) {
                         dataStoreManager.addLog("Remote trigger: FORCE SYNC enabled!")
