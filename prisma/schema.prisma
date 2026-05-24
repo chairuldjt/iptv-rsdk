@@ -103,8 +103,6 @@ model DeviceConfig {
   educationSource       String   @default("smb")          // "smb", "web"
   educationPlaybackMode String   @default("copy")         // "copy", "stream"
   educationForceSync    Boolean  @default(false)
-  entertainmentCustomTitle String  @default("Custom Konten")
-  entertainmentCustomUrl   String? @db.Text
   createdAt             DateTime @default(now())
   updatedAt             DateTime @updatedAt
 }
@@ -129,6 +127,21 @@ model EducationFolder {
   createdAt DateTime         @default(now())
   updatedAt DateTime         @updatedAt
   videos    EducationVideo[]
+}
+
+model EntertainmentItem {
+  id           Int      @id @default(autoincrement())
+  title        String
+  subtitle     String   @default("")
+  url          String?  @db.Text
+  contentType  String   @default("webview") // "webview", "media_player", "m3u_player"
+  thumbnailUrl String?  @db.Text
+  isActive     Boolean  @default(true)
+  sortOrder    Int      @default(0)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@index([isActive, sortOrder])
 }
 
 model DeviceLog {

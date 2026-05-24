@@ -76,9 +76,7 @@ Server juga mencoba mencocokkan `mac_address` saat `device_id` baru belum ditemu
     "education_play_order": "alphabetical",
     "education_source": "smb",
     "education_playback_mode": "copy",
-    "education_force_sync": false,
-    "entertainment_custom_title": "Custom Konten",
-    "entertainment_custom_url": "https://contoh-rs.local/hiburan"
+    "education_force_sync": false
   }
 }
 ```
@@ -98,9 +96,6 @@ Device tidak ditemukan mengembalikan HTTP `404` dengan message `Device not found
 | `education_source` | String | Sumber video edukasi (`smb` atau `web`). |
 | `education_playback_mode` | String | Mode putar video edukasi (`copy` ke lokal atau `stream` langsung). |
 | `education_*` | String | Path SMB, kredensial, repeat mode, dan urutan playlist edukasi. |
-| `entertainment_custom_title` | String | Label opsi Custom Konten pada menu Hiburan Android. |
-| `entertainment_custom_url` | String | URL WebView untuk opsi Custom Konten. |
-
 ---
 
 ## 3. Device Channels
@@ -334,6 +329,36 @@ Endpoint CRUD untuk mengelola video edukasi yang disimpan di repository web (Nex
   ]
 }
 ```
+
+---
+
+## 11. Entertainment Items
+
+Endpoint untuk daftar item menu Hiburan Android. Item yang `isActive=false` atau URL kosong tidak dikirim ke client.
+
+### Get Entertainment Items
+**Endpoint:** `GET /api/entertainment/items`
+
+**Response:**
+```json
+{
+  "status": true,
+  "message": "Entertainment items loaded",
+  "data": [
+    {
+      "id": 1,
+      "title": "SoundCloud",
+      "subtitle": "Musik dan audio streaming",
+      "url": "https://soundcloud.com",
+      "content_type": "webview",
+      "thumbnail_url": "/uploads/entertainment-thumbnails/default-soundcloud.svg",
+      "sort_order": 10
+    }
+  ]
+}
+```
+
+`content_type` mendukung `webview`, `media_player`, dan `m3u_player`.
 
 ### Add New Video
 **Endpoint:** `POST /api/education/videos`  

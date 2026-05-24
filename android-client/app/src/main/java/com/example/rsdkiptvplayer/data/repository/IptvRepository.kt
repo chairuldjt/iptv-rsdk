@@ -128,10 +128,6 @@ class IptvRepository(
                     )
                     dataStoreManager.setEducationSource(config.education_source ?: "smb")
                     dataStoreManager.setEducationPlaybackMode(config.education_playback_mode ?: "copy")
-                    dataStoreManager.setEntertainmentCustomContent(
-                        config.entertainment_custom_title ?: "Custom Konten",
-                        config.entertainment_custom_url ?: ""
-                    )
                     dataStoreManager.setAutoStartOnBoot(config.auto_start_on_boot ?: false)
 
                     if (config.force_sync == true) {

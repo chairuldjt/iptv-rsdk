@@ -95,7 +95,7 @@ Untuk mempermudah pengembangan backend (Web Admin & API) serta frontend (Android
 *   [ ] **Web Video Repository Gallery**: Galeri video edukasi dengan folder, rename folder, upload MP4, direct URL stream, dan thumbnail per video untuk didistribusikan ke STB.
 *   [ ] **Remote Management**: Mengubah aspek rasio, interval sinkronisasi, status aktif, dan reset setting dari jauh secara terpusat per perangkat atau global.
 *   [ ] **Remote Toggle Lock Settings**: Mengunci pengaturan lokal di STB agar pengguna biasa tidak bisa mengubah konfigurasi secara tidak sengaja.
-*   [ ] **Remote Entertainment Content**: Mengatur URL Custom Konten untuk menu Hiburan Android dari dashboard web, berdampingan dengan SoundCloud dan YouTube WebView.
+*   [ ] **Remote Entertainment Content**: Mengatur beberapa item menu Hiburan Android dari dashboard web, termasuk WebView, media player, M3U player, thumbnail, judul, sub teks, serta default SoundCloud dan YouTube yang bisa diubah.
 *   [ ] **Auto-Active Default Rule**: Pendaftaran perangkat baru otomatis diberi hak akses langsung aktif.
 *   [ ] **Device Blacklisting**: Kemampuan menonaktifkan perangkat dari dashboard web, yang secara instan akan memblokir akses STB dan menampilkan pesan pemblokiran.
 *   [ ] **Offline Cleanup**: Threshold auto-delete device offline lama, dengan pengecualian untuk device yang sengaja dinonaktifkan.

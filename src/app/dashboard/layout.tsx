@@ -85,6 +85,17 @@ export default function DashboardLayout({
           </Link>
 
           <Link
+            href="/dashboard/entertainment"
+            className="flex items-center gap-3 px-4 py-3 rounded-xl text-slate-300 hover:text-white hover:bg-slate-800/50 transition-all duration-200 group"
+          >
+            <svg className="w-5 h-5 text-slate-400 group-hover:text-primary transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19V6l12-2v13" />
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM21 17c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2z" />
+            </svg>
+            <span className="font-medium text-sm">Entertainment</span>
+          </Link>
+
+          <Link
             href="/dashboard/logs"
             className="flex items-center gap-3 px-4 py-3 rounded-xl text-slate-300 hover:text-white hover:bg-slate-800/50 transition-all duration-200 group"
           >

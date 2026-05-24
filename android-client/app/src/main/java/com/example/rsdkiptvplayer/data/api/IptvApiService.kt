@@ -60,9 +60,7 @@ data class ConfigData(
     val education_play_order: String? = "alphabetical",
     val education_source: String? = "smb",
     val education_playback_mode: String? = "copy",
-    val education_force_sync: Boolean? = false,
-    val entertainment_custom_title: String? = "Custom Konten",
-    val entertainment_custom_url: String? = ""
+    val education_force_sync: Boolean? = false
 )
 
 data class EducationVideoResponse(
@@ -78,6 +76,22 @@ data class EducationVideoData(
     val thumbnail_url: String? = null,
     val folder_id: Int? = null,
     val folder_name: String? = null
+)
+
+data class EntertainmentItemsResponse(
+    val status: Boolean,
+    val message: String,
+    val data: List<EntertainmentItemData>?
+)
+
+data class EntertainmentItemData(
+    val id: Int,
+    val title: String,
+    val subtitle: String?,
+    val url: String?,
+    val content_type: String? = "webview",
+    val thumbnail_url: String? = null,
+    val sort_order: Int? = 0
 )
 
 data class ChannelResponse(
@@ -161,6 +175,9 @@ interface IptvApiService {
 
     @GET("api/education/videos")
     suspend fun getEducationVideos(): Response<EducationVideoResponse>
+
+    @GET("api/entertainment/items")
+    suspend fun getEntertainmentItems(): Response<EntertainmentItemsResponse>
 }
 
 data class UpdateCheckResponse(

@@ -90,8 +90,6 @@ export async function GET(
         education_source: config.educationSource || 'smb',
         education_playback_mode: config.educationPlaybackMode || 'copy',
         education_force_sync: currentEducationForceSync,
-        entertainment_custom_title: config.entertainmentCustomTitle || 'Custom Konten',
-        entertainment_custom_url: config.entertainmentCustomUrl || '',
       },
     })
   } catch (error: unknown) {

@@ -129,8 +129,6 @@ Konfigurasi per device. Setiap device baru dibuatkan config dari default global 
 | `educationSource` | String | Sumber video edukasi (`smb` atau `web`). |
 | `educationPlaybackMode` | String | Mode putar video (`copy` atau `stream`). |
 | `educationForceSync` | Boolean | Trigger sync edukasi sekali pakai. |
-| `entertainmentCustomTitle` | String | Label opsi Custom Konten pada menu Hiburan Android. |
-| `entertainmentCustomUrl` | Text/null | URL WebView untuk opsi Custom Konten. |
 
 Catatan: default global **tidak** lagi disimpan sebagai `device_configs.deviceId = NULL`. Default global disimpan di `app_settings` dengan key `device.defaultConfig`, lalu disalin ke `device_configs` saat device baru register.
 
@@ -154,6 +152,22 @@ Daftar video edukasi Web Repository yang dapat diputar client Android saat `educ
 | `title` | String | Judul video. |
 | `videoUrl` | Text | URL eksternal atau path lokal `/uploads/videos/...`. |
 | `thumbnailUrl` | Text/null | URL eksternal atau path lokal `/uploads/video-thumbnails/...`. |
+| `createdAt` | DateTime | Timestamp pembuatan. |
+| `updatedAt` | DateTime | Timestamp perubahan terakhir. |
+
+### `EntertainmentItem`
+Daftar item menu Hiburan Android. Item nonaktif atau URL kosong akan disembunyikan dari client.
+
+| Kolom | Tipe | Catatan |
+| --- | --- | --- |
+| `id` | Int | Primary key autoincrement. |
+| `title` | String | Judul item. |
+| `subtitle` | String | Sub teks pada kartu Android. |
+| `url` | Text/null | URL WebView, media langsung, atau playlist M3U. |
+| `contentType` | String | `webview`, `media_player`, atau `m3u_player`. |
+| `thumbnailUrl` | Text/null | Thumbnail custom atau default. |
+| `isActive` | Boolean | Toggle tampil/sembunyi. |
+| `sortOrder` | Int | Urutan tampil di aplikasi. |
 | `createdAt` | DateTime | Timestamp pembuatan. |
 | `updatedAt` | DateTime | Timestamp perubahan terakhir. |
 
