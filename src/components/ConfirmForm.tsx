@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState, useRef, useEffect } from 'react'
+import React, { useState, useRef, useTransition } from 'react'
 
 interface ConfirmFormProps extends React.FormHTMLAttributes<HTMLFormElement> {
   action: (formData: FormData) => void | Promise<void>
@@ -8,80 +8,92 @@ interface ConfirmFormProps extends React.FormHTMLAttributes<HTMLFormElement> {
   children: React.ReactNode
 }
 
-export default function ConfirmForm({
-  action,
-  message,
-  children,
-  ...props
-}: ConfirmFormProps) {
+export default function ConfirmForm({ action, message, children, ...props }: ConfirmFormProps) {
   const [showModal, setShowModal] = useState(false)
-  const [isConfirmed, setIsConfirmed] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [isPending, startTransition] = useTransition()
   const formRef = useRef<HTMLFormElement>(null)
 
   const handleInitialSubmit = (e: React.FormEvent<HTMLFormElement>) => {
-    // Jika belum dikonfirmasi di modal, cegah pengiriman dan tampilkan modal
-    if (!isConfirmed) {
-      e.preventDefault()
-      setShowModal(true)
-    }
-    // Jika sudah isConfirmed = true, maka event submit ini akan dibiarkan lewat ke 'action'
+    e.preventDefault()
+    setError(null)
+    setShowModal(true)
   }
 
   const handleConfirm = () => {
-    setIsConfirmed(true)
+    setError(null)
+    const formData = new FormData(formRef.current || undefined)
+    startTransition(async () => {
+      try {
+        await action(formData)
+        setShowModal(false)
+      } catch (err: unknown) {
+        const isRedirect =
+          err instanceof Error && (err.message.includes('NEXT_REDIRECT') || 'digest' in err && String((err as { digest?: string }).digest).includes('NEXT_REDIRECT'))
+        if (isRedirect) {
+          setShowModal(false)
+          return
+        }
+        console.error('Action failed:', err)
+        setError(err instanceof Error ? err.message : 'Gagal memproses penghapusan data.')
+      }
+    })
   }
-
-  // Gunakan useEffect untuk memicu submit setelah state isConfirmed berubah menjadi true
-  useEffect(() => {
-    if (isConfirmed && formRef.current) {
-      formRef.current.requestSubmit()
-      
-      // Reset state agar bisa digunakan lagi nanti
-      setIsConfirmed(false)
-      setShowModal(false)
-    }
-  }, [isConfirmed])
 
   return (
     <>
-      <form 
-        ref={formRef} 
-        action={action} 
-        onSubmit={handleInitialSubmit} 
-        {...props}
-      >
+      <form ref={formRef} action={action} onSubmit={handleInitialSubmit} {...props}>
         {children}
       </form>
 
-      {/* Confirmation Modal */}
       {showModal && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-slate-950/90 backdrop-blur-md animate-fade-in">
-          <div className="w-full max-w-sm glass-card p-6 rounded-2xl border border-rose-500/30 shadow-2xl animate-slide-up text-center">
-            <div className="w-16 h-16 bg-rose-500/10 rounded-full flex items-center justify-center mx-auto mb-4 border border-rose-500/20">
-              <svg className="w-8 h-8 text-rose-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-background/90 backdrop-blur-sm animate-fade-in">
+          <div className="w-full max-w-md card p-6 rounded-2xl border border-border shadow-2xl animate-slide-up text-center space-y-6">
+            <div className="w-12 h-12 rounded-full bg-destructive/10 border border-destructive/20 flex items-center justify-center mx-auto text-destructive">
+              <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z" />
               </svg>
             </div>
-            
-            <h3 className="text-xl font-bold text-white mb-2">Konfirmasi Hapus</h3>
-            <p className="text-slate-400 text-sm mb-6 leading-relaxed">
-              {message}
-            </p>
 
-            <div className="flex flex-col gap-3">
+            <div className="space-y-2">
+              <h3 className="text-lg font-bold text-foreground">Konfirmasi Hapus</h3>
+              <p className="text-xs text-muted-foreground leading-relaxed px-2">
+                {message || 'Data yang dihapus tidak dapat dikembalikan. Apakah Anda yakin ingin melanjutkan?'}
+              </p>
+            </div>
+
+            {error && (
+              <div className="p-3 rounded-lg bg-destructive/10 border border-destructive/20 text-destructive text-xs text-left font-semibold leading-relaxed animate-fade-in">
+                {error}
+              </div>
+            )}
+
+            <div className="flex flex-col sm:flex-row gap-3">
               <button
                 type="button"
-                onClick={handleConfirm}
-                className="w-full py-3 rounded-xl bg-rose-500 hover:bg-rose-600 font-bold text-white text-sm transition-all duration-200 cursor-pointer text-center shadow-lg shadow-rose-500/20"
+                disabled={isPending}
+                onClick={() => setShowModal(false)}
+                className="flex-1 order-2 sm:order-1 btn btn-secondary btn-sm py-2.5"
               >
-                Ya, Hapus Sekarang
+                Batal
               </button>
               <button
                 type="button"
-                onClick={() => setShowModal(false)}
-                className="w-full py-3 rounded-xl bg-slate-800 hover:bg-slate-700 font-bold text-slate-300 text-sm transition-all duration-200 cursor-pointer text-center"
+                disabled={isPending}
+                onClick={handleConfirm}
+                className="flex-1 order-1 sm:order-2 btn btn-destructive btn-sm py-2.5"
               >
-                Batal
+                {isPending ? (
+                  <>
+                    <svg className="animate-spin h-3.5 w-3.5" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                    </svg>
+                    Menghapus...
+                  </>
+                ) : (
+                  'Ya, Hapus Sekarang'
+                )}
               </button>
             </div>
           </div>

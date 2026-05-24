@@ -8,11 +8,7 @@ interface DevicePaginationProps {
   currentPage: number
 }
 
-export default function DevicePagination({
-  totalItems,
-  pageSize,
-  currentPage,
-}: DevicePaginationProps) {
+export default function DevicePagination({ totalItems, pageSize, currentPage }: DevicePaginationProps) {
   const router = useRouter()
   const pathname = usePathname()
   const searchParams = useSearchParams()
@@ -26,92 +22,64 @@ export default function DevicePagination({
     router.push(`${pathname}?${params.toString()}`, { scroll: false })
   }
 
-  // Generate page numbers to show
   const getPageNumbers = () => {
-    const pages = []
-    const range = 1 // how many pages to show around current page
-    
+    const pages: Array<number | string> = []
+    const range = 1
     for (let i = 1; i <= totalPages; i++) {
-      if (
-        i === 1 ||
-        i === totalPages ||
-        (i >= currentPage - range && i <= currentPage + range)
-      ) {
+      if (i === 1 || i === totalPages || (i >= currentPage - range && i <= currentPage + range)) {
         pages.push(i)
-      } else if (
-        i === currentPage - range - 1 ||
-        i === currentPage + range + 1
-      ) {
+      } else if (i === currentPage - range - 1 || i === currentPage + range + 1) {
         pages.push('...')
       }
     }
-    
-    // Filter duplicates of '...'
-    const filteredPages: Array<number | string> = []
+    const filtered: Array<number | string> = []
     pages.forEach((p) => {
-      if (p === '...' && filteredPages[filteredPages.length - 1] === '...') {
-        return
-      }
-      filteredPages.push(p)
+      if (p === '...' && filtered[filtered.length - 1] === '...') return
+      filtered.push(p)
     })
-    return filteredPages
+    return filtered
   }
 
   const pages = getPageNumbers()
-
-  // Calculate item range
   const startItem = (currentPage - 1) * pageSize + 1
   const endItem = Math.min(currentPage * pageSize, totalItems)
 
   return (
-    <div className="flex flex-col sm:flex-row items-center justify-between gap-4 px-6 py-5 border-t border-slate-800 bg-slate-950/20">
-      {/* Items status */}
-      <span className="text-xs text-slate-400">
-        Showing <strong className="text-white">{startItem}-{endItem}</strong> of <strong className="text-white">{totalItems}</strong> devices
+    <div className="flex flex-col sm:flex-row items-center justify-between gap-4 px-5 py-4 border-t border-border">
+      <span className="text-xs text-muted-foreground">
+        Showing <strong className="text-foreground">{startItem}-{endItem}</strong> of <strong className="text-foreground">{totalItems}</strong> devices
       </span>
-
-      {/* Navigation Buttons */}
       <div className="flex items-center gap-1.5">
-        {/* Previous Button */}
         <button
           onClick={() => handlePageChange(currentPage - 1)}
           disabled={currentPage === 1}
-          className="px-3 py-1.5 bg-slate-800/80 hover:bg-slate-700/80 disabled:opacity-30 disabled:cursor-not-allowed text-slate-300 hover:text-white rounded-xl border border-slate-700/50 shadow-sm transition-all text-xs font-bold cursor-pointer"
+          className="btn btn-xs btn-ghost disabled:opacity-30"
         >
           Prev
         </button>
-
-        {/* Page numbers */}
         {pages.map((p, idx) => {
           if (p === '...') {
-            return (
-              <span key={`dots-${idx}`} className="px-1.5 text-slate-500 font-bold select-none text-xs">
-                ...
-              </span>
-            )
+            return <span key={`dots-${idx}`} className="px-1 text-muted-foreground text-xs">...</span>
           }
-
           const pageNum = p as number
           return (
             <button
               key={`page-${pageNum}`}
               onClick={() => handlePageChange(pageNum)}
-              className={`w-7.5 h-7.5 flex items-center justify-center rounded-xl text-xs font-bold border transition-all cursor-pointer ${
+              className={`w-8 h-8 flex items-center justify-center rounded-lg text-xs font-semibold border transition-all ${
                 currentPage === pageNum
-                  ? 'bg-indigo-600 border-indigo-500 text-white'
-                  : 'bg-slate-800/50 border-slate-800 text-slate-400 hover:text-white hover:bg-slate-850'
+                  ? 'bg-primary border-primary text-primary-foreground'
+                  : 'border-border text-muted-foreground hover:text-foreground hover:bg-accent/50'
               }`}
             >
               {pageNum}
             </button>
           )
         })}
-
-        {/* Next Button */}
         <button
           onClick={() => handlePageChange(currentPage + 1)}
           disabled={currentPage === totalPages}
-          className="px-3 py-1.5 bg-slate-800/80 hover:bg-slate-700/80 disabled:opacity-30 disabled:cursor-not-allowed text-slate-300 hover:text-white rounded-xl border border-slate-700/50 shadow-sm transition-all text-xs font-bold cursor-pointer"
+          className="btn btn-xs btn-ghost disabled:opacity-30"
         >
           Next
         </button>

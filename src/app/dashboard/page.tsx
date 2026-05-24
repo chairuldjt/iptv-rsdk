@@ -1,21 +1,19 @@
 import prisma from '@/lib/db'
 import { getOnlineThreshold } from '@/lib/time'
 import Link from 'next/link'
+import StatCard from '@/components/StatCard'
+import PageHeader from '@/components/PageHeader'
 
-export const revalidate = 0 // Disable cache for live stats
+export const revalidate = 0
 
 export default async function DashboardPage() {
-  // Fetch stats from DB
   const totalDevices = await prisma.device.count()
   const activeDevices = await prisma.device.count({ where: { isActive: true } })
-  
-  // A device is considered online if it had a heartbeat in the last 10 minutes (600 seconds)
+
   const tenMinutesAgo = getOnlineThreshold(10)
   const onlineDevices = await prisma.device.count({
     where: {
-      lastOnline: {
-        gte: tenMinutesAgo,
-      },
+      lastOnline: { gte: tenMinutesAgo },
       isActive: true,
     },
   })
@@ -24,127 +22,116 @@ export default async function DashboardPage() {
   const totalChannels = await prisma.channel.count()
   const totalLogs = await prisma.deviceLog.count()
 
-  // Fetch 5 recently active devices
   const recentDevices = await prisma.device.findMany({
     orderBy: { lastOnline: 'desc' },
     take: 5,
   })
 
-  // Fetch 5 recent error logs
   const recentLogs = await prisma.deviceLog.findMany({
     orderBy: { createdAt: 'desc' },
     take: 5,
-    include: {
-      device: true,
-    },
+    include: { device: true },
   })
 
   return (
     <div className="space-y-8 animate-fade-in">
-      {/* Title */}
-      <div>
-        <h2 className="text-3xl font-extrabold tracking-tight text-white">Dashboard Overview</h2>
-        <p className="text-slate-400 mt-1 text-sm">Real-time status of your RSDK IPTV player fleet and channel distribution.</p>
+      <PageHeader
+        title="Dashboard Overview"
+        description="Real-time status of your RSDK IPTV player fleet and channel distribution."
+      />
+
+      {/* Stats Grid */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <StatCard
+          title="Total Devices"
+          value={totalDevices}
+          subtitle={`${activeDevices} Active · ${totalDevices - activeDevices} Inactive`}
+          variant="info"
+          icon={
+            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M10.5 1.5H8.25A2.25 2.25 0 006 3.75v16.5a2.25 2.25 0 002.25 2.25h7.5A2.25 2.25 0 0018 20.25V3.75a2.25 2.25 0 00-2.25-2.25H13.5m-3 0V3h3V1.5m-3 0h3m-3 18.75h3" />
+            </svg>
+          }
+        />
+        <StatCard
+          title="Online STBs"
+          value={onlineDevices}
+          subtitle="Active heartbeats (10 min)"
+          variant="success"
+          icon={
+            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 13.5l10.5-11.25L12 10.5h8.25L9.75 21.75 12 13.5H3.75z" />
+            </svg>
+          }
+        />
+        <StatCard
+          title="Total Channels"
+          value={totalChannels}
+          subtitle={`From ${totalPlaylists} M3U Playlists`}
+          variant="info"
+          icon={
+            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 10.5l4.72-4.72a.75.75 0 011.28.53v11.38a.75.75 0 01-1.28.53l-4.72-4.72M4.5 18.75h9.75a2.25 2.25 0 002.25-2.25V7.5a2.25 2.25 0 00-2.25-2.25H4.5A2.25 2.25 0 002.25 7.5v9a2.25 2.25 0 002.25 2.25z" />
+            </svg>
+          }
+        />
+        <StatCard
+          title="Playback Errors"
+          value={totalLogs}
+          subtitle="Urgent logs registered"
+          variant="destructive"
+          icon={
+            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z" />
+            </svg>
+          }
+        />
       </div>
 
-      {/* Grid Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        {/* Card 1 */}
-        <div className="glass-card p-6 rounded-2xl flex items-center justify-between">
-          <div>
-            <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Total Devices</span>
-            <h3 className="text-3xl font-extrabold text-white mt-1">{totalDevices}</h3>
-            <span className="text-xs text-emerald-400 font-medium mt-1 inline-block">{activeDevices} Active ({totalDevices - activeDevices} Inactive)</span>
-          </div>
-          <div className="w-12 h-12 rounded-xl bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center text-indigo-400 glow-indigo">
-            <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z" />
-            </svg>
-          </div>
-        </div>
-
-        {/* Card 2 */}
-        <div className="glass-card p-6 rounded-2xl flex items-center justify-between">
-          <div>
-            <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Online STBs</span>
-            <h3 className="text-3xl font-extrabold text-emerald-400 mt-1">{onlineDevices}</h3>
-            <span className="text-xs text-slate-400 font-medium mt-1 inline-block">Active heartbeats (10m)</span>
-          </div>
-          <div className="w-12 h-12 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400 glow-green">
-            <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
-            </svg>
-          </div>
-        </div>
-
-        {/* Card 3 */}
-        <div className="glass-card p-6 rounded-2xl flex items-center justify-between">
-          <div>
-            <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Total Channels</span>
-            <h3 className="text-3xl font-extrabold text-violet-400 mt-1">{totalChannels}</h3>
-            <span className="text-xs text-slate-400 font-medium mt-1 inline-block">From {totalPlaylists} M3U Playlists</span>
-          </div>
-          <div className="w-12 h-12 rounded-xl bg-violet-500/10 border border-violet-500/20 flex items-center justify-center text-violet-400">
-            <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 00-2 2z" />
-            </svg>
-          </div>
-        </div>
-
-        {/* Card 4 */}
-        <div className="glass-card p-6 rounded-2xl flex items-center justify-between">
-          <div>
-            <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Playback Errors</span>
-            <h3 className="text-3xl font-extrabold text-rose-500 mt-1">{totalLogs}</h3>
-            <span className="text-xs text-rose-400 font-medium mt-1 inline-block">Urgent logs registered</span>
-          </div>
-          <div className="w-12 h-12 rounded-xl bg-rose-500/10 border border-rose-500/20 flex items-center justify-center text-rose-500">
-            <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-            </svg>
-          </div>
-        </div>
-      </div>
-
-      {/* Main Grid Split */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+      {/* Main Grid */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Recent Devices */}
-        <div className="glass-card rounded-2xl border border-border overflow-hidden">
-          <div className="px-6 py-5 border-b border-border flex items-center justify-between">
-            <h4 className="font-bold text-white text-base">Recently Active Devices</h4>
-            <Link href="/dashboard/devices" className="text-xs font-bold text-indigo-400 hover:text-indigo-300">View All →</Link>
+        <div className="card rounded-2xl overflow-hidden border-border">
+          <div className="px-5 py-4 border-b border-border flex items-center justify-between">
+            <h4 className="font-semibold text-foreground text-sm">Recently Active Devices</h4>
+            <Link href="/dashboard/devices" className="text-xs font-semibold text-primary hover:text-primary/80 transition-colors">
+              View All &rarr;
+            </Link>
           </div>
-          <div className="divide-y divide-border/60">
+          <div className="divide-y divide-border/50">
             {recentDevices.length === 0 ? (
-              <div className="p-8 text-center text-slate-500 text-sm">No registered devices yet. Run the Android client to auto-register.</div>
+              <div className="px-5 py-12 text-center text-xs text-muted-foreground">
+                No registered devices yet. Run the Android client to auto-register.
+              </div>
             ) : (
               recentDevices.map((d) => {
                 const isOnline = d.lastOnline && d.lastOnline.getTime() >= tenMinutesAgo.getTime()
                 return (
-                  <div key={d.id} className="p-4 px-6 flex items-center justify-between hover:bg-slate-800/20 transition-all">
-                    <div className="flex items-center gap-3">
-                      <div className={`w-2.5 h-2.5 rounded-full ${isOnline ? 'bg-emerald-500 glow-green' : 'bg-slate-600'}`}></div>
-                      <div>
-                        <span className="font-semibold text-sm text-white">{d.deviceName}</span>
-                        <div className="flex flex-wrap gap-x-2 gap-y-0.5 text-xs text-slate-400 mt-0.5">
+                  <div key={d.id} className="p-4 px-5 flex items-center justify-between hover:bg-accent/30 transition-colors">
+                    <div className="flex items-center gap-3 min-w-0">
+                      <span className={`w-2 h-2 rounded-full shrink-0 ${isOnline ? 'bg-emerald-500' : 'bg-muted'}`} />
+                      <div className="min-w-0">
+                        <span className="font-semibold text-xs text-foreground block truncate">{d.deviceName}</span>
+                        <div className="flex flex-wrap gap-x-2 gap-y-0.5 text-[10px] text-muted-foreground mt-0.5 font-mono">
                           <span>IP: {d.lastIp || 'Unknown'}</span>
                           {d.macAddress && (
                             <>
-                              <span>•</span>
-                              <span className="text-indigo-400">MAC: {d.macAddress}</span>
+                              <span>·</span>
+                              <span>MAC: {d.macAddress}</span>
                             </>
                           )}
-                          <span>•</span>
-                          <span>ID: {d.deviceId.substring(0, 12)}...</span>
                         </div>
                       </div>
                     </div>
-                    <div className="text-right">
-                      <span className={`px-2.5 py-0.5 rounded-full text-xs font-semibold ${d.isActive ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' : 'bg-slate-700/30 text-slate-400 border border-slate-700/50'}`}>
+                    <div className="text-right shrink-0 ml-4">
+                      <span className={d.isActive
+                        ? 'badge badge-success'
+                        : 'badge badge-muted'
+                      }>
                         {d.isActive ? 'Active' : 'Disabled'}
                       </span>
-                      <p className="text-[10px] text-slate-500 mt-1">
-                        Online: {d.lastOnline ? new Date(d.lastOnline).toLocaleTimeString() : 'Never'}
+                      <p className="text-[9px] text-muted-foreground mt-1 font-mono">
+                        {d.lastOnline ? new Date(d.lastOnline).toLocaleTimeString() : 'Never'}
                       </p>
                     </div>
                   </div>
@@ -154,30 +141,32 @@ export default async function DashboardPage() {
           </div>
         </div>
 
-        {/* Recent Error Logs */}
-        <div className="glass-card rounded-2xl border border-border overflow-hidden">
-          <div className="px-6 py-5 border-b border-border flex items-center justify-between">
-            <h4 className="font-bold text-white text-base">Urgent Diagnostics Logs</h4>
-            <Link href="/dashboard/logs" className="text-xs font-bold text-indigo-400 hover:text-indigo-300">View All →</Link>
+        {/* Recent Logs */}
+        <div className="card rounded-2xl overflow-hidden border-border">
+          <div className="px-5 py-4 border-b border-border flex items-center justify-between">
+            <h4 className="font-semibold text-foreground text-sm">Recent Diagnostics Logs</h4>
+            <Link href="/dashboard/logs" className="text-xs font-semibold text-primary hover:text-primary/80 transition-colors">
+              View All &rarr;
+            </Link>
           </div>
-          <div className="divide-y divide-border/60">
+          <div className="divide-y divide-border/50">
             {recentLogs.length === 0 ? (
-              <div className="p-8 text-center text-slate-500 text-sm">No client errors reported. Systems are running smoothly!</div>
+              <div className="px-5 py-12 text-center text-xs text-muted-foreground">
+                No client errors reported. Systems are running smoothly.
+              </div>
             ) : (
               recentLogs.map((l) => (
-                <div key={l.id} className="p-4 px-6 hover:bg-slate-800/20 transition-all flex flex-col gap-1.5">
+                <div key={l.id} className="p-4 px-5 hover:bg-accent/30 transition-colors flex flex-col gap-1.5">
                   <div className="flex items-center justify-between">
-                    <span className="px-2 py-0.5 rounded bg-rose-500/10 text-rose-500 text-[10px] font-bold border border-rose-500/20">
-                      {l.errorType}
-                    </span>
-                    <span className="text-[10px] text-slate-500">
+                    <span className="badge badge-destructive">{l.errorType}</span>
+                    <span className="text-[9px] text-muted-foreground font-mono">
                       {new Date(l.createdAt).toLocaleString()}
                     </span>
                   </div>
-                  <p className="text-xs font-medium text-slate-300 line-clamp-1">{l.errorMessage}</p>
-                  <div className="flex gap-2 text-[10px] text-slate-500">
+                  <p className="text-xs font-medium text-foreground/80 line-clamp-1">{l.errorMessage}</p>
+                  <div className="flex gap-2 text-[9px] text-muted-foreground font-mono">
                     <span>STB: {l.device.deviceName}</span>
-                    <span>•</span>
+                    <span>·</span>
                     <span>Channel ID: {l.channelId || 'N/A'}</span>
                   </div>
                 </div>

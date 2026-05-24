@@ -2,48 +2,28 @@ import prisma from '@/lib/db'
 import { parseAndSavePlaylist } from '@/lib/m3uParser'
 import { revalidatePath } from 'next/cache'
 import ConfirmForm from '@/components/ConfirmForm'
+import PageHeader from '@/components/PageHeader'
 
-export const revalidate = 0 // Disable cache for live playlists list
+export const revalidate = 0
 
-// Server Action for adding and parsing a playlist
 async function uploadPlaylistAction(formData: FormData) {
   'use server'
-
   const name = formData.get('name') as string
   const sourceUrl = formData.get('sourceUrl') as string
   const m3uFile = formData.get('m3uFile') as File
-
   if (!name) return
-
   let m3uContent = ''
-
   try {
     if (m3uFile && m3uFile.size > 0) {
-      // 1. Read uploaded file content
       m3uContent = await m3uFile.text()
     } else if (sourceUrl) {
-      // 2. Fetch external M3U content if URL provided
       const response = await fetch(sourceUrl)
-      if (response.ok) {
-        m3uContent = await response.text()
-      } else {
-        throw new Error('Failed to fetch M3U playlist from URL')
-      }
+      if (response.ok) m3uContent = await response.text()
+      else throw new Error('Failed to fetch M3U playlist from URL')
     }
-
     if (!m3uContent) return
-
-    // 3. Save playlist record in DB
-    const playlist = await prisma.playlist.create({
-      data: {
-        name,
-        sourceUrl: sourceUrl || null,
-      },
-    })
-
-    // 4. Parse M3U and insert channels/categories
+    const playlist = await prisma.playlist.create({ data: { name, sourceUrl: sourceUrl || null } })
     await parseAndSavePlaylist(playlist.id, m3uContent)
-
     revalidatePath('/dashboard/playlists')
     revalidatePath('/dashboard')
   } catch (error) {
@@ -51,18 +31,12 @@ async function uploadPlaylistAction(formData: FormData) {
   }
 }
 
-// Server Action for deleting a playlist
 async function deletePlaylistAction(formData: FormData) {
   'use server'
-  
   const id = parseInt(formData.get('playlistId') as string)
   if (!id) return
-
   try {
-    await prisma.playlist.delete({
-      where: { id },
-    })
-
+    await prisma.playlist.delete({ where: { id } })
     revalidatePath('/dashboard/playlists')
     revalidatePath('/dashboard')
   } catch (error) {
@@ -70,25 +44,13 @@ async function deletePlaylistAction(formData: FormData) {
   }
 }
 
-// Server Action to set a playlist as the global active one
 async function setGlobalPlaylistAction(formData: FormData) {
   'use server'
   const id = parseInt(formData.get('playlistId') as string)
   if (!id) return
-
   try {
-    // 1. Unset any existing global playlist
-    await prisma.playlist.updateMany({
-      where: { isGlobal: true },
-      data: { isGlobal: false },
-    })
-
-    // 2. Set the new global playlist
-    await prisma.playlist.update({
-      where: { id },
-      data: { isGlobal: true },
-    })
-
+    await prisma.playlist.updateMany({ where: { isGlobal: true }, data: { isGlobal: false } })
+    await prisma.playlist.update({ where: { id }, data: { isGlobal: true } })
     revalidatePath('/dashboard/playlists')
     revalidatePath('/dashboard')
   } catch (error) {
@@ -97,127 +59,85 @@ async function setGlobalPlaylistAction(formData: FormData) {
 }
 
 export default async function PlaylistsPage() {
-  // Fetch existing playlists
-  const playlists = await prisma.playlist.findMany({
-    orderBy: { createdAt: 'desc' },
-  })
+  const playlists = await prisma.playlist.findMany({ orderBy: { createdAt: 'desc' } })
 
   return (
-    <div className="space-y-8 animate-fade-in">
-      {/* Page Header */}
-      <div>
-        <h2 className="text-3xl font-extrabold tracking-tight text-white">Playlists Manager</h2>
-        <p className="text-slate-400 mt-1 text-sm">Upload local M3U files or sync with external IPTV server URLs to populate channels.</p>
-      </div>
+    <div className="space-y-6 animate-fade-in">
+      <PageHeader
+        title="Playlists Manager"
+        description="Upload local M3U files or sync with external IPTV server URLs to populate channels."
+      />
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        {/* Upload Form Card */}
-        <div className="lg:col-span-1 glass-card p-6 rounded-2xl border border-border h-fit">
-          <h3 className="font-bold text-white text-lg mb-4">Add Playlist</h3>
-          
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Upload Form */}
+        <div className="lg:col-span-1 card p-5 rounded-2xl h-fit space-y-4">
+          <h3 className="font-semibold text-foreground text-sm">Add Playlist</h3>
           <form action={uploadPlaylistAction} className="space-y-4">
             <div>
-              <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">Playlist Name</label>
-              <input
-                type="text"
-                name="name"
-                required
-                placeholder="e.g. National Premium TV"
-                className="w-full px-4 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-white text-sm focus:outline-none focus:border-primary transition-colors"
-              />
+              <label className="block text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-1.5">Playlist Name</label>
+              <input type="text" name="name" required placeholder="e.g. National Premium TV" className="field-input" />
             </div>
-
             <div>
-              <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">M3U File Upload</label>
-              <input
-                type="file"
-                name="m3uFile"
-                accept=".m3u,.m3u8"
-                className="w-full text-slate-400 text-xs file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-semibold file:bg-slate-800 file:text-indigo-400 file:hover:bg-slate-700/50 cursor-pointer"
-              />
+              <label className="block text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-1.5">M3U File Upload</label>
+              <input type="file" name="m3uFile" accept=".m3u,.m3u8" className="file-input" />
             </div>
-
             <div className="flex items-center gap-2 py-1">
-              <div className="h-px flex-1 bg-border/60"></div>
-              <span className="text-[10px] text-slate-500 font-bold uppercase">OR</span>
-              <div className="h-px flex-1 bg-border/60"></div>
+              <div className="h-px flex-1 bg-border" />
+              <span className="text-[9px] font-semibold text-muted-foreground uppercase tracking-wider">OR</span>
+              <div className="h-px flex-1 bg-border" />
             </div>
-
             <div>
-              <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">External M3U URL</label>
-              <input
-                type="url"
-                name="sourceUrl"
-                placeholder="http://example.com/playlist.m3u8"
-                className="w-full px-4 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-white text-sm focus:outline-none focus:border-primary transition-colors"
-              />
+              <label className="block text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-1.5">External M3U URL</label>
+              <input type="url" name="sourceUrl" placeholder="http://example.com/playlist.m3u8" className="field-input" />
             </div>
-
-            <button
-              type="submit"
-              className="w-full mt-2 py-3 rounded-xl bg-primary hover:bg-indigo-500 font-bold text-white text-sm transition-all duration-200 cursor-pointer text-center glow-indigo"
-            >
+            <button type="submit" className="w-full btn btn-primary py-2.5">
               Parse & Save Playlist
             </button>
           </form>
         </div>
 
-        {/* Playlists Table/List Card */}
-        <div className="lg:col-span-2 glass-card rounded-2xl border border-border overflow-hidden">
-          <div className="px-6 py-5 border-b border-border">
-            <h3 className="font-bold text-white text-lg">Parsed Playlists ({playlists.length})</h3>
+        {/* Playlists List */}
+        <div className="lg:col-span-2 card rounded-2xl overflow-hidden">
+          <div className="px-5 py-4 border-b border-border">
+            <h3 className="font-semibold text-foreground text-sm">Parsed Playlists ({playlists.length})</h3>
           </div>
-
-          <div className="divide-y divide-border/60">
+          <div className="divide-y divide-border/50">
             {playlists.length === 0 ? (
-              <div className="p-12 text-center text-slate-500 text-sm">
+              <div className="px-5 py-16 text-center text-xs text-muted-foreground">
                 No playlists parsed yet. Fill the upload form on the left to add your first playlist!
               </div>
             ) : (
               playlists.map((p) => (
-                <div key={p.id} className="p-6 flex flex-col md:flex-row md:items-center justify-between gap-4 hover:bg-slate-800/10 transition-all">
-                  <div className="space-y-1">
-                    <div className="flex items-center gap-2">
-                      <h4 className="font-extrabold text-white text-base">{p.name}</h4>
-                      {p.isGlobal && (
-                        <span className="px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 text-[10px] font-bold uppercase tracking-wider shadow-[0_0_10px_rgba(16,185,129,0.1)]">
-                          Global Active
-                        </span>
-                      )}
+                <div key={p.id} className="p-5 flex flex-col md:flex-row md:items-center justify-between gap-4 hover:bg-accent/30 transition-colors">
+                  <div className="space-y-1 min-w-0">
+                    <div className="flex items-center flex-wrap gap-2">
+                      <h4 className="font-semibold text-foreground text-sm truncate">{p.name}</h4>
+                      {p.isGlobal && <span className="badge badge-success">Global Active</span>}
                     </div>
-                    <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-slate-400">
-                      <span>Channels: <strong className="text-violet-400">{p.totalChannels} channels</strong></span>
-                      <span>•</span>
+                    <div className="flex flex-wrap gap-x-3 gap-y-0.5 text-xs text-muted-foreground">
+                      <span>Channels: <strong className="text-violet-400 font-semibold">{p.totalChannels} channels</strong></span>
+                      <span className="text-border">·</span>
                       <span>Uploaded: {new Date(p.createdAt).toLocaleDateString()}</span>
                     </div>
                     {p.sourceUrl && (
-                      <p className="text-[10px] text-slate-500 break-all font-mono">URL: {p.sourceUrl}</p>
+                      <p className="text-[10px] text-muted-foreground break-all font-mono">URL: {p.sourceUrl}</p>
                     )}
                   </div>
-
-                  <div className="flex items-center gap-3 self-end md:self-center">
+                  <div className="flex items-center gap-3 shrink-0 self-end md:self-center">
                     {!p.isGlobal && (
                       <form action={setGlobalPlaylistAction}>
                         <input type="hidden" name="playlistId" value={p.id} />
-                        <button
-                          type="submit"
-                          className="px-4 py-2 text-xs font-bold text-emerald-400 hover:text-white border border-emerald-500/20 hover:bg-emerald-500/15 rounded-xl transition-all cursor-pointer"
-                        >
+                        <button type="submit" className="btn btn-xs text-emerald-400 hover:text-emerald-300 border border-emerald-500/20 hover:bg-emerald-500/10">
                           Set as Global
                         </button>
                       </form>
                     )}
-
-                    {/* Delete Form */}
                     <ConfirmForm
                       action={deletePlaylistAction}
                       message="Are you sure you want to delete this playlist? This will instantly delete all categories and channels tied to it."
                     >
                       <input type="hidden" name="playlistId" value={p.id} />
-                      <button
-                        type="submit"
-                        className="px-4 py-2 text-xs font-semibold text-rose-400 hover:text-white border border-rose-500/20 hover:bg-rose-500/15 rounded-xl transition-all cursor-pointer"
-                      >
+                      <button type="submit" className="btn btn-xs text-rose-400 hover:text-rose-300 border border-rose-500/20 hover:bg-rose-500/10">
                         Delete Playlist
                       </button>
                     </ConfirmForm>
