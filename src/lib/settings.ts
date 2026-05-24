@@ -93,6 +93,16 @@ export async function setAppPublicOrigin(origin: string): Promise<void> {
   })
 }
 
+export async function resetRelayRuntimeSettings(): Promise<void> {
+  await prisma.appSetting.deleteMany({
+    where: {
+      key: {
+        in: [APP_PUBLIC_ORIGIN_KEY, ON_DEMAND_HLS_RELAY_CONFIG_KEY],
+      },
+    },
+  })
+}
+
 export async function getOnDemandHlsRelayConfig(): Promise<OnDemandHlsRelayConfig> {
   const setting = await prisma.appSetting.findUnique({
     where: { key: ON_DEMAND_HLS_RELAY_CONFIG_KEY },

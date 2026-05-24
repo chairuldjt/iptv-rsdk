@@ -9,6 +9,7 @@ import {
 import {
   getAppPublicOrigin,
   getOnDemandHlsRelayConfig,
+  resetRelayRuntimeSettings,
   setAppPublicOrigin,
   setOnDemandHlsRelayConfig,
 } from '@/lib/settings'
@@ -49,10 +50,18 @@ async function saveRelayRuntimeAction(formData: FormData) {
   redirect('/dashboard/setup?relaySaved=1')
 }
 
+async function resetRelayRuntimeAction() {
+  'use server'
+
+  await resetRelayRuntimeSettings()
+  revalidatePath('/dashboard/setup')
+  redirect('/dashboard/setup?relayReset=1')
+}
+
 export default async function SetupPage({
   searchParams,
 }: {
-  searchParams: Promise<{ saved?: string; reset?: string; relaySaved?: string }>
+  searchParams: Promise<{ saved?: string; reset?: string; relaySaved?: string; relayReset?: string }>
 }) {
   const resolvedSearchParams = await searchParams
   const config = await getDefaultDeviceConfig()
@@ -61,6 +70,7 @@ export default async function SetupPage({
   const showSaved = resolvedSearchParams.saved === '1'
   const showReset = resolvedSearchParams.reset === '1'
   const showRelaySaved = resolvedSearchParams.relaySaved === '1'
+  const showRelayReset = resolvedSearchParams.relayReset === '1'
 
   return (
     <div className="space-y-8 animate-fade-in">
@@ -86,6 +96,12 @@ export default async function SetupPage({
       {showRelaySaved && (
         <div className="p-3 bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 rounded-xl text-xs font-bold">
           Runtime relay setting saved. Relay baru akan memakai konfigurasi ini pada request berikutnya.
+        </div>
+      )}
+
+      {showRelayReset && (
+        <div className="p-3 bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 rounded-xl text-xs font-bold">
+          Runtime relay setting dikembalikan ke fallback bawaan kode.
         </div>
       )}
 
@@ -209,6 +225,15 @@ export default async function SetupPage({
             className="w-full py-3 rounded-xl bg-primary hover:bg-indigo-500 font-bold text-white text-sm transition-all duration-200 cursor-pointer text-center glow-indigo"
           >
             Save Relay Runtime
+          </button>
+        </form>
+
+        <form action={resetRelayRuntimeAction} className="mt-4">
+          <button
+            type="submit"
+            className="w-full py-3 rounded-xl border border-amber-500/20 bg-amber-500/5 text-amber-400 hover:bg-amber-500 hover:text-white font-bold text-xs transition-all duration-200 cursor-pointer"
+          >
+            Reset Relay Runtime to Built-in Defaults
           </button>
         </form>
       </div>
