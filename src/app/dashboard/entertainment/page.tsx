@@ -2,6 +2,8 @@ import prisma from '@/lib/db'
 import ConfirmForm from '@/components/ConfirmForm'
 import EntertainmentItemForm from '@/components/EntertainmentItemForm'
 import { deleteEntertainmentItemAction } from './actions'
+import { createPlayableStreamUrl, createUdpOnDemandHlsPath, isUdpStreamUrl } from '@/lib/playableStreams'
+import { getAppPublicOrigin, getHlsRelayBaseUrl } from '@/lib/settings'
 
 export const revalidate = 0
 
@@ -14,10 +16,49 @@ export default async function EntertainmentPage({
   const editId = resolvedSearchParams.edit ? parseInt(resolvedSearchParams.edit, 10) : null
   const showSaved = resolvedSearchParams.saved === '1'
 
-  const items = await prisma.entertainmentItem.findMany({
-    orderBy: [{ sortOrder: 'asc' }, { title: 'asc' }],
-  })
+  const [items, videos, channels, appPublicOrigin, hlsRelayBaseUrl] = await Promise.all([
+    prisma.entertainmentItem.findMany({
+      orderBy: [{ sortOrder: 'asc' }, { title: 'asc' }],
+    }),
+    prisma.educationVideo.findMany({
+      orderBy: [{ folder: { name: 'asc' } }, { title: 'asc' }],
+      include: { folder: true },
+    }),
+    prisma.channel.findMany({
+      where: { isActive: true },
+      orderBy: [{ playlistId: 'asc' }, { sortOrder: 'asc' }],
+      include: {
+        playlist: { select: { name: true, isGlobal: true } },
+        category: { select: { name: true } },
+      },
+    }),
+    getAppPublicOrigin(),
+    getHlsRelayBaseUrl(),
+  ])
   const editingItem = editId ? items.find((item) => item.id === editId) ?? null : null
+  const publicOrigin = appPublicOrigin || ''
+  const videoOptions = videos.map((video) => ({
+    id: video.id,
+    title: video.title,
+    folderName: video.folder?.name || null,
+    videoUrl: video.videoUrl,
+    thumbnailUrl: video.thumbnailUrl,
+  }))
+  const channelOptions = channels.map((channel) => ({
+    id: channel.id,
+    name: channel.name,
+    playlistName: channel.playlist.name,
+    categoryName: channel.category?.name || 'Uncategorized',
+    streamUrl: channel.streamUrl,
+    apiUrl: channel.streamUrl,
+    relayUrl: createChannelRelayUrl({
+      channelId: channel.id,
+      origin: publicOrigin,
+      name: channel.name,
+      streamUrl: channel.streamUrl,
+      hlsRelayBaseUrl,
+    }),
+  }))
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -102,7 +143,12 @@ export default async function EntertainmentPage({
           )}
         </section>
 
-        <EntertainmentItemForm key={editingItem?.id ?? 'new'} editingItem={editingItem} />
+        <EntertainmentItemForm
+          key={editingItem?.id ?? 'new'}
+          editingItem={editingItem}
+          videoOptions={videoOptions}
+          channelOptions={channelOptions}
+        />
       </div>
     </div>
   )
@@ -112,4 +158,29 @@ function contentTypeLabel(type: string): string {
   if (type === 'media_player') return 'Media'
   if (type === 'm3u_player') return 'M3U'
   return 'WebView'
+}
+
+function createChannelRelayUrl({
+  channelId,
+  origin,
+  name,
+  streamUrl,
+  hlsRelayBaseUrl,
+}: {
+  channelId: number
+  origin: string
+  name: string
+  streamUrl: string
+  hlsRelayBaseUrl: string
+}) {
+  if (isUdpStreamUrl(streamUrl)) {
+    return origin ? new URL(createUdpOnDemandHlsPath(channelId), origin).toString() : createUdpOnDemandHlsPath(channelId)
+  }
+
+  return createPlayableStreamUrl({
+    origin,
+    name,
+    streamUrl,
+    hlsRelayBaseUrl,
+  })
 }

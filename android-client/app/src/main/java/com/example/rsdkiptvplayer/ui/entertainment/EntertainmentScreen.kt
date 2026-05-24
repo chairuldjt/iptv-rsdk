@@ -472,7 +472,10 @@ private fun resolveUrl(serverUrl: String, value: String): String {
 }
 
 private suspend fun resolveM3uUrl(url: String): String = withContext(Dispatchers.IO) {
-    if (url.endsWith(".m3u8", ignoreCase = true)) return@withContext url
+    val lowerUrl = url.lowercase()
+    if (lowerUrl.endsWith(".m3u8")) return@withContext url
+    if (!lowerUrl.endsWith(".m3u")) return@withContext url
+
     val conn = URL(url).openConnection() as HttpURLConnection
     conn.connectTimeout = 10000
     conn.readTimeout = 10000
