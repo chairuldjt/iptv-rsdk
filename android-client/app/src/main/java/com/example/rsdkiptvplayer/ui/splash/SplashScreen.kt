@@ -54,19 +54,20 @@ fun SplashScreen(
     var splashSoundId by remember { mutableIntStateOf(0) }
 
     DisposableEffect(Unit) {
+        soundPool.setOnLoadCompleteListener { _, sampleId, status ->
+            if (status == 0) {
+                soundPool.play(sampleId, 1.0f, 1.0f, 1, 0, 1.0f)
+            }
+        }
         splashSoundId = soundPool.load(context, R.raw.splash_opening_chime, 1)
         onDispose {
             soundPool.release()
         }
     }
 
-    LaunchedEffect(splashSoundId) {
+    LaunchedEffect(Unit) {
         currentVersionCode = UpdateManager.getCurrentVersionCode(context)
         currentVersionName = UpdateManager.getCurrentVersionName(context)
-
-        if (splashSoundId != 0) {
-            soundPool.play(splashSoundId, 1.0f, 1.0f, 1, 0, 1.0f)
-        }
 
         // Animate splash in
         alpha.animateTo(
