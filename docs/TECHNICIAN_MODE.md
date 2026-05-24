@@ -105,3 +105,13 @@ Setelah sukses masuk ke Mode Teknisi, menu-menu berikut akan diaktifkan untuk op
 ### 4.6. Penampil Log Lokal (Local Diagnostics Log)
 *   Menampilkan 50 baris aktivitas sistem terbaru di layar TV (seperti log *success sync*, *player exceptions*, *network failure timestamps*).
 *   Sangat mempermudah diagnosis langsung di lapangan tanpa perlu menghubungkan kabel ADB USB ke komputer laptop.
+
+### 4.7. Konten Edukasi & Mode Putar (Education Content Settings)
+*   **Sumber Video Edukasi (Education Source)**:
+    *   `SMB`: Menggunakan folder shared SMB lokal (misal: `\\10.55.1.5\Edukasi`).
+    *   `Web`: Menggunakan database video terpusat yang diunggah ke server Next.js.
+*   **Mode Putar Video (Playback Mode)**:
+    *   `Copy`: Mengunduh berkas video secara latar belakang ke folder lokal STB (`education_videos`) terlebih dahulu, kemudian memutarnya secara lokal. Sangat disarankan untuk menjaga pemutaran tetap lancar saat koneksi jaringan tidak stabil.
+    *   `Stream`: Mengalirkan (streaming) video secara langsung dari server Next.js (Web) atau server SMB tanpa mengunduh berkas ke memori STB terlebih dahulu, menggunakan `DelegatingDataSource` internal.
+*   Kombinasi sumber dan mode putar ini tersinkronisasi otomatis dengan pengaturan default global atau pengaturan spesifik per STB di Web Admin.
+

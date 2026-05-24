@@ -100,10 +100,21 @@ model DeviceConfig {
   educationSmbDomain    String   @default("")
   educationRepeatMode   String   @default("all")          // "all", "one", "none"
   educationPlayOrder    String   @default("alphabetical") // "alphabetical", "random", "shuffle"
+  educationSource       String   @default("smb")          // "smb", "web"
+  educationPlaybackMode String   @default("copy")         // "copy", "stream"
   educationForceSync    Boolean  @default(false)
   createdAt             DateTime @default(now())
   updatedAt             DateTime @updatedAt
 }
+
+model EducationVideo {
+  id        Int      @id @default(autoincrement())
+  title     String
+  videoUrl  String   @db.Text
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
 
 model DeviceLog {
   id           Int      @id @default(autoincrement())

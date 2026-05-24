@@ -21,6 +21,8 @@ export type DefaultDeviceConfig = {
   educationSmbDomain: string
   educationRepeatMode: string
   educationPlayOrder: string
+  educationSource: string
+  educationPlaybackMode: string
 }
 
 export const FALLBACK_DEFAULT_DEVICE_CONFIG: DefaultDeviceConfig = {
@@ -40,6 +42,8 @@ export const FALLBACK_DEFAULT_DEVICE_CONFIG: DefaultDeviceConfig = {
   educationSmbDomain: process.env.IPTV_DEFAULT_EDUCATION_SMB_DOMAIN || '',
   educationRepeatMode: process.env.IPTV_DEFAULT_EDUCATION_REPEAT_MODE || 'all',
   educationPlayOrder: process.env.IPTV_DEFAULT_EDUCATION_PLAY_ORDER || 'alphabetical',
+  educationSource: process.env.IPTV_DEFAULT_EDUCATION_SOURCE || 'smb',
+  educationPlaybackMode: process.env.IPTV_DEFAULT_EDUCATION_PLAYBACK_MODE || 'copy',
 }
 
 export async function getDefaultDeviceConfig(): Promise<DefaultDeviceConfig> {
@@ -110,6 +114,8 @@ export function defaultDeviceConfigFromFormData(formData: FormData): DefaultDevi
     educationSmbDomain: stringValue(formData, 'educationSmbDomain', ''),
     educationRepeatMode: stringValue(formData, 'educationRepeatMode', FALLBACK_DEFAULT_DEVICE_CONFIG.educationRepeatMode),
     educationPlayOrder: stringValue(formData, 'educationPlayOrder', FALLBACK_DEFAULT_DEVICE_CONFIG.educationPlayOrder),
+    educationSource: stringValue(formData, 'educationSource', FALLBACK_DEFAULT_DEVICE_CONFIG.educationSource),
+    educationPlaybackMode: stringValue(formData, 'educationPlaybackMode', FALLBACK_DEFAULT_DEVICE_CONFIG.educationPlaybackMode),
   })
 }
 
@@ -133,6 +139,8 @@ function normalizeDefaultDeviceConfig(value: unknown): DefaultDeviceConfig {
     educationSmbDomain: safeString(source.educationSmbDomain, ''),
     educationRepeatMode: oneOf(source.educationRepeatMode, ['all', 'one', 'none'], FALLBACK_DEFAULT_DEVICE_CONFIG.educationRepeatMode),
     educationPlayOrder: oneOf(source.educationPlayOrder, ['alphabetical', 'random', 'shuffle'], FALLBACK_DEFAULT_DEVICE_CONFIG.educationPlayOrder),
+    educationSource: oneOf(source.educationSource, ['smb', 'web'], FALLBACK_DEFAULT_DEVICE_CONFIG.educationSource),
+    educationPlaybackMode: oneOf(source.educationPlaybackMode, ['copy', 'stream'], FALLBACK_DEFAULT_DEVICE_CONFIG.educationPlaybackMode),
   }
 }
 

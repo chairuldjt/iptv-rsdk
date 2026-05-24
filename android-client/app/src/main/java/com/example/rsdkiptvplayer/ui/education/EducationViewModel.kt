@@ -27,15 +27,34 @@ import kotlinx.coroutines.withContext
 import java.io.File
 import java.net.URLDecoder
 import java.net.URLEncoder
+import com.example.rsdkiptvplayer.util.EducationSyncManager
+import com.example.rsdkiptvplayer.util.EducationSyncManager.isSupportedVideoName
+import com.example.rsdkiptvplayer.util.EducationSyncManager.ensureMd4Provider
+import com.example.rsdkiptvplayer.util.EducationSyncManager.normalizeSmbFolderUrls
 
 @OptIn(UnstableApi::class)
 class EducationViewModel(application: Application) : AndroidViewModel(application) {
     private val dataStoreManager = (application as IptvApplication).dataStoreManager
 
-    val exoPlayer: ExoPlayer = ExoPlayer.Builder(application).build().apply {
-        repeatMode = Player.REPEAT_MODE_ALL
-        playWhenReady = true
+    private val defaultDataSourceFactory = androidx.media3.datasource.DefaultDataSource.Factory(application)
+
+    private fun buildSmbDataSourceFactory(): SmbDataSource.Factory {
+        return SmbDataSource.Factory(buildSmbContext())
     }
+
+    val exoPlayer: ExoPlayer = ExoPlayer.Builder(application)
+        .setMediaSourceFactory(
+            ProgressiveMediaSource.Factory {
+                val smbFactory = buildSmbDataSourceFactory()
+                val defaultDs = defaultDataSourceFactory.createDataSource()
+                val smbDs = smbFactory.createDataSource()
+                DelegatingDataSource(defaultDs, smbDs)
+            }
+        )
+        .build().apply {
+            repeatMode = Player.REPEAT_MODE_ALL
+            playWhenReady = true
+        }
 
     private val _folderPath = MutableStateFlow("")
     val folderPath: StateFlow<String> = _folderPath.asStateFlow()
@@ -134,23 +153,10 @@ class EducationViewModel(application: Application) : AndroidViewModel(applicatio
 
             val result = withContext(Dispatchers.IO) {
                 runCatching {
-                    val localDir = File(getApplication<IptvApplication>().getExternalFilesDir(null), "education_videos")
-                    if (!localDir.exists()) {
-                        localDir.mkdirs()
-                    }
-
-                    val videos = localDir.listFiles()
-                        ?.filter { file -> !file.isDirectory && file.name.isSupportedVideoName() }
-                        ?: emptyList()
-
+                    val source = dataStoreManager.educationSourceFlow.first()
+                    val playbackMode = dataStoreManager.educationPlaybackModeFlow.first()
                     val playOrder = dataStoreManager.educationPlayOrderFlow.first()
                     val repeatModeStr = dataStoreManager.educationRepeatModeFlow.first()
-
-                    val sortedVideos = when (playOrder) {
-                        "random" -> videos.shuffled()
-                        "shuffle" -> videos.shuffled(java.util.Random(12345))
-                        else -> videos.sortedBy { it.name.lowercase() }
-                    }
 
                     val exoRepeatMode = when (repeatModeStr) {
                         "one" -> Player.REPEAT_MODE_ONE
@@ -158,45 +164,124 @@ class EducationViewModel(application: Application) : AndroidViewModel(applicatio
                         else -> Player.REPEAT_MODE_ALL
                     }
 
-                    Triple(sortedVideos, exoRepeatMode, playOrder)
+                    data class PlayItem(val title: String, val uri: Uri)
+
+                    val items = if (playbackMode == "stream") {
+                        if (source == "web") {
+                            val serverUrl = dataStoreManager.getServerUrl()
+                            val apiService = com.example.rsdkiptvplayer.data.api.RetrofitClient.getService(serverUrl)
+                            val response = apiService.getEducationVideos()
+                            if (response.isSuccessful && response.body()?.status == true) {
+                                val videos = response.body()?.data ?: emptyList()
+                                videos.map { video ->
+                                    val fullUrl = if (video.video_url.startsWith("http")) {
+                                        video.video_url
+                                    } else {
+                                        val base = serverUrl.trimEnd('/')
+                                        val path = video.video_url.trimStart('/')
+                                        "$base/$path"
+                                    }
+                                    PlayItem(video.title, Uri.parse(fullUrl))
+                                }
+                            } else {
+                                throw IllegalStateException("Gagal memuat daftar video dari server web: HTTP ${response.code()}")
+                            }
+                        } else {
+                            // SMB stream mode
+                            val path = _folderPath.value
+                            if (path.isBlank()) {
+                                throw IllegalStateException("Path SMB kosong.")
+                            }
+                            ensureMd4Provider()
+                            val smbContext = buildSmbContext()
+                            val folderCandidates = normalizeSmbFolderUrls(path)
+                            var folder: SmbFile? = null
+                            var lastConnectionError: Exception? = null
+
+                            for (candidateUrl in folderCandidates) {
+                                try {
+                                    val candidateFolder = SmbFile(candidateUrl, smbContext)
+                                    if (candidateFolder.exists() && candidateFolder.isDirectory) {
+                                        folder = candidateFolder
+                                        break
+                                    }
+                                } catch (e: Exception) {
+                                    lastConnectionError = e
+                                }
+                            }
+                            val resolvedFolder = folder ?: throw (lastConnectionError ?: IllegalStateException("Folder SMB tidak ditemukan."))
+                            val remoteFiles = resolvedFolder.listFiles()
+                                ?.filter { file -> !file.isDirectory && file.name.isSupportedVideoName() }
+                                ?: emptyList()
+
+                            remoteFiles.map { PlayItem(it.name.substringBeforeLast('.'), Uri.parse(it.url.toString())) }
+                        }
+                    } else {
+                        // "copy" mode
+                        val localDir = File(getApplication<IptvApplication>().getExternalFilesDir(null), "education_videos")
+                        if (!localDir.exists()) {
+                            localDir.mkdirs()
+                        }
+
+                        val videos = localDir.listFiles()
+                            ?.filter { file -> !file.isDirectory && file.name.isSupportedVideoName() }
+                            ?: emptyList()
+
+                        videos.map { PlayItem(it.name.substringBeforeLast('.'), Uri.fromFile(it)) }
+                    }
+
+                    val sortedItems = when (playOrder) {
+                        "random" -> items.shuffled()
+                        "shuffle" -> items.shuffled(java.util.Random(12345))
+                        else -> items.sortedBy { it.title.lowercase() }
+                    }
+
+                    Triple(sortedItems, exoRepeatMode, playOrder)
                 }
             }
 
             result
-                .onSuccess { (videos, repeatModeVal, order) ->
-                    _videoCount.value = videos.size
-                    if (videos.isEmpty()) {
+                .onSuccess { (playItems, repeatModeVal, order) ->
+                    _videoCount.value = playItems.size
+                    if (playItems.isEmpty()) {
                         _isLoading.value = false
-                        val currentSyncState = com.example.rsdkiptvplayer.util.EducationSyncManager.syncState.value
-                        val currentPath = _folderPath.value.trim()
-                        if (currentPath.isBlank()) {
-                            _errorMessage.value = "Path folder video edukasi kosong."
-                            return@onSuccess
-                        }
-
-                        if (currentSyncState !is com.example.rsdkiptvplayer.util.EducationSyncManager.SyncState.Checking &&
-                            currentSyncState !is com.example.rsdkiptvplayer.util.EducationSyncManager.SyncState.Syncing) {
-                            viewModelScope.launch {
-                                com.example.rsdkiptvplayer.util.EducationSyncManager.sync(getApplication())
+                        val playbackMode = dataStoreManager.educationPlaybackModeFlow.first()
+                        val source = dataStoreManager.educationSourceFlow.first()
+                        
+                        if (playbackMode == "copy") {
+                            val currentSyncState = com.example.rsdkiptvplayer.util.EducationSyncManager.syncState.value
+                            val currentPath = _folderPath.value.trim()
+                            if (source == "smb" && currentPath.isBlank()) {
+                                _errorMessage.value = "Path folder video edukasi kosong."
+                                return@onSuccess
                             }
+
+                            if (currentSyncState !is com.example.rsdkiptvplayer.util.EducationSyncManager.SyncState.Checking &&
+                                currentSyncState !is com.example.rsdkiptvplayer.util.EducationSyncManager.SyncState.Syncing) {
+                                viewModelScope.launch {
+                                    com.example.rsdkiptvplayer.util.EducationSyncManager.sync(getApplication())
+                                }
+                            }
+                            _errorMessage.value = null
+                            dataStoreManager.addLog("Local education folder is empty. Triggering auto-sync.")
+                        } else {
+                            _errorMessage.value = "Tidak ada video edukasi yang ditemukan."
                         }
-                        _errorMessage.value = null
-                        dataStoreManager.addLog("Local education folder is empty. Triggering auto-sync.")
                         return@onSuccess
                     }
 
-                    val mediaItems = videos.map { file ->
+                    val mediaItems = playItems.map { item ->
                         MediaItem.Builder()
-                            .setUri(Uri.fromFile(file))
+                            .setUri(item.uri)
                             .setMediaMetadata(
                                 androidx.media3.common.MediaMetadata.Builder()
-                                    .setTitle(file.name.substringBeforeLast('.'))
+                                    .setTitle(item.title)
                                     .build()
                             )
                             .build()
                     }
 
-                    _currentTitle.value = videos.first().name.substringBeforeLast('.')
+                    _currentTitle.value = playItems.first().title
                     exoPlayer.stop()
                     exoPlayer.clearMediaItems()
                     exoPlayer.repeatMode = repeatModeVal
@@ -204,13 +289,15 @@ class EducationViewModel(application: Application) : AndroidViewModel(applicatio
                     exoPlayer.prepare()
                     exoPlayer.playWhenReady = true
                     _isLoading.value = false
-                    dataStoreManager.addLog("Local education playlist loaded: ${videos.size} videos (Order: $order, Repeat: $repeatModeVal)")
+                    val playbackModeStr = dataStoreManager.educationPlaybackModeFlow.first()
+                    val sourceStr = dataStoreManager.educationSourceFlow.first()
+                    dataStoreManager.addLog("Education playlist loaded: ${playItems.size} videos (Source: $sourceStr, Mode: $playbackModeStr, Order: $order)")
                 }
                 .onFailure { error ->
                     _videoCount.value = 0
                     _isLoading.value = false
-                    _errorMessage.value = error.localizedMessage ?: "Gagal memuat video edukasi luring."
-                    dataStoreManager.addLog("Local education load error: ${error.message}")
+                    _errorMessage.value = error.localizedMessage ?: "Gagal memuat video edukasi."
+                    dataStoreManager.addLog("Education load error: ${error.message}")
                 }
         }
     }

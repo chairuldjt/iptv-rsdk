@@ -70,6 +70,16 @@ Daftar channel hasil parsing.
 
 Index penting: `(playlistId, isActive, sortOrder)`, `categoryId`.
 
+### `education_videos`
+Daftar video edukasi di repository web terpusat.
+
+| Kolom | Tipe | Catatan |
+| --- | --- | --- |
+| `id` | Int | Primary key autoincrement. |
+| `title` | String | Judul video. |
+| `videoUrl` | Text | URL eksternal atau path file terunggah ke server lokal (misal: `/uploads/videos/...`). |
+| `createdAt` / `updatedAt` | DateTime | Timestamp Prisma. |
+
 ---
 
 ## 3. Tabel Device
@@ -116,6 +126,8 @@ Konfigurasi per device. Setiap device baru dibuatkan config dari default global 
 | `educationSmbDomain` | String | Domain/workgroup SMB. |
 | `educationRepeatMode` | String | `all`, `one`, `none`. |
 | `educationPlayOrder` | String | `alphabetical`, `random`, `shuffle`. |
+| `educationSource` | String | Sumber video edukasi (`smb` atau `web`). |
+| `educationPlaybackMode` | String | Mode putar video (`copy` atau `stream`). |
 | `educationForceSync` | Boolean | Trigger sync edukasi sekali pakai. |
 
 Catatan: default global **tidak** lagi disimpan sebagai `device_configs.deviceId = NULL`. Default global disimpan di `app_settings` dengan key `device.defaultConfig`, lalu disalin ke `device_configs` saat device baru register.

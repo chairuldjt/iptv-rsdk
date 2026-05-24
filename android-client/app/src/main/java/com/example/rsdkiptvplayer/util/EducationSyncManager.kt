@@ -41,6 +41,12 @@ object EducationSyncManager {
                 val app = context.applicationContext as IptvApplication
                 val dataStoreManager = app.dataStoreManager
 
+                val source = dataStoreManager.educationSourceFlow.first()
+                if (source == "web") {
+                    syncWeb(context, forceSync)
+                    return@withContext
+                }
+
                 val path = dataStoreManager.educationVideoPathFlow.first().trim()
                 if (path.isEmpty()) {
                     _syncState.value = SyncState.Error(
@@ -212,7 +218,7 @@ object EducationSyncManager {
         }
     }
 
-    private fun classifySyncError(error: Exception): String {
+    fun classifySyncError(error: Exception): String {
         val rawMessage = error.localizedMessage.orEmpty()
         val message = rawMessage.lowercase()
         return when {
@@ -234,11 +240,11 @@ object EducationSyncManager {
                 message.contains("cannot find") ||
                 message.contains("no such") -> "Path SMB tidak ditemukan. Periksa nama share dan folder."
             message.contains("unknown host") -> "Host SMB tidak ditemukan. Gunakan IP server atau periksa DNS."
-            else -> "Gagal sinkronisasi SMB."
+            else -> error.localizedMessage ?: "Gagal sinkronisasi."
         }
     }
 
-    private fun ensureMd4Provider() {
+    fun ensureMd4Provider() {
         val provider = Md4Provider()
         try {
             Crypto.initProvider(provider)
@@ -260,7 +266,7 @@ object EducationSyncManager {
         field.set(null, provider)
     }
 
-    private fun normalizeSmbFolderUrls(path: String): List<String> {
+    fun normalizeSmbFolderUrls(path: String): List<String> {
         val trimmed = path.trim()
         val rawSmb = if (trimmed.startsWith("smb://", ignoreCase = true)) {
             trimmed.removePrefix("smb://")
@@ -295,11 +301,11 @@ object EducationSyncManager {
     }
 
     private fun String.encodeSmbPathSegment(): String {
-        return URLEncoder.encode(this, "UTF-8")
+        return java.net.URLEncoder.encode(this, "UTF-8")
             .replace("+", "%20")
     }
 
-    private fun String.isSupportedVideoName(): Boolean {
+    fun String.isSupportedVideoName(): Boolean {
         val name = lowercase()
         return name.endsWith(".mp4") ||
                 name.endsWith(".mkv") ||
@@ -308,5 +314,165 @@ object EducationSyncManager {
                 name.endsWith(".m3u8") ||
                 name.endsWith(".mov") ||
                 name.endsWith(".avi")
+    }
+
+    suspend fun syncWeb(context: Context, forceSync: Boolean) {
+        val app = context.applicationContext as IptvApplication
+        val dataStoreManager = app.dataStoreManager
+
+        _syncState.value = SyncState.Checking("Menghubungi web repository...")
+
+        val serverUrl = dataStoreManager.getServerUrl()
+        val apiService = com.example.rsdkiptvplayer.data.api.RetrofitClient.getService(serverUrl)
+
+        val response = apiService.getEducationVideos()
+        if (!response.isSuccessful || response.body() == null || response.body()?.status != true) {
+            throw IllegalStateException("Gagal memuat daftar video dari server web: HTTP ${response.code()}")
+        }
+
+        val remoteVideos = response.body()?.data ?: emptyList()
+        if (remoteVideos.isEmpty()) {
+            _syncState.value = SyncState.Error(
+                message = "Web repository kosong.",
+                detail = "Tidak ada video edukasi yang ditambahkan di portal admin."
+            )
+            return
+        }
+
+        val localDir = File(context.getExternalFilesDir(null), "education_videos")
+        if (!localDir.exists()) {
+            localDir.mkdirs()
+        }
+
+        val localFiles = localDir.listFiles() ?: emptyArray()
+
+        if (forceSync) {
+            _syncState.value = SyncState.Checking(
+                message = "Membersihkan cache video edukasi lokal...",
+                detail = "Cache lama akan diunduh ulang dari web."
+            )
+            localFiles.forEach { it.delete() }
+        }
+
+        // 1. Delete local files not present on web
+        val remoteNames = remoteVideos.map { getFileNameFromUrl(it.video_url, it.title) }.toSet()
+        val currentLocalFiles = localDir.listFiles() ?: emptyArray()
+        currentLocalFiles.forEach { localFile ->
+            if (localFile.name !in remoteNames) {
+                localFile.delete()
+            }
+        }
+
+        // 2. Identify files to download
+        val localFilesMap = localDir.listFiles()?.associateBy { it.name } ?: emptyMap()
+        
+        data class DownloadTask(val videoUrl: String, val fileName: String, val size: Long)
+        
+        val tasks = remoteVideos.map { video ->
+            val fileName = getFileNameFromUrl(video.video_url, video.title)
+            val fullUrl = if (video.video_url.startsWith("http")) {
+                video.video_url
+            } else {
+                val base = serverUrl.trimEnd('/')
+                val path = video.video_url.trimStart('/')
+                "$base/$path"
+            }
+            
+            // HEAD request to check size
+            var remoteSize: Long = -1
+            try {
+                val conn = java.net.URL(fullUrl).openConnection() as java.net.HttpURLConnection
+                conn.requestMethod = "HEAD"
+                conn.connectTimeout = 4000
+                conn.readTimeout = 4000
+                remoteSize = conn.contentLengthLong
+                conn.disconnect()
+            } catch (e: Exception) {
+                // Ignore HEAD failures
+            }
+
+            DownloadTask(fullUrl, fileName, remoteSize)
+        }
+
+        val filesToDownload = tasks.filter { task ->
+            val localFile = localFilesMap[task.fileName]
+            localFile == null || (task.size > 0 && localFile.length() != task.size)
+        }
+
+        if (filesToDownload.isEmpty()) {
+            _syncState.value = SyncState.Success("Semua video edukasi web sudah terunduh.")
+            return
+        }
+
+        // 3. Download files one by one
+        filesToDownload.forEachIndexed { index, task ->
+            val localFile = File(localDir, task.fileName)
+            val tempFile = File(localDir, "${task.fileName}.tmp")
+            if (tempFile.exists()) {
+                tempFile.delete()
+            }
+
+            _syncState.value = SyncState.Syncing(index + 1, filesToDownload.size, task.fileName, 0f)
+
+            val conn = java.net.URL(task.videoUrl).openConnection() as java.net.HttpURLConnection
+            conn.connectTimeout = 15000
+            conn.readTimeout = 15000
+            conn.connect()
+
+            if (conn.responseCode != 200) {
+                throw IllegalStateException("Gagal mengunduh ${task.fileName}: HTTP ${conn.responseCode}")
+            }
+
+            val totalLength = if (task.size > 0) task.size else conn.contentLengthLong
+            val buffer = ByteArray(64 * 1024)
+            var totalBytesRead: Long = 0
+
+            conn.inputStream.use { inputStream ->
+                FileOutputStream(tempFile).use { outputStream ->
+                    while (true) {
+                        val bytesRead = inputStream.read(buffer)
+                        if (bytesRead == -1) break
+
+                        outputStream.write(buffer, 0, bytesRead)
+                        totalBytesRead += bytesRead
+                        if (totalLength > 0) {
+                            val progress = totalBytesRead.toFloat() / totalLength.toFloat()
+                            _syncState.value = SyncState.Syncing(index + 1, filesToDownload.size, task.fileName, progress)
+                        }
+                    }
+                    outputStream.flush()
+                }
+            }
+
+            if (localFile.exists()) {
+                localFile.delete()
+            }
+            if (!tempFile.renameTo(localFile)) {
+                throw IllegalStateException("Gagal menyimpan berkas video: ${task.fileName}")
+            }
+        }
+
+        _syncState.value = SyncState.Success("Berhasil mengunduh ${filesToDownload.size} video edukasi web.")
+        dataStoreManager.addLog("Education web videos cached successfully: ${filesToDownload.size} files downloaded.")
+    }
+
+    fun getFileNameFromUrl(url: String, title: String): String {
+        val cleanUrl = url.substringBefore('?').substringBefore('#')
+        val nameFromUrl = cleanUrl.substringAfterLast('/')
+        if (nameFromUrl.isNotBlank() && nameFromUrl.contains('.')) {
+            return nameFromUrl
+        }
+        // Fallback to title with extension
+        val extension = when {
+            url.endsWith(".mkv", ignoreCase = true) -> ".mkv"
+            url.endsWith(".webm", ignoreCase = true) -> ".webm"
+            url.endsWith(".ts", ignoreCase = true) -> ".ts"
+            url.endsWith(".m3u8", ignoreCase = true) -> ".m3u8"
+            url.endsWith(".mov", ignoreCase = true) -> ".mov"
+            url.endsWith(".avi", ignoreCase = true) -> ".avi"
+            else -> ".mp4"
+        }
+        val safeTitle = title.replace(Regex("[\\\\/:*?\"<>|]"), "_")
+        return "$safeTitle$extension"
     }
 }

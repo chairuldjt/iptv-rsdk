@@ -359,11 +359,33 @@ export default async function SetupPage({
 
           <section className="space-y-4 border-t border-border/60 pt-6">
             <div>
-              <h3 className="font-bold text-white text-lg">Education SMB</h3>
-              <p className="text-xs text-slate-500 mt-1">Default folder dan kredensial video edukasi untuk perangkat baru.</p>
+              <h3 className="font-bold text-white text-lg">Video Edukasi</h3>
+              <p className="text-xs text-slate-500 mt-1">Default folder, kredensial, sumber, dan cara putar video edukasi untuk perangkat baru.</p>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+              <Field label="Sumber Video Edukasi">
+                <select
+                  name="educationSource"
+                  defaultValue={config.educationSource}
+                  className="w-full px-4 py-2 bg-slate-900 border border-slate-800 rounded-xl text-white text-sm focus:outline-none focus:border-primary"
+                >
+                  <option value="smb">SMB / Windows Share (Lokal)</option>
+                  <option value="web">Web Repository (Terpusat)</option>
+                </select>
+              </Field>
+
+              <Field label="Mode Playback Edukasi">
+                <select
+                  name="educationPlaybackMode"
+                  defaultValue={config.educationPlaybackMode}
+                  className="w-full px-4 py-2 bg-slate-900 border border-slate-800 rounded-xl text-white text-sm focus:outline-none focus:border-primary"
+                >
+                  <option value="copy">Salin ke Lokal (Unduh Dulu)</option>
+                  <option value="stream">Alirkan Langsung (Streaming)</option>
+                </select>
+              </Field>
+
               <Field label="SMB Video Folder" wide>
                 <input
                   type="text"

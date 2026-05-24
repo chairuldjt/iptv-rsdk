@@ -83,8 +83,15 @@ fi
 log "Building Next.js app"
 npm run build
 
-log "Starting or reloading PM2 app"
+log "Ensuring directory structures and write permissions"
+mkdir -p public/uploads/videos
+mkdir -p public/uploads/apk
+mkdir -p public/relay
 mkdir -p logs
+chmod +x deploy.sh scripts/*.sh || true
+chmod -R 777 public/uploads public/relay logs || chmod -R 775 public/uploads public/relay logs || true
+
+log "Starting or reloading PM2 app"
 pm2 startOrReload ecosystem.config.cjs --update-env
 pm2 save
 

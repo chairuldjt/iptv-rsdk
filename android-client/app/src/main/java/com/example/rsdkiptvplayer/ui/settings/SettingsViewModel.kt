@@ -64,6 +64,12 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
     private val _educationSmbDomain = MutableStateFlow("")
     val educationSmbDomain: StateFlow<String> = _educationSmbDomain.asStateFlow()
 
+    private val _educationSource = MutableStateFlow("smb")
+    val educationSource: StateFlow<String> = _educationSource.asStateFlow()
+
+    private val _educationPlaybackMode = MutableStateFlow("copy")
+    val educationPlaybackMode: StateFlow<String> = _educationPlaybackMode.asStateFlow()
+
     private val _m3uSyncResult = MutableStateFlow<String?>(null)
     val m3uSyncResult: StateFlow<String?> = _m3uSyncResult.asStateFlow()
 
@@ -151,6 +157,18 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
         viewModelScope.launch {
             dataStoreManager.educationSmbDomainFlow.collectLatest { domain ->
                 _educationSmbDomain.value = domain
+            }
+        }
+
+        viewModelScope.launch {
+            dataStoreManager.educationSourceFlow.collectLatest { source ->
+                _educationSource.value = source
+            }
+        }
+
+        viewModelScope.launch {
+            dataStoreManager.educationPlaybackModeFlow.collectLatest { mode ->
+                _educationPlaybackMode.value = mode
             }
         }
     }
@@ -301,12 +319,16 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
         }
     }
 
-    fun updateEducationContentSettings(path: String, username: String, password: String, domain: String) {
+    fun updateEducationContentSettings(path: String, username: String, password: String, domain: String, source: String, playbackMode: String) {
         viewModelScope.launch {
             dataStoreManager.setEducationVideoPath(path)
             dataStoreManager.setEducationSmbCredentials(username, password, domain)
-            // Trigger sync immediately in the background when settings are saved
-            com.example.rsdkiptvplayer.util.EducationSyncManager.sync(getApplication())
+            dataStoreManager.setEducationSource(source)
+            dataStoreManager.setEducationPlaybackMode(playbackMode)
+            // Trigger sync immediately in the background when settings are saved and playback mode is copy
+            if (playbackMode == "copy") {
+                com.example.rsdkiptvplayer.util.EducationSyncManager.sync(getApplication())
+            }
         }
     }
 

@@ -87,6 +87,8 @@ export async function GET(
         education_smb_domain: config.educationSmbDomain,
         education_repeat_mode: config.educationRepeatMode || 'all',
         education_play_order: config.educationPlayOrder || 'alphabetical',
+        education_source: config.educationSource || 'smb',
+        education_playback_mode: config.educationPlaybackMode || 'copy',
         education_force_sync: currentEducationForceSync,
       },
     })

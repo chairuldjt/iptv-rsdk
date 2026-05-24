@@ -74,6 +74,8 @@ Server juga mencoba mencocokkan `mac_address` saat `device_id` baru belum ditemu
     "education_smb_domain": "",
     "education_repeat_mode": "all",
     "education_play_order": "alphabetical",
+    "education_source": "smb",
+    "education_playback_mode": "copy",
     "education_force_sync": false
   }
 }
@@ -91,6 +93,8 @@ Device tidak ditemukan mengembalikan HTTP `404` dengan message `Device not found
 | `force_sync` | Boolean | Trigger sekali pakai untuk sync channel. Di-reset server setelah dikirim. |
 | `clear_cache_trigger` | Boolean | Trigger sekali pakai untuk menghapus cache channel lokal. Di-reset server setelah dikirim. |
 | `education_force_sync` | Boolean | Trigger sekali pakai untuk sync ulang cache video edukasi. Di-reset server setelah dikirim. |
+| `education_source` | String | Sumber video edukasi (`smb` atau `web`). |
+| `education_playback_mode` | String | Mode putar video edukasi (`copy` ke lokal atau `stream` langsung). |
 | `education_*` | String | Path SMB, kredensial, repeat mode, dan urutan playlist edukasi. |
 
 ---
@@ -290,3 +294,54 @@ Membuat cookie `admin_session` bila username/password valid.
 Menghapus cookie `admin_session`.
 
 Route `/dashboard/*` diproteksi oleh `src/proxy.ts` sesuai konvensi Next.js 16.
+
+---
+
+## 10. Education Videos Repository (Web)
+
+Endpoint CRUD untuk mengelola video edukasi yang disimpan di repository web (Next.js server).
+
+### Get Video List
+**Endpoint:** `GET /api/education/videos`  
+**Akses:** Terbuka untuk Android client dan Web Admin.
+
+**Response:**
+```json
+{
+  "status": true,
+  "message": "Videos loaded",
+  "data": [
+    {
+      "id": 1,
+      "title": "Edukasi Kebersihan Gigi",
+      "video_url": "/uploads/videos/1716301293_gigi.mp4",
+      "createdAt": "2026-05-24T06:50:00.000Z"
+    }
+  ]
+}
+```
+
+### Add New Video
+**Endpoint:** `POST /api/education/videos`  
+**Format:** `multipart/form-data`  
+**Payload:**
+- `title` (String): Judul video.
+- `videoUrl` (String, opsional): Link URL video jika beraliran langsung eksternal.
+- `videoFile` (File, opsional): File MP4 video untuk diunggah ke server lokal.
+
+### Update Video
+**Endpoint:** `PUT /api/education/videos/{id}`  
+**Format:** `multipart/form-data`  
+**Payload:** Sama dengan POST.
+
+### Delete Video
+**Endpoint:** `DELETE /api/education/videos/{id}`  
+**Akses:** Web Admin.  
+**Response:**
+```json
+{
+  "status": true,
+  "message": "Video berhasil dihapus dari repository!"
+}
+```
+

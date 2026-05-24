@@ -126,6 +126,8 @@ class IptvRepository(
                         config.education_repeat_mode ?: "all",
                         config.education_play_order ?: "alphabetical"
                     )
+                    dataStoreManager.setEducationSource(config.education_source ?: "smb")
+                    dataStoreManager.setEducationPlaybackMode(config.education_playback_mode ?: "copy")
                     dataStoreManager.setAutoStartOnBoot(config.auto_start_on_boot ?: false)
 
                     if (config.force_sync == true) {
@@ -138,8 +140,10 @@ class IptvRepository(
                     }
 
                     val educationPath = dataStoreManager.getEducationVideoPath()
-                    if (educationPath.isNotBlank()) {
-                        // Trigger SMB video caching in the background
+                    val eduSource = dataStoreManager.getEducationSource()
+                    val eduPlaybackMode = dataStoreManager.getEducationPlaybackMode()
+                    if (eduPlaybackMode == "copy" && (eduSource == "web" || educationPath.isNotBlank())) {
+                        // Trigger background video caching
                         kotlinx.coroutines.CoroutineScope(Dispatchers.IO).launch {
                             com.example.rsdkiptvplayer.util.EducationSyncManager.sync(context, forceSync = config.education_force_sync == true)
                         }

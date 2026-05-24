@@ -58,7 +58,21 @@ data class ConfigData(
     val education_smb_domain: String?,
     val education_repeat_mode: String? = "all",
     val education_play_order: String? = "alphabetical",
+    val education_source: String? = "smb",
+    val education_playback_mode: String? = "copy",
     val education_force_sync: Boolean? = false
+)
+
+data class EducationVideoResponse(
+    val status: Boolean,
+    val message: String,
+    val data: List<EducationVideoData>?
+)
+
+data class EducationVideoData(
+    val id: Int,
+    val title: String,
+    val video_url: String
 )
 
 data class ChannelResponse(
@@ -139,6 +153,9 @@ interface IptvApiService {
 
     @POST("api/device/remote/screenshot/upload")
     suspend fun uploadScreenshot(@Body request: UploadScreenshotRequest): Response<LogResponse>
+
+    @GET("api/education/videos")
+    suspend fun getEducationVideos(): Response<EducationVideoResponse>
 }
 
 data class UpdateCheckResponse(

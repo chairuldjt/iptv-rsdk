@@ -86,10 +86,13 @@ Untuk mempermudah pengembangan backend (Web Admin & API) serta frontend (Android
 *   [ ] **Remote Numeric PIN Input**: PIN teknisi bisa dimasukkan langsung memakai tombol angka remote `0-9`.
 *   [ ] **Network Security Config**: Mendukung koneksi HTTP non-HTTPS untuk server lokal/intranet.
 *   [ ] **Auto-Start On Boot**: Broadcast receiver untuk menjalankan aplikasi secara otomatis setelah perangkat STB menyala.
+*   [ ] **Dual Education Sources**: Mendukung sumber video edukasi dari SMB share lokal maupun portal terpusat (Web Repository).
+*   [ ] **Stream vs Copy Playback**: Pilihan memutar video edukasi langsung secara online (Stream) atau mengunduh ke storage lokal STB terlebih dahulu (Copy) menggunakan `DelegatingDataSource` internal.
 
 ### Sisi Web Admin Backend:
 *   [ ] **Dashboard Device**: Memantau status perangkat (*Online*, *Offline*, *Disabled*, *Last IP*, *App Version*) dengan filter status.
 *   [ ] **M3U Playlist Parser**: Parsing link/file M3U menjadi database kategori dan channel terstruktur.
+*   [ ] **Web Video Repository (CRUD)**: Panel premium untuk mengelola data video edukasi (upload file MP4 atau direct URL stream) untuk didistribusikan ke STB.
 *   [ ] **Remote Management**: Mengubah aspek rasio, interval sinkronisasi, status aktif, dan reset setting dari jauh secara terpusat per perangkat atau global.
 *   [ ] **Remote Toggle Lock Settings**: Mengunci pengaturan lokal di STB agar pengguna biasa tidak bisa mengubah konfigurasi secara tidak sengaja.
 *   [ ] **Auto-Active Default Rule**: Pendaftaran perangkat baru otomatis diberi hak akses langsung aktif.
@@ -132,11 +135,22 @@ IPTV_DEFAULT_EDUCATION_SMB_PASSWORD=""
 IPTV_DEFAULT_EDUCATION_SMB_DOMAIN=""
 IPTV_DEFAULT_EDUCATION_REPEAT_MODE="all"
 IPTV_DEFAULT_EDUCATION_PLAY_ORDER="alphabetical"
+IPTV_DEFAULT_EDUCATION_SOURCE="smb"
+IPTV_DEFAULT_EDUCATION_PLAYBACK_MODE="copy"
 ```
 
-### Relay IPTV UDP Multicast ke HLS
+### Relay IPTV UDP Multicast ke HLS (Mode Relay)
 
-Jika playlist berisi URL `udp://@238.x.x.x:1234`, browser dan client di luar VLAN IPTV perlu HLS relay. Server Ubuntu dapat menjalankan relay otomatis dari M3U:
+Jika playlist siaran TV Anda berisi URL UDP Multicast (seperti `udp://@238.x.x.x:1234`), browser web dashboard dan perangkat client di luar VLAN IPTV memerlukan relay ke format HLS (`.m3u8`). Sistem mendukung dua metode relay:
+
+#### 1. On-Demand HLS Relay (Sangat Direkomendasikan & Bawaan Aplikasi)
+Sistem Next.js akan mendeteksi request client secara otomatis ke endpoint `/api/stream/udp-hls/{channelId}/index.m3u8` dan menjalankan subprocess `ffmpeg` untuk melakukan transcoding HLS secara dinamis **hanya ketika siaran ditonton**. Subprocess akan mati otomatis setelah beberapa menit jika tidak ada client yang aktif (idle).
+
+*   **Setup**: Cukup sesuaikan konfigurasi default di dashboard **Setup Defaults** pada bagian **On-Demand HLS Relay Runtime** (menentukan path biner `ffmpeg`, port, directory penyimpanan segment sementara `/public/relay`, dan timeout idle).
+*   Tidak membutuhkan konfigurasi service tambahan di sistem Linux.
+
+#### 2. Background Continuous Relay (Legacy / Pre-run Service)
+Metode lama di mana seluruh channel UDP yang ada di M3U ditranscoding sekaligus secara terus-menerus di latar belakang menggunakan `systemd` service:
 
 ```bash
 sudo env APP_DIR=/var/www/html/iptv-rsdk \
@@ -149,10 +163,5 @@ sudo systemctl start iptv-relay-all
 journalctl -u iptv-relay-all -f
 ```
 
-Dashboard Devices -> `HLS Relay Base URL` harus mengarah ke root relay, contoh:
+Jika menggunakan metode legacy ini, arahkan **HLS Relay Base URL** di dashboard Setup ke folder root output tersebut, misalnya: `http://10.55.1.5/relay`.
 
-```text
-http://10.55.1.5/relay
-```
-
-Runtime relay on-demand dapat diatur dari dashboard `Setup Defaults` pada bagian `On-Demand HLS Relay Runtime`. Nilai dari web disimpan di database dan dipakai untuk relay baru berikutnya. Jika belum ada setting web, backend memakai fallback bawaan kode.

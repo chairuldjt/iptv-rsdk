@@ -432,6 +432,8 @@ fun SettingsScreen(
     val educationSmbUsername by viewModel.educationSmbUsername.collectAsState()
     val educationSmbPassword by viewModel.educationSmbPassword.collectAsState()
     val educationSmbDomain by viewModel.educationSmbDomain.collectAsState()
+    val educationSource by viewModel.educationSource.collectAsState()
+    val educationPlaybackMode by viewModel.educationPlaybackMode.collectAsState()
     val m3uSyncResult by viewModel.m3uSyncResult.collectAsState()
     val isSyncingM3u by viewModel.isSyncingM3u.collectAsState()
 
@@ -442,6 +444,8 @@ fun SettingsScreen(
     var inputEducationUsernameText by remember { mutableStateOf("") }
     var inputEducationPasswordText by remember { mutableStateOf("") }
     var inputEducationDomainText by remember { mutableStateOf("") }
+    var inputEducationSource by remember { mutableStateOf("smb") }
+    var inputEducationPlaybackMode by remember { mutableStateOf("copy") }
     var isTextInputFocused by remember { mutableStateOf(false) }
 
     var isUnlockedSession by remember { mutableStateOf(false) }
@@ -493,6 +497,14 @@ fun SettingsScreen(
 
     LaunchedEffect(educationSmbDomain) {
         inputEducationDomainText = educationSmbDomain
+    }
+
+    LaunchedEffect(educationSource) {
+        inputEducationSource = educationSource
+    }
+
+    LaunchedEffect(educationPlaybackMode) {
+        inputEducationPlaybackMode = educationPlaybackMode
     }
 
     BackHandler {
@@ -993,17 +1005,23 @@ fun SettingsScreen(
                                 inputUsername = inputEducationUsernameText,
                                 inputPassword = inputEducationPasswordText,
                                 inputDomain = inputEducationDomainText,
+                                activeSource = inputEducationSource,
+                                activePlaybackMode = inputEducationPlaybackMode,
                                 onPathChange = { inputEducationPathText = it },
                                 onUsernameChange = { inputEducationUsernameText = it },
                                 onPasswordChange = { inputEducationPasswordText = it },
                                 onDomainChange = { inputEducationDomainText = it },
+                                onSourceChange = { inputEducationSource = it },
+                                onPlaybackModeChange = { inputEducationPlaybackMode = it },
                                 onInputFocusChanged = { isTextInputFocused = it },
                                 onSave = {
                                     viewModel.updateEducationContentSettings(
                                         inputEducationPathText,
                                         inputEducationUsernameText,
                                         inputEducationPasswordText,
-                                        inputEducationDomainText
+                                        inputEducationDomainText,
+                                        inputEducationSource,
+                                        inputEducationPlaybackMode
                                     )
                                     Toast.makeText(context, "Pengaturan edukasi disimpan.", Toast.LENGTH_SHORT).show()
                                 }
@@ -1417,10 +1435,14 @@ fun EducationContentPane(
     inputUsername: String,
     inputPassword: String,
     inputDomain: String,
+    activeSource: String,
+    activePlaybackMode: String,
     onPathChange: (String) -> Unit,
     onUsernameChange: (String) -> Unit,
     onPasswordChange: (String) -> Unit,
     onDomainChange: (String) -> Unit,
+    onSourceChange: (String) -> Unit,
+    onPlaybackModeChange: (String) -> Unit,
     onInputFocusChanged: (Boolean) -> Unit,
     onSave: () -> Unit
 ) {
@@ -1433,53 +1455,117 @@ fun EducationContentPane(
         Text("Konten Video Edukasi", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = Color.White)
 
         Text(
-            "Atur folder SMB/Windows Share berisi video edukasi. Menu Edukasi akan memutar semua video secara looping.",
+            "Pilih apakah video edukasi berasal dari folder SMB (Local Share) atau Web Repository terpusat. Anda juga bisa memilih untuk menyalin file secara lokal atau mengalirkannya langsung via jaringan.",
             fontSize = 12.sp,
             color = Color(0xFF94A3B8),
             lineHeight = 15.sp
         )
 
-        Text("Path Folder Network", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 13.sp)
+        Text("Sumber Video Edukasi", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 13.sp)
 
-        SettingsOutlinedTextField(
-            value = inputPath,
-            onValueChange = onPathChange,
-            label = "\\\\10.45.128.129\\edukasi",
-            modifier = Modifier.fillMaxWidth(),
-            onFocusChanged = onInputFocusChanged
-        )
-
-        Text("Login SMB / Windows Share", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 13.sp)
-
-        Row(
-            horizontalArrangement = Arrangement.spacedBy(10.dp),
-            modifier = Modifier.fillMaxWidth()
+        val sources = listOf("smb" to "SMB Share (Lokal)", "web" to "Web Repository (Terpusat)")
+        LazyRow(
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            modifier = Modifier.fillMaxWidth().padding(bottom = 4.dp)
         ) {
-            SettingsOutlinedTextField(
-                value = inputUsername,
-                onValueChange = onUsernameChange,
-                label = "Username / kosongkan untuk guest",
-                modifier = Modifier.weight(1f),
-                onFocusChanged = onInputFocusChanged
-            )
+            itemsIndexed(sources) { _, (key, label) ->
+                val isSelected = key == activeSource
+                var isFocused by remember { mutableStateOf(false) }
 
-            SettingsOutlinedTextField(
-                value = inputDomain,
-                onValueChange = onDomainChange,
-                label = "Domain / WORKGROUP",
-                modifier = Modifier.weight(0.75f),
-                onFocusChanged = onInputFocusChanged
-            )
+                Button(
+                    onClick = { onSourceChange(key) },
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = if (isSelected) Color(0xFF6366F1) else if (isFocused) Color(0xFF334155) else Color(0xFF1E293B)
+                    ),
+                    border = BorderStroke(1.dp, if (isFocused) Color(0xFF6366F1) else Color(0xFF334155)),
+                    modifier = Modifier.settingsFocusGlow().onFocusChanged { isFocused = it.isFocused }
+                ) {
+                    Text(label)
+                }
+            }
         }
 
-        SettingsOutlinedTextField(
-            value = inputPassword,
-            onValueChange = onPasswordChange,
-            label = "Password",
-            modifier = Modifier.fillMaxWidth(),
-            obscureText = true,
-            onFocusChanged = onInputFocusChanged
-        )
+        Text("Mode Playback Edukasi", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 13.sp)
+
+        val modes = listOf("copy" to "Salin ke Lokal (Unduh)", "stream" to "Alirkan Langsung (Stream)")
+        LazyRow(
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            modifier = Modifier.fillMaxWidth().padding(bottom = 6.dp)
+        ) {
+            itemsIndexed(modes) { _, (key, label) ->
+                val isSelected = key == activePlaybackMode
+                var isFocused by remember { mutableStateOf(false) }
+
+                Button(
+                    onClick = { onPlaybackModeChange(key) },
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = if (isSelected) Color(0xFF6366F1) else if (isFocused) Color(0xFF334155) else Color(0xFF1E293B)
+                    ),
+                    border = BorderStroke(1.dp, if (isFocused) Color(0xFF6366F1) else Color(0xFF334155)),
+                    modifier = Modifier.settingsFocusGlow().onFocusChanged { isFocused = it.isFocused }
+                ) {
+                    Text(label)
+                }
+            }
+        }
+
+        if (activeSource == "smb") {
+            Text("Path Folder Network", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 13.sp)
+
+            SettingsOutlinedTextField(
+                value = inputPath,
+                onValueChange = onPathChange,
+                label = "\\\\10.45.128.129\\edukasi",
+                modifier = Modifier.fillMaxWidth(),
+                onFocusChanged = onInputFocusChanged
+            )
+
+            Text("Login SMB / Windows Share", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 13.sp)
+
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                SettingsOutlinedTextField(
+                    value = inputUsername,
+                    onValueChange = onUsernameChange,
+                    label = "Username / kosongkan untuk guest",
+                    modifier = Modifier.weight(1f),
+                    onFocusChanged = onInputFocusChanged
+                )
+
+                SettingsOutlinedTextField(
+                    value = inputDomain,
+                    onValueChange = onDomainChange,
+                    label = "Domain / WORKGROUP",
+                    modifier = Modifier.weight(0.75f),
+                    onFocusChanged = onInputFocusChanged
+                )
+            }
+
+            SettingsOutlinedTextField(
+                value = inputPassword,
+                onValueChange = onPasswordChange,
+                label = "Password",
+                modifier = Modifier.fillMaxWidth(),
+                obscureText = true,
+                onFocusChanged = onInputFocusChanged
+            )
+        } else {
+            Card(
+                colors = CardDefaults.cardColors(containerColor = Color(0xFF1E293B).copy(alpha = 0.4f)),
+                border = BorderStroke(1.dp, Color(0xFF334155)),
+                modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)
+            ) {
+                Text(
+                    text = "💡 Menggunakan Web Repository terpusat. Daftar video edukasi akan diambil secara otomatis dari server web dan tidak memerlukan konfigurasi Windows Share/SMB lokal.",
+                    color = Color(0xFF7DD3FC),
+                    fontSize = 12.sp,
+                    lineHeight = 16.sp,
+                    modifier = Modifier.padding(14.dp)
+                )
+            }
+        }
 
         Button(
             onClick = onSave,

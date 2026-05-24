@@ -145,6 +145,8 @@ async function saveDeviceConfigAction(formData: FormData) {
   const educationSmbDomain = formData.get('educationSmbDomain') as string
   const educationRepeatMode = formData.get('educationRepeatMode') as string
   const educationPlayOrder = formData.get('educationPlayOrder') as string
+  const educationSource = formData.get('educationSource') as string
+  const educationPlaybackMode = formData.get('educationPlaybackMode') as string
   const educationForceSyncTrigger = formData.get('educationForceSyncTrigger') === 'true'
 
   const lockSettings = formData.get('lockSettings') === 'on'
@@ -178,6 +180,8 @@ async function saveDeviceConfigAction(formData: FormData) {
         educationSmbDomain: educationSmbDomain || '',
         educationRepeatMode: educationRepeatMode || 'all',
         educationPlayOrder: educationPlayOrder || 'alphabetical',
+        educationSource: educationSource || 'smb',
+        educationPlaybackMode: educationPlaybackMode || 'copy',
         ...(educationForceSyncTrigger ? { educationForceSync: true } : {}),
       },
     })

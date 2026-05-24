@@ -34,6 +34,8 @@ class DataStoreManager(private val context: Context) {
         val EDUCATION_SMB_DOMAIN = stringPreferencesKey("education_smb_domain")
         val EDUCATION_REPEAT_MODE = stringPreferencesKey("education_repeat_mode")
         val EDUCATION_PLAY_ORDER = stringPreferencesKey("education_play_order")
+        val EDUCATION_SOURCE = stringPreferencesKey("education_source")
+        val EDUCATION_PLAYBACK_MODE = stringPreferencesKey("education_playback_mode")
         val TECHNICIAN_PIN = stringPreferencesKey("technician_pin")
     }
 
@@ -175,6 +177,44 @@ class DataStoreManager(private val context: Context) {
 
     val educationPlayOrderFlow: Flow<String> = context.dataStore.data.map { prefs ->
         prefs[EDUCATION_PLAY_ORDER] ?: "alphabetical"
+    }
+
+    val educationSourceFlow: Flow<String> = context.dataStore.data.map { prefs ->
+        prefs[EDUCATION_SOURCE] ?: "smb"
+    }
+
+    val educationPlaybackModeFlow: Flow<String> = context.dataStore.data.map { prefs ->
+        prefs[EDUCATION_PLAYBACK_MODE] ?: "copy"
+    }
+
+    suspend fun getEducationSource(): String {
+        val prefs = context.dataStore.data.first()
+        return prefs[EDUCATION_SOURCE] ?: "smb"
+    }
+
+    suspend fun setEducationSource(source: String) {
+        val current = getEducationSource()
+        if (current != source) {
+            context.dataStore.edit { prefs ->
+                prefs[EDUCATION_SOURCE] = source
+            }
+            addLog("Education source changed to: $source")
+        }
+    }
+
+    suspend fun getEducationPlaybackMode(): String {
+        val prefs = context.dataStore.data.first()
+        return prefs[EDUCATION_PLAYBACK_MODE] ?: "copy"
+    }
+
+    suspend fun setEducationPlaybackMode(mode: String) {
+        val current = getEducationPlaybackMode()
+        if (current != mode) {
+            context.dataStore.edit { prefs ->
+                prefs[EDUCATION_PLAYBACK_MODE] = mode
+            }
+            addLog("Education playback mode changed to: $mode")
+        }
     }
 
     suspend fun setEducationSmbCredentials(username: String, password: String, domain: String) {
