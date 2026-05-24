@@ -95,7 +95,28 @@ Script ini akan menjalankan `npm ci`, Prisma generate/migrate, `npm run build`, 
 
 ## 🛠️ 3. Cara Build APK
 
-Pastikan Anda sudah menginstal JDK 17+ dan Android SDK. Jalankan perintah berikut dari direktori utama proyek:
+Pastikan Anda sudah menginstal JDK 17+ dan Android SDK. Android client saat ini **tidak memakai product flavor/channel terpisah**; build debug dan release memakai package yang sama, dan update check hanya membandingkan `versionCode`.
+
+Versi APK diambil otomatis dari Git:
+- `versionCode`: hasil `git rev-list --count HEAD`.
+- `versionName`: hasil `git describe --tags --always`.
+
+Karena itu, buat tag Git jika ingin `versionName` yang tampil di dashboard/Android lebih rapi, misalnya `v1.2.3`.
+
+### A. Release signing
+Build release wajib memiliki credential signing di `android-client/.env` atau environment variables:
+
+```env
+KEYSTORE_FILE=app/keystore/rsdk-release.jks
+KEYSTORE_STORE_PASSWORD=...
+KEYSTORE_KEY_ALIAS=...
+KEYSTORE_KEY_PASSWORD=...
+```
+
+`KEYSTORE_FILE` relatif terhadap folder `android-client`.
+
+### B. Build debug dan release
+Jalankan perintah berikut dari direktori utama proyek:
 
 1. Masuk ke direktori client:
    ```powershell
@@ -115,6 +136,11 @@ Pastikan Anda sudah menginstal JDK 17+ dan Android SDK. Jalankan perintah beriku
    `android-client/app/build/outputs/apk/release/app-release.apk`
 
 Build release sudah mengaktifkan minify/resource shrink dan signing dari `android-client/.env`.
+
+### C. Upload OTA dari Web Admin
+Dashboard **Updates** membaca `versionCode` dan `versionName` langsung dari manifest APK di browser sebelum upload. APK yang di-upload disimpan sebagai **Draft** lebih dulu. Klik **Deploy Version** untuk menjadikannya versi OTA aktif.
+
+Hanya satu record `app_updates.isDeployed=true` yang dipakai endpoint update check. Update yang di-upload saat ini otomatis diset `isMandatory=true`.
 
 ---
 
@@ -142,6 +168,8 @@ Setelah APK berhasil di-build, Anda dapat menginstalnya ke STB atau Android TV m
 - **Default M3U URL**: `DataStoreManager.kt`
 - **Default Playlist Source**: `DataStoreManager.kt`
 - **Default Server API Connection (Enabled/Disabled)**: `DataStoreManager.kt` & `SettingsViewModel.kt`
+- **Android versionCode/versionName**: otomatis dari Git di `android-client/app/build.gradle.kts`
+- **Release signing env**: `android-client/.env`
 - **PM2 Config**: `ecosystem.config.cjs`
 - **Deploy Script**: `deploy.sh`
 

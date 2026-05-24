@@ -230,8 +230,29 @@ class BootReceiver : BroadcastReceiver() {
 
 Desain antarmuka dirancang khusus untuk layar TV berjarak 3 meter dengan navigasi remote control standar (D-pad UP/DOWN/LEFT/RIGHT/OK).
 
+Home screen memakai carousel Compose dengan ikon Material, background per menu, chime saat seleksi berubah, serta `BuildConfig.HOME_LOW_EFFECT_MODE=true` sebagai mode efek ringan bawaan untuk STB dengan GPU/RAM terbatas. Toggle mute suara navigasi tidak lagi ditampilkan di Settings Android.
+
 ### Aturan UI/UX Penting:
 1. **Focus State Indication**: Semua item menu yang dapat diklik wajib memiliki visual focus yang tebal. Gunakan selektor drawable atau XML border bersinar (glow) dan naikkan ukuran elemen (scale up 1.05x) saat status `focused = true`.
 2. **Tanpa Touchscreen Dependency**: Pastikan tidak ada tombol yang melayang yang tidak bisa dicapai oleh D-pad. Urutan navigasi diatur secara eksplisit menggunakan `android:nextFocusLeft`, `android:nextFocusRight`, dll.
 3. **Loading Status**: Tampilkan progress bar yang informatif ("Menghubungkan ke Server...", "Sinkronisasi Saluran...") daripada halaman hitam kosong saat memuat data.
 4. **Dark Mode by Default**: Latar belakang aplikasi harus berwarna gelap pekat (misal: `#0F172A` Slate Dark) untuk kenyamanan mata pengguna TV di malam hari.
+
+---
+
+## 📦 8. Versioning & OTA Update
+
+APK tidak lagi memakai flavor update channel seperti `production` atau `debugLatency`. Build debug dan release memakai package utama `com.example.rsdkiptvplayer`, dan endpoint update hanya menerima `versionCode`.
+
+Nilai build dihasilkan otomatis oleh Gradle:
+```kotlin
+versionCode = git rev-list --count HEAD
+versionName = git describe --tags --always
+```
+
+Saat user membuka dialog Info Aplikasi, Android memanggil:
+```http
+GET /api/app-update/check?versionCode={currentVersionCode}
+```
+
+Jika server mengembalikan `update_available=true`, client mengunduh `apk_url` ke cache lokal lalu memulai instalasi APK melalui `FileProvider`.

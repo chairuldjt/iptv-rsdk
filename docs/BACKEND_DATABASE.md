@@ -17,10 +17,11 @@ devices
 
 app_settings
 app_updates
+sound_preferences
 users
 ```
 
-`playlists`, `categories`, dan `channels` menyimpan hasil parsing M3U. `devices` dan `device_configs` menyimpan status serta konfigurasi per STB. `app_settings` menyimpan konfigurasi global berbasis key/value seperti default setup device baru dan runtime relay. `app_updates` menyimpan metadata APK yang di-upload dari dashboard.
+`playlists`, `categories`, dan `channels` menyimpan hasil parsing M3U. `devices` dan `device_configs` menyimpan status serta konfigurasi per STB. `app_settings` menyimpan konfigurasi global berbasis key/value seperti default setup device baru dan runtime relay. `app_updates` menyimpan metadata APK yang di-upload dari dashboard. `sound_preferences` masih tersedia di schema untuk preferensi suara per device, walaupun UI Android terbaru tidak lagi menampilkan toggle mute suara navigasi Home.
 
 ---
 
@@ -221,8 +222,22 @@ Metadata APK update dari dashboard Updates.
 | `versionName` | String | Nama versi tampil. |
 | `apkFileName` | String | File di `public/uploads/apk`. |
 | `changelog` | Text/null | Catatan rilis. |
-| `isMandatory` | Boolean | Update wajib atau opsional. |
-| `isDeployed` | Boolean | Hanya deployed update dipakai endpoint check. |
+| `isMandatory` | Boolean | Saat ini upload dashboard mengisi `true` secara default. |
+| `isDeployed` | Boolean | Hanya versi deployed aktif yang dipakai endpoint check. |
+
+Alur dashboard:
+- Upload APK membaca `versionCode` dan `versionName` dari manifest APK di browser, lalu menyimpan record sebagai draft.
+- Deploy version mengubah semua record lain menjadi `isDeployed=false`, lalu mengaktifkan satu record pilihan.
+- Delete update menghapus record database dan file APK di `public/uploads/apk`.
+
+### `sound_preferences`
+Preferensi suara per device.
+
+| Kolom | Tipe | Catatan |
+| --- | --- | --- |
+| `deviceId` | String | Primary key. |
+| `muteSelectionSound` | Boolean | Default `false`; tersisa untuk kompatibilitas data. |
+| `createdAt` / `updatedAt` | DateTime | Timestamp Prisma. |
 
 ---
 
@@ -234,6 +249,6 @@ Metadata APK update dari dashboard Updates.
 - Clear cache, force sync channel, dan force sync edukasi dari dashboard.
 - Playlist upload/sync M3U, parse category/channel, global playlist.
 - Preview stream direct/relay dan konfigurasi HLS relay.
-- Upload, deploy, dan delete APK update.
+- Upload APK dengan auto-detect manifest, draft history, deploy satu versi aktif, download, dan delete APK update.
 - Remote control device via polling command dan screenshot streaming.
 - Log viewer untuk error yang dikirim Android.

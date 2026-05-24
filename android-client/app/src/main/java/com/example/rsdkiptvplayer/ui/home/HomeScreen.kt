@@ -2,8 +2,11 @@ package com.example.rsdkiptvplayer.ui.home
 
 import androidx.activity.compose.BackHandler
 
+import android.media.AudioAttributes
+import android.media.SoundPool
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.Crossfade
+import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
@@ -20,6 +23,13 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.rounded.MenuBook
+import androidx.compose.material.icons.rounded.Info
+import androidx.compose.material.icons.rounded.LiveTv
+import androidx.compose.material.icons.rounded.Movie
+import androidx.compose.material.icons.rounded.RoomService
+import androidx.compose.material.icons.rounded.Settings
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -33,6 +43,7 @@ import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.graphics.Shadow
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEventType
@@ -47,6 +58,7 @@ import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Offset as TextOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -110,6 +122,9 @@ fun HomeScreen(
         }
     }
     var selectedHomeBackground by remember { mutableIntStateOf(R.drawable.home_bg_tv) }
+    var selectedHomeAccent by remember { mutableStateOf(Color(0xFFFFE9A6)) }
+    val screenGlowPulse = remember { Animatable(0f) }
+    var hasTriggeredScreenGlow by remember { mutableStateOf(false) }
 
     LaunchedEffect(Unit) {
         resolvedDeviceId = dataStoreManager.getDeviceId()
@@ -198,18 +213,30 @@ fun HomeScreen(
     }
 
     Box(modifier = Modifier.fillMaxSize()) {
-        Crossfade(
-            targetState = selectedHomeBackground,
-            animationSpec = tween(durationMillis = 520),
-            label = "home_selection_background"
-        ) { backgroundRes ->
+        if (BuildConfig.HOME_LOW_EFFECT_MODE) {
             Image(
-                painter = painterResource(id = backgroundRes),
+                painter = painterResource(id = selectedHomeBackground),
                 contentDescription = "Hospitality menu background",
                 modifier = Modifier.fillMaxSize(),
                 contentScale = ContentScale.Crop
             )
+        } else {
+            Crossfade(
+                targetState = selectedHomeBackground,
+                animationSpec = tween(durationMillis = 520),
+                label = "home_selection_background"
+            ) { backgroundRes ->
+                Image(
+                    painter = painterResource(id = backgroundRes),
+                    contentDescription = "Hospitality menu background",
+                    modifier = Modifier.fillMaxSize(),
+                    contentScale = ContentScale.Crop
+                )
+            }
         }
+
+        val configuration = androidx.compose.ui.platform.LocalConfiguration.current
+        val isSmallScreen = configuration.screenWidthDp < 760 || configuration.screenHeightDp < 500
 
         Box(
             modifier = Modifier
@@ -225,8 +252,41 @@ fun HomeScreen(
                 )
         )
 
-        val configuration = androidx.compose.ui.platform.LocalConfiguration.current
-        val isSmallScreen = configuration.screenWidthDp < 760 || configuration.screenHeightDp < 500
+        LaunchedEffect(selectedHomeBackground) {
+            if (!hasTriggeredScreenGlow) {
+                hasTriggeredScreenGlow = true
+                return@LaunchedEffect
+            }
+            screenGlowPulse.snapTo(0f)
+            screenGlowPulse.animateTo(
+                targetValue = if (BuildConfig.HOME_LOW_EFFECT_MODE) 0.58f else 0.66f,
+                animationSpec = tween(durationMillis = 120)
+            )
+            screenGlowPulse.animateTo(
+                targetValue = 0f,
+                animationSpec = tween(durationMillis = if (BuildConfig.HOME_LOW_EFFECT_MODE) 320 else 420)
+            )
+        }
+
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(
+                    Brush.radialGradient(
+                        colors = listOf(
+                            selectedHomeAccent.copy(alpha = screenGlowPulse.value),
+                            selectedHomeAccent.copy(alpha = screenGlowPulse.value * 0.58f),
+                            selectedHomeAccent.copy(alpha = screenGlowPulse.value * 0.18f),
+                            Color.Transparent
+                        ),
+                        center = Offset(
+                            x = if (isSmallScreen) 540f else 960f,
+                            y = if (isSmallScreen) 330f else 360f
+                        ),
+                        radius = if (isSmallScreen) 980f else 1680f
+                    )
+                )
+        )
 
         Column(
             modifier = Modifier
@@ -290,6 +350,7 @@ fun HomeScreen(
                 menuFocusRequester = menuFocusRequester,
                 onSelectionChanged = { item ->
                     selectedHomeBackground = item.backgroundRes
+                    selectedHomeAccent = item.accent
                 }
             )
         }
@@ -461,13 +522,27 @@ private fun HospitalityMenuBar(
     val context = LocalContext.current
     val configuration = androidx.compose.ui.platform.LocalConfiguration.current
     val isSmallScreen = configuration.screenWidthDp < 760 || configuration.screenHeightDp < 500
+    val lowEffectMode = BuildConfig.HOME_LOW_EFFECT_MODE
+    var hasPlayedSelectionSound by remember { mutableStateOf(false) }
+    val soundPool = remember {
+        SoundPool.Builder()
+            .setMaxStreams(2)
+            .setAudioAttributes(
+                AudioAttributes.Builder()
+                    .setUsage(AudioAttributes.USAGE_ASSISTANCE_SONIFICATION)
+                    .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
+                    .build()
+            )
+            .build()
+    }
+    var selectionSoundId by remember { mutableIntStateOf(0) }
 
     var selectedIndex by remember { mutableIntStateOf(2) }
     var dragAmount by remember { mutableFloatStateOf(0f) }
     val carouselFocusRequester = menuFocusRequester
     val menuItems = listOf(
         HospitalityCarouselItem(
-            iconRes = R.drawable.ic_home_education,
+            icon = Icons.AutoMirrored.Rounded.MenuBook,
             title = "EDUKASI",
             subtitle = when {
                 educationSource == null -> "Memuat..."
@@ -481,7 +556,7 @@ private fun HospitalityMenuBar(
             action = onEducationClick
         ),
         HospitalityCarouselItem(
-            iconRes = R.drawable.ic_home_services,
+            icon = Icons.Rounded.RoomService,
             title = "LAYANAN",
             subtitle = "Informasi RS",
             accent = Color(0xFFE7D8A0),
@@ -489,7 +564,7 @@ private fun HospitalityMenuBar(
             action = onServiceClick
         ),
         HospitalityCarouselItem(
-            iconRes = R.drawable.ic_home_tv,
+            icon = Icons.Rounded.LiveTv,
             title = "TV CHANNEL",
             subtitle = "$channelsCount saluran",
             accent = Color(0xFFFFE9A6),
@@ -497,7 +572,7 @@ private fun HospitalityMenuBar(
             action = onTvClick
         ),
         HospitalityCarouselItem(
-            iconRes = R.drawable.ic_home_media,
+            icon = Icons.Rounded.Movie,
             title = "HIBURAN",
             subtitle = "Konten & Musik",
             accent = Color(0xFFFF9A76),
@@ -505,7 +580,7 @@ private fun HospitalityMenuBar(
             action = onEntertainmentClick
         ),
         HospitalityCarouselItem(
-            iconRes = R.drawable.ic_home_info,
+            icon = Icons.Rounded.Info,
             title = "INFO APLIKASI",
             subtitle = "Cek Pembaruan",
             accent = Color(0xFFC084FC),
@@ -513,7 +588,7 @@ private fun HospitalityMenuBar(
             action = onInfoClick
         ),
         HospitalityCarouselItem(
-            iconRes = R.drawable.ic_home_settings,
+            icon = Icons.Rounded.Settings,
             title = "SETTING",
             subtitle = "Sistem",
             accent = Color(0xFF7DD3FC),
@@ -522,17 +597,28 @@ private fun HospitalityMenuBar(
         )
     )
 
-    LaunchedEffect(Unit) {
-        carouselFocusRequester.requestFocus()
+    DisposableEffect(Unit) {
+        selectionSoundId = soundPool.load(context, R.raw.home_selection_chime, 1)
+        onDispose {
+            soundPool.release()
+        }
     }
 
-    LaunchedEffect(selectedIndex) {
+    LaunchedEffect(Unit) { carouselFocusRequester.requestFocus() }
+
+    LaunchedEffect(selectedIndex, selectionSoundId) {
         onSelectionChanged(menuItems[selectedIndex])
+        if (!hasPlayedSelectionSound) {
+            hasPlayedSelectionSound = true
+            return@LaunchedEffect
+        }
+        if (selectionSoundId != 0) {
+            soundPool.play(selectionSoundId, 0.38f, 0.42f, 1, 0, 1.0f)
+        }
     }
 
     fun moveSelection(delta: Int) {
         selectedIndex = wrapCarouselIndex(selectedIndex + delta, menuItems.size)
-        carouselFocusRequester.requestFocus()
     }
 
     Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.fillMaxWidth()) {
@@ -623,13 +709,13 @@ private fun HospitalityMenuBar(
                     HospitalityCarouselCard(
                         item = item,
                         offset = offset,
+                        lowEffectMode = lowEffectMode,
                         isSmallScreen = isSmallScreen,
                         onClick = {
                             if (offset == 0) {
                                 item.action()
                             } else {
                                 selectedIndex = itemIndex
-                                carouselFocusRequester.requestFocus()
                             }
                         }
                     )
@@ -671,7 +757,7 @@ private fun HospitalityMenuBar(
 }
 
 private data class HospitalityCarouselItem(
-    val iconRes: Int,
+    val icon: ImageVector,
     val title: String,
     val subtitle: String,
     val accent: Color,
@@ -774,21 +860,192 @@ private fun CarouselTouchButton(
 private fun HospitalityCarouselCard(
     item: HospitalityCarouselItem,
     offset: Int,
+    lowEffectMode: Boolean,
     isSmallScreen: Boolean,
     onClick: () -> Unit
 ) {
     val isActive = offset == 0
     val distance = abs(offset)
+    if (lowEffectMode) {
+        val scale by animateFloatAsState(
+            targetValue = when (distance) {
+                0 -> 1.10f
+                1 -> 0.92f
+                else -> 0.72f
+            },
+            animationSpec = tween(durationMillis = 160),
+            label = "hospitality_carousel_scale_debug_step1"
+        )
+        val cardWidth by animateDpAsState(
+            targetValue = when (distance) {
+                0 -> if (isSmallScreen) 126.dp else 164.dp
+                1 -> if (isSmallScreen) 92.dp else 112.dp
+                else -> if (isSmallScreen) 68.dp else 82.dp
+            },
+            animationSpec = tween(durationMillis = 160),
+            label = "hospitality_carousel_width_debug_step1"
+        )
+        val iconBoxSize by animateDpAsState(
+            targetValue = when (distance) {
+                0 -> if (isSmallScreen) 88.dp else 116.dp
+                1 -> if (isSmallScreen) 56.dp else 72.dp
+                else -> if (isSmallScreen) 40.dp else 50.dp
+            },
+            animationSpec = tween(durationMillis = 160),
+            label = "hospitality_carousel_box_size_debug_step1"
+        )
+        val iconSize = when (distance) {
+            0 -> if (isSmallScreen) 38.dp else 54.dp
+            1 -> if (isSmallScreen) 26.dp else 36.dp
+            else -> if (isSmallScreen) 20.dp else 26.dp
+        }
+        val iconPlateSize = when (distance) {
+            0 -> if (isSmallScreen) 48.dp else 62.dp
+            1 -> if (isSmallScreen) 30.dp else 40.dp
+            else -> if (isSmallScreen) 22.dp else 30.dp
+        }
+        val offsetY by animateDpAsState(
+            targetValue = if (isActive) {
+                if (isSmallScreen) (-8).dp else (-12).dp
+            } else {
+                if (isSmallScreen) 6.dp else 10.dp
+            },
+            animationSpec = tween(durationMillis = 160),
+            label = "hospitality_carousel_offset_y_debug_step2"
+        )
+        val borderWidth by animateDpAsState(
+            targetValue = if (isActive) {
+                if (isSmallScreen) 2.dp else 3.dp
+            } else {
+                1.dp
+            },
+            animationSpec = tween(durationMillis = 160),
+            label = "hospitality_carousel_border_width_debug_step1"
+        )
+        val borderColor by animateColorAsState(
+            targetValue = if (isActive) item.accent else Color.White.copy(alpha = 0.30f),
+            animationSpec = tween(durationMillis = 160),
+            label = "hospitality_carousel_border_color_debug_step1"
+        )
+        val cardShape = RoundedCornerShape(if (isActive) 16.dp else 12.dp)
+        val shadowElevation by animateDpAsState(
+            targetValue = if (isActive) {
+                if (isSmallScreen) 6.dp else 8.dp
+            } else {
+                if (isSmallScreen) 2.dp else 3.dp
+            },
+            animationSpec = tween(durationMillis = 160),
+            label = "hospitality_carousel_shadow_debug_step3"
+        )
+
+        Column(
+            modifier = Modifier
+                .width(cardWidth)
+                .offset(y = offsetY)
+                .scale(scale)
+                .zIndex(if (isActive) 3f else 1f / (distance + 1))
+                .clickable(
+                    interactionSource = remember { MutableInteractionSource() },
+                    indication = null
+                ) { onClick() },
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(iconBoxSize)
+                    .shadow(
+                        elevation = shadowElevation,
+                        shape = cardShape,
+                        ambientColor = if (isActive) item.accent.copy(alpha = 0.18f) else Color.Black.copy(alpha = 0.10f),
+                        spotColor = if (isActive) item.accent.copy(alpha = 0.22f) else Color.Black.copy(alpha = 0.12f)
+                    )
+                    .clip(cardShape)
+                    .background(
+                        if (isActive) Color(0xFF142331) else Color(0xFF101A24)
+                    )
+                    .border(
+                        BorderStroke(
+                            width = borderWidth,
+                            color = borderColor
+                        ),
+                        cardShape
+                    ),
+                contentAlignment = Alignment.Center
+            ) {
+                Box(
+                    modifier = Modifier
+                        .matchParentSize()
+                        .background(
+                            Brush.verticalGradient(
+                                colors = listOf(
+                                    item.accent.copy(alpha = if (isActive) 0.16f else 0.08f),
+                                    Color(0xFF142331).copy(alpha = if (isActive) 0.96f else 0.92f),
+                                    Color(0xFF0F1822)
+                                )
+                            )
+                        )
+                )
+                Box(
+                    modifier = Modifier
+                        .matchParentSize()
+                        .background(
+                            Brush.verticalGradient(
+                                colors = listOf(
+                                    Color.White.copy(alpha = if (isActive) 0.07f else 0.03f),
+                                    Color.Transparent,
+                                    Color.Black.copy(alpha = if (isActive) 0.14f else 0.08f)
+                                )
+                            )
+                        )
+                )
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.TopCenter)
+                        .padding(top = if (isSmallScreen) 5.dp else 7.dp)
+                        .width(if (isActive) iconBoxSize * 0.52f else iconBoxSize * 0.40f)
+                        .height(if (isSmallScreen) 3.dp else 4.dp)
+                        .clip(RoundedCornerShape(999.dp))
+                        .background(item.accent.copy(alpha = if (isActive) 0.78f else 0.36f))
+                )
+                Icon(
+                    imageVector = item.icon,
+                    contentDescription = item.title,
+                    tint = Color.White.copy(alpha = if (isActive) 0.98f else 0.78f),
+                    modifier = Modifier
+                        .size(iconPlateSize)
+                        .offset(y = if (isActive) (-2).dp else 0.dp)
+                )
+            }
+
+            Spacer(modifier = Modifier.height(if (isActive) 8.dp else 4.dp))
+
+            if (!isActive) {
+                Text(
+                    text = item.title,
+                    color = Color.White.copy(alpha = 0.76f),
+                    fontSize = if (isSmallScreen) 8.sp else 10.sp,
+                    fontWeight = FontWeight.Bold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+        }
+        return
+    }
+
+    val targetScale = when (distance) {
+        0 -> if (lowEffectMode) 1.12f else 1.22f
+        1 -> 0.90f
+        else -> 0.66f
+    }
     val scale by animateFloatAsState(
-        targetValue = when (distance) {
-            0 -> 1.22f
-            1 -> 0.90f
-            else -> 0.66f
-        },
+        targetValue = targetScale,
+        animationSpec = if (lowEffectMode) tween(durationMillis = 0) else tween(durationMillis = 220),
         label = "hospitality_carousel_scale"
     )
     val glowAlpha by animateFloatAsState(
-        targetValue = if (isActive) 0.84f else 0.18f,
+        targetValue = if (isActive) if (lowEffectMode) 0.24f else 0.84f else if (lowEffectMode) 0f else 0.18f,
+        animationSpec = if (lowEffectMode) tween(durationMillis = 0) else tween(durationMillis = 220),
         label = "hospitality_carousel_glow_alpha"
     )
     val cardWidth by animateDpAsState(
@@ -797,6 +1054,7 @@ private fun HospitalityCarouselCard(
             1 -> if (isSmallScreen) 92.dp else 112.dp
             else -> if (isSmallScreen) 68.dp else 82.dp
         },
+        animationSpec = if (lowEffectMode) tween(durationMillis = 0) else tween(durationMillis = 220),
         label = "hospitality_carousel_width"
     )
     val iconBoxSize by animateDpAsState(
@@ -805,33 +1063,40 @@ private fun HospitalityCarouselCard(
             1 -> if (isSmallScreen) 56.dp else 72.dp
             else -> if (isSmallScreen) 40.dp else 50.dp
         },
+        animationSpec = if (lowEffectMode) tween(durationMillis = 0) else tween(durationMillis = 220),
         label = "hospitality_carousel_box_size"
     )
     val offsetY by animateDpAsState(
         targetValue = if (isActive) (if (isSmallScreen) (-16).dp else (-28).dp) else (if (isSmallScreen) 10.dp else 16.dp),
+        animationSpec = if (lowEffectMode) tween(durationMillis = 0) else tween(durationMillis = 220),
         label = "hospitality_carousel_offset_y"
     )
     val borderWidth by animateDpAsState(
         targetValue = if (isActive) (if (isSmallScreen) 3.dp else 4.dp) else (if (isSmallScreen) 1.8.dp else 2.5.dp),
+        animationSpec = if (lowEffectMode) tween(durationMillis = 0) else tween(durationMillis = 220),
         label = "hospitality_carousel_border_width"
     )
     val borderColor by animateColorAsState(
         targetValue = if (isActive) item.accent else Color.White.copy(alpha = 0.45f),
+        animationSpec = if (lowEffectMode) tween(durationMillis = 0) else tween(durationMillis = 220),
         label = "hospitality_carousel_border_color"
     )
     val cornerRadius by animateDpAsState(
         targetValue = if (isActive) (if (isSmallScreen) 16.dp else 24.dp) else (if (isSmallScreen) 12.dp else 18.dp),
+        animationSpec = if (lowEffectMode) tween(durationMillis = 0) else tween(durationMillis = 220),
         label = "hospitality_carousel_corner_radius"
     )
     val cardShape = RoundedCornerShape(cornerRadius)
 
     val shadowElevation by animateDpAsState(
-        targetValue = if (isActive) (if (isSmallScreen) 16.dp else 24.dp) else (if (isSmallScreen) 5.dp else 7.dp),
+        targetValue = if (lowEffectMode) 0.dp else if (isActive) (if (isSmallScreen) 16.dp else 24.dp) else (if (isSmallScreen) 5.dp else 7.dp),
+        animationSpec = if (lowEffectMode) tween(durationMillis = 0) else tween(durationMillis = 220),
         label = "hospitality_carousel_shadow_elevation"
     )
 
     val contentAlpha by animateFloatAsState(
         targetValue = if (distance <= 1) 1f else 0f,
+        animationSpec = if (lowEffectMode) tween(durationMillis = 0) else tween(durationMillis = 220),
         label = "hospitality_carousel_content_alpha"
     )
 
@@ -898,7 +1163,7 @@ private fun HospitalityCarouselCard(
                     contentDescription = null,
                     modifier = Modifier
                         .matchParentSize()
-                        .alpha(if (isActive) 0.42f else 0.18f),
+                        .alpha(if (lowEffectMode) 0f else if (isActive) 0.42f else 0.18f),
                     contentScale = ContentScale.Crop
                 )
                 Box(
@@ -914,7 +1179,7 @@ private fun HospitalityCarouselCard(
                         )
                 )
                 Icon(
-                    painter = painterResource(id = item.iconRes),
+                    imageVector = item.icon,
                     contentDescription = item.title,
                     tint = Color.White.copy(alpha = if (isActive) 1f else 0.76f),
                     modifier = Modifier.size(
@@ -1168,7 +1433,7 @@ private fun InfoAplikasiDialog(
                 return
             }
             val apiService = RetrofitClient.getService(serverUrl)
-            val response = apiService.checkUpdate(currentVersionCode, BuildConfig.UPDATE_CHANNEL)
+            val response = apiService.checkUpdate(currentVersionCode)
             if (response.isSuccessful) {
                 val body = response.body()
                 if (body != null && body.update_available) {

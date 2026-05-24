@@ -40,7 +40,6 @@ val gitVersionName: String = try {
 android {
     namespace = "com.example.rsdkiptvplayer"
     compileSdk = 36
-    flavorDimensions += "channel"
     defaultConfig {
         applicationId = "com.example.rsdkiptvplayer"
         minSdk = 23
@@ -49,19 +48,7 @@ android {
         versionName = gitVersionName
         
         buildConfigField("String", "DEFAULT_API_BASE_URL", "\"https://iptv.teknisirsdk.my.id\"")
-    }
-
-    productFlavors {
-        create("production") {
-            dimension = "channel"
-            buildConfigField("String", "UPDATE_CHANNEL", "\"production\"")
-        }
-        create("debugLatency") {
-            dimension = "channel"
-            applicationIdSuffix = ".debuglatency"
-            versionNameSuffix = "-debug-latency"
-            buildConfigField("String", "UPDATE_CHANNEL", "\"debug-latency\"")
-        }
+        buildConfigField("boolean", "HOME_LOW_EFFECT_MODE", "true")
     }
 
     signingConfigs {
@@ -120,6 +107,7 @@ dependencies {
   implementation(libs.androidx.compose.ui.tooling.preview)
   implementation(libs.androidx.compose.material3)
   implementation(libs.androidx.compose.material.icons.core)
+  implementation(libs.androidx.compose.material.icons.extended)
   // Tooling
   debugImplementation(libs.androidx.compose.ui.tooling)
   // Instrumented tests

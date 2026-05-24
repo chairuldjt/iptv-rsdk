@@ -84,6 +84,14 @@ Script akan menjalankan install dependency, Prisma migration, build Next.js, rel
    ```
    Hasil build ada di: `android-client/app/build/outputs/apk/release/app-release.apk`
 
+   Catatan versi:
+   - `versionCode` APK otomatis mengikuti jumlah commit Git.
+   - `versionName` otomatis mengikuti `git describe --tags --always`.
+   - Build release membutuhkan keystore di `android-client/.env` (`KEYSTORE_FILE`, `KEYSTORE_STORE_PASSWORD`, `KEYSTORE_KEY_ALIAS`, `KEYSTORE_KEY_PASSWORD`).
+
+3. **Deploy OTA APK dari Dashboard**:
+   Buka `/dashboard/updates`, pilih APK release, lalu dashboard akan membaca `versionCode` dan `versionName` otomatis dari manifest. Upload akan masuk sebagai draft; klik **Deploy Version** untuk menjadikannya versi OTA aktif yang dicek Android melalui `/api/app-update/check`.
+
 ---
 
 ## 📲 5. Instalasi ke Perangkat (ADB)

@@ -2,17 +2,15 @@ import prisma from '@/lib/db'
 import ConfirmForm from '@/components/ConfirmForm'
 import UploadApkForm from '@/components/UploadApkForm'
 import { deployUpdateAction, deleteUpdateAction } from './actions'
-import { APP_UPDATE_CHANNELS, APP_UPDATE_CHANNEL_LABELS } from '@/lib/appUpdateChannels'
 
 export const revalidate = 0 // Disable cache for live updates list
 
 export default async function UpdatesPage() {
   const updates = await prisma.appUpdate.findMany({
-    orderBy: [
-      { updateChannel: 'asc' },
-      { versionCode: 'desc' }
-    ]
+    orderBy: { versionCode: 'desc' }
   })
+
+  const deployedUpdate = updates.find(u => u.isDeployed)
 
   return (
     <div className="space-y-8 animate-fade-in">
@@ -28,44 +26,35 @@ export default async function UpdatesPage() {
 
         {/* History & Active Deployment Card */}
         <div className="lg:col-span-2 space-y-6">
-          {APP_UPDATE_CHANNELS.map((channel) => {
-            const deployedUpdate = updates.find((u) => u.updateChannel === channel && u.isDeployed)
-
-            if (!deployedUpdate) return null
-
-            return (
-              <div key={channel} className="p-5 bg-indigo-500/10 border border-indigo-500/20 rounded-2xl flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-                <div>
-                  <span className="px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 text-[9px] font-bold uppercase tracking-wider shadow-[0_0_10px_rgba(16,185,129,0.1)]">
-                    {APP_UPDATE_CHANNEL_LABELS[channel]} Active OTA
-                  </span>
-                  <h4 className="font-extrabold text-white text-xl mt-2">v{deployedUpdate.versionName} <span className="text-indigo-400 font-mono text-sm">({deployedUpdate.versionCode})</span></h4>
-                  <p className="text-slate-400 text-xs mt-1">File: <span className="font-mono text-[11px] text-slate-300">{deployedUpdate.apkFileName}</span></p>
-                  {deployedUpdate.packageName && (
-                    <p className="text-slate-500 text-[11px] mt-1">Package: <span className="font-mono text-slate-300">{deployedUpdate.packageName}</span></p>
-                  )}
-                  {deployedUpdate.changelog && (
-                    <div className="mt-2 bg-slate-950/40 p-3 rounded-xl border border-border/40 max-w-lg">
-                      <span className="text-[10px] uppercase font-bold text-slate-500">Changelog:</span>
-                      <p className="text-slate-300 text-xs whitespace-pre-line mt-1">{deployedUpdate.changelog}</p>
-                    </div>
-                  )}
-                </div>
-                <div className="flex flex-col items-end gap-3 self-end md:self-center">
-                  <div className="text-xs text-right font-semibold text-slate-400">
-                    Deployed: {new Date(deployedUpdate.updatedAt).toLocaleDateString()}
+          {deployedUpdate && (
+            <div className="p-5 bg-indigo-500/10 border border-indigo-500/20 rounded-2xl flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+              <div>
+                <span className="px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 text-[9px] font-bold uppercase tracking-wider shadow-[0_0_10px_rgba(16,185,129,0.1)]">
+                  Active OTA Version
+                </span>
+                <h4 className="font-extrabold text-white text-xl mt-2">v{deployedUpdate.versionName} <span className="text-indigo-400 font-mono text-sm">({deployedUpdate.versionCode})</span></h4>
+                <p className="text-slate-400 text-xs mt-1">File: <span className="font-mono text-[11px] text-slate-300">{deployedUpdate.apkFileName}</span></p>
+                {deployedUpdate.changelog && (
+                  <div className="mt-2 bg-slate-950/40 p-3 rounded-xl border border-border/40 max-w-lg">
+                    <span className="text-[10px] uppercase font-bold text-slate-500">Changelog:</span>
+                    <p className="text-slate-300 text-xs whitespace-pre-line mt-1">{deployedUpdate.changelog}</p>
                   </div>
-                  <a
-                    href={createApkDownloadUrl(deployedUpdate.apkFileName)}
-                    download={deployedUpdate.apkFileName}
-                    className="px-4 py-2 rounded-xl bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/20 text-emerald-400 hover:text-emerald-300 text-xs font-bold transition-all"
-                  >
-                    Download APK
-                  </a>
-                </div>
+                )}
               </div>
-            )
-          })}
+              <div className="flex flex-col items-end gap-3 self-end md:self-center">
+                <div className="text-xs text-right font-semibold text-slate-400">
+                  Deployed: {new Date(deployedUpdate.updatedAt).toLocaleDateString()}
+                </div>
+                <a
+                  href={createApkDownloadUrl(deployedUpdate.apkFileName)}
+                  download={deployedUpdate.apkFileName}
+                  className="px-4 py-2 rounded-xl bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/20 text-emerald-400 hover:text-emerald-300 text-xs font-bold transition-all"
+                >
+                  Download APK
+                </a>
+              </div>
+            </div>
+          )}
 
           <div className="glass-card rounded-2xl border border-border overflow-hidden">
             <div className="px-6 py-5 border-b border-border">
@@ -83,9 +72,6 @@ export default async function UpdatesPage() {
                     <div className="space-y-1">
                       <div className="flex items-center gap-2">
                         <h4 className="font-extrabold text-white text-base">v{u.versionName} <span className="text-indigo-400 font-mono text-xs">(Code {u.versionCode})</span></h4>
-                        <span className="px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-300 border border-amber-500/20 text-[9px] font-bold uppercase tracking-wider">
-                          {APP_UPDATE_CHANNEL_LABELS[u.updateChannel as keyof typeof APP_UPDATE_CHANNEL_LABELS] ?? u.updateChannel}
-                        </span>
                         {u.isDeployed ? (
                           <span className="px-2 py-0.5 rounded-full bg-indigo-500/15 text-indigo-400 border border-indigo-500/30 text-[9px] font-bold uppercase tracking-wider">
                             Active
@@ -102,9 +88,6 @@ export default async function UpdatesPage() {
                         )}
                       </div>
                       <p className="text-[10px] text-slate-400 font-mono leading-relaxed">Filename: {u.apkFileName}</p>
-                      {u.packageName && (
-                        <p className="text-[10px] text-slate-500 font-mono leading-relaxed">Package: {u.packageName}</p>
-                      )}
                       {u.changelog && (
                         <p className="text-xs text-slate-500 line-clamp-1 italic">Notes: {u.changelog}</p>
                       )}

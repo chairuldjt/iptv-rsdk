@@ -165,3 +165,21 @@ journalctl -u iptv-relay-all -f
 ```
 
 Jika menggunakan metode legacy ini, arahkan **HLS Relay Base URL** di dashboard Setup ke folder root output tersebut, misalnya: `http://10.55.1.5/relay`.
+
+---
+
+## 📦 Build & OTA APK Ringkas
+
+Android client sekarang memakai satu package utama tanpa flavor update channel. `versionCode` diambil otomatis dari jumlah commit Git, sedangkan `versionName` dari `git describe --tags --always`. Build release membutuhkan signing env di `android-client/.env`.
+
+```powershell
+cd android-client
+./gradlew assembleDebug
+./gradlew assembleRelease
+```
+
+Output:
+- Debug: `android-client/app/build/outputs/apk/debug/app-debug.apk`
+- Release: `android-client/app/build/outputs/apk/release/app-release.apk`
+
+Dashboard **Updates** membaca metadata manifest APK otomatis, menyimpan upload sebagai draft, lalu hanya versi yang diklik **Deploy Version** yang menjadi OTA aktif untuk endpoint `/api/app-update/check`.

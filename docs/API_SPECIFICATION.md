@@ -188,6 +188,8 @@ Device tidak ditemukan mengembalikan HTTP `404`; client versi terbaru akan menco
 ### Check Update
 **Endpoint:** `GET /api/app-update/check?versionCode={currentVersionCode}`
 
+`versionCode` wajib berupa integer. Server mencari record `app_updates` yang sedang aktif (`isDeployed=true`) dengan `versionCode` tertinggi, lalu membandingkannya dengan `versionCode` APK client.
+
 Response saat ada APK deployed yang lebih baru:
 ```json
 {
@@ -202,10 +204,29 @@ Response saat ada APK deployed yang lebih baru:
 }
 ```
 
+Jika tidak ada versi deployed aktif, response:
+```json
+{
+  "status": true,
+  "update_available": false,
+  "message": "No deployed updates found"
+}
+```
+
+Jika versi deployed tidak lebih baru dari client, `update_available` bernilai `false` tetapi metadata versi aktif tetap dikirim.
+
 ### Upload APK
 **Endpoint:** `POST /api/app-update/upload`  
 **Akses:** Web Admin.  
-**Format:** `multipart/form-data` berisi file APK dan metadata versi. File tersimpan di `public/uploads/apk`.
+**Format:** `multipart/form-data`.
+
+Payload:
+- `apkFile`: file `.apk`.
+- `versionCode`: integer, biasanya diisi otomatis oleh UI dashboard dari manifest APK.
+- `versionName`: string, biasanya diisi otomatis oleh UI dashboard dari manifest APK.
+- `changelog`: catatan rilis opsional.
+
+File tersimpan di `public/uploads/apk` dengan nama aman berawalan `versionCode`, misalnya `123_app-release.apk`. Record baru disimpan sebagai draft (`isDeployed=false`) dan mandatory (`isMandatory=true`) sampai admin menekan **Deploy Version** di dashboard.
 
 ### Download APK
 **Endpoint:** `GET /uploads/apk/{filename}`  

@@ -5,7 +5,6 @@ import { getErrorMessage } from '@/lib/errors'
 import { revalidatePath } from 'next/cache'
 import { writeFile, mkdir, unlink } from 'fs/promises'
 import path from 'path'
-import { normalizeAppUpdateChannel } from '@/lib/appUpdateChannels'
 
 // Server Action for uploading a new APK update
 export async function uploadApkAction(
@@ -15,8 +14,6 @@ export async function uploadApkAction(
   void prevState
   const versionCodeStr = formData.get('versionCode') as string
   const versionName = formData.get('versionName') as string
-  const updateChannel = normalizeAppUpdateChannel(formData.get('updateChannel') as string | null)
-  const packageNameRaw = formData.get('packageName') as string | null
   const changelog = formData.get('changelog') as string
   const isMandatory = true // Force all updates by default
   const apkFile = formData.get('apkFile') as File
@@ -46,8 +43,7 @@ export async function uploadApkAction(
     }
     
     // Clean file name to prevent directory traversal
-    const packageName = packageNameRaw?.trim() || null
-    const safeFileName = `${updateChannel}_${versionCode}_${apkFile.name.replace(/[^a-zA-Z0-9.\-_]/g, '')}`
+    const safeFileName = `${versionCode}_${apkFile.name.replace(/[^a-zA-Z0-9.\-_]/g, '')}`
     const filePath = path.join(uploadDir, safeFileName)
     
     try {
@@ -64,11 +60,9 @@ export async function uploadApkAction(
     try {
       await prisma.appUpdate.create({
         data: {
-          updateChannel,
           versionCode,
           versionName,
           apkFileName: safeFileName,
-          packageName,
           changelog: changelog || null,
           isMandatory,
           isDeployed: false, // Upload as draft by default
@@ -96,19 +90,10 @@ export async function deployUpdateAction(formData: FormData) {
   if (isNaN(id)) return
 
   try {
-    const targetUpdate = await prisma.appUpdate.findUnique({
-      where: { id },
-      select: { updateChannel: true }
-    })
-    if (!targetUpdate) return
-
     await prisma.$transaction([
       // Set all to false
       prisma.appUpdate.updateMany({
-        where: {
-          isDeployed: true,
-          updateChannel: targetUpdate.updateChannel,
-        },
+        where: { isDeployed: true },
         data: { isDeployed: false }
       }),
       // Set this to true

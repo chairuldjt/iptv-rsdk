@@ -1,17 +1,10 @@
 'use client'
 
 import { useState, useRef } from 'react'
-import {
-  APP_UPDATE_CHANNEL_DESCRIPTIONS,
-  APP_UPDATE_CHANNEL_LABELS,
-  APP_UPDATE_PACKAGE_HINTS,
-  type AppUpdateChannel,
-} from '@/lib/appUpdateChannels'
 
 type ApkInfo = {
   versionCode?: number
   versionName?: string
-  package?: string
 }
 
 type UploadResponse = {
@@ -20,11 +13,9 @@ type UploadResponse = {
 }
 
 export default function UploadApkForm() {
-  const [updateChannel, setUpdateChannel] = useState<AppUpdateChannel>('production')
   const [parsingState, setParsingState] = useState<'idle' | 'analyzing' | 'success' | 'error'>('idle')
   const [versionCode, setVersionCode] = useState<string>('')
   const [versionName, setVersionName] = useState<string>('')
-  const [packageName, setPackageName] = useState<string>('')
   const [errorMsg, setErrorMsg] = useState<string>('')
   const [fileName, setFileName] = useState<string>('')
   const [fileSize, setFileSize] = useState<string>('')
@@ -61,7 +52,6 @@ export default function UploadApkForm() {
       if (result && result.versionCode !== undefined && result.versionName) {
         setVersionCode(String(result.versionCode))
         setVersionName(result.versionName)
-        setPackageName(result.package || '')
         setParsingState('success')
       } else {
         throw new Error('Format APK tidak didukung atau Manifest tidak memiliki versionCode/versionName.')
@@ -71,7 +61,6 @@ export default function UploadApkForm() {
       setParsingState('error')
       setVersionCode('')
       setVersionName('')
-      setPackageName('')
       setErrorMsg(err instanceof Error ? err.message : 'Gagal menganalisis berkas APK. Pastikan berkas valid.')
     }
   }
@@ -81,7 +70,6 @@ export default function UploadApkForm() {
     setParsingState('idle')
     setVersionCode('')
     setVersionName('')
-    setPackageName('')
     setFileName('')
     setFileSize('')
     setErrorMsg('')
@@ -123,11 +111,9 @@ export default function UploadApkForm() {
 
         if (isSuccess) {
           // Reset form fields
-          setUpdateChannel('production')
           setParsingState('idle')
           setVersionCode('')
           setVersionName('')
-          setPackageName('')
           setFileName('')
           setFileSize('')
           setErrorMsg('')
@@ -166,28 +152,6 @@ export default function UploadApkForm() {
       <h3 className="font-bold text-white text-lg mb-4">Deploy New Version</h3>
       
       <form ref={formRef} onSubmit={handleSubmit} className="space-y-4">
-        <div>
-          <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">
-            Update Channel
-          </label>
-          <select
-            name="updateChannel"
-            value={updateChannel}
-            onChange={(e) => setUpdateChannel(e.target.value as AppUpdateChannel)}
-            disabled={isUploading}
-            className="w-full px-4 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-white text-sm focus:outline-none focus:border-primary disabled:opacity-50"
-          >
-            {Object.entries(APP_UPDATE_CHANNEL_LABELS).map(([value, label]) => (
-              <option key={value} value={value}>
-                {label}
-              </option>
-            ))}
-          </select>
-          <p className="text-[10px] text-slate-500 mt-1">
-            {APP_UPDATE_CHANNEL_DESCRIPTIONS[updateChannel]}
-          </p>
-        </div>
-
         {/* APK File Upload Area */}
         <div>
           <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">
@@ -307,30 +271,6 @@ export default function UploadApkForm() {
             className="w-full px-4 py-2.5 bg-slate-900/60 border border-slate-800 rounded-xl text-white text-sm focus:outline-none font-mono cursor-not-allowed select-none opacity-80"
           />
           <p className="text-[10px] text-slate-500 mt-1">Nilai dibaca otomatis dari kode biner Manifest APK.</p>
-        </div>
-
-        <div>
-          <div className="flex items-center justify-between mb-1">
-            <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider">
-              Package Name
-            </label>
-            {packageName && (
-              <span className="text-[9px] font-bold text-emerald-400 uppercase tracking-wider bg-emerald-500/10 border border-emerald-500/20 px-1.5 py-0.5 rounded">
-                Parsed
-              </span>
-            )}
-          </div>
-          <input
-            type="text"
-            name="packageName"
-            readOnly
-            value={packageName}
-            placeholder={APP_UPDATE_PACKAGE_HINTS[updateChannel]}
-            className="w-full px-4 py-2.5 bg-slate-900/60 border border-slate-800 rounded-xl text-white text-sm focus:outline-none font-mono cursor-not-allowed select-none opacity-80"
-          />
-          <p className="text-[10px] text-slate-500 mt-1">
-            Untuk channel ini biasanya memakai `{APP_UPDATE_PACKAGE_HINTS[updateChannel]}`.
-          </p>
         </div>
 
         {/* Version Name (String) */}

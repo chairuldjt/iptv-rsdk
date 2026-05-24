@@ -76,9 +76,6 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
     private val _isSyncingM3u = MutableStateFlow(false)
     val isSyncingM3u: StateFlow<Boolean> = _isSyncingM3u.asStateFlow()
 
-    private val _muteSelectionSound = MutableStateFlow(false)
-    val muteSelectionSound: StateFlow<Boolean> = _muteSelectionSound.asStateFlow()
-
     init {
         // Fetch values
         viewModelScope.launch {
@@ -175,11 +172,6 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
             }
         }
 
-        viewModelScope.launch {
-            repository.muteSelectionSoundFlow.collectLatest { muted ->
-                _muteSelectionSound.value = muted
-            }
-        }
     }
 
     fun updateSyncMode(mode: String) {
@@ -344,12 +336,6 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
     fun unlockSettings() {
         viewModelScope.launch {
             dataStoreManager.setLockSettings(false)
-        }
-    }
-
-    fun changeMuteSelectionSound(muted: Boolean) {
-        viewModelScope.launch {
-            dataStoreManager.setMuteSelectionSound(muted)
         }
     }
 

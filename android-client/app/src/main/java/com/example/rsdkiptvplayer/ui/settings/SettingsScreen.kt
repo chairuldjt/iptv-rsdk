@@ -436,8 +436,6 @@ fun SettingsScreen(
     val educationPlaybackMode by viewModel.educationPlaybackMode.collectAsState()
     val m3uSyncResult by viewModel.m3uSyncResult.collectAsState()
     val isSyncingM3u by viewModel.isSyncingM3u.collectAsState()
-    val muteSelectionSound by viewModel.muteSelectionSound.collectAsState()
-
     var activeMenuIdx by remember { mutableStateOf(initialTabIdx) }
     var inputUrlText by remember { mutableStateOf("") }
     var inputM3uText by remember { mutableStateOf("") }
@@ -985,7 +983,6 @@ fun SettingsScreen(
                             3 -> DisplayBootPane(
                                 activeRatio = aspectRatio,
                                 autoStart = autoStart,
-                                muteSelectionSound = muteSelectionSound,
                                 onRatioChange = {
                                     viewModel.changeAspectRatio(it)
                                     Toast.makeText(context, "Aspek rasio disimpan.", Toast.LENGTH_SHORT).show()
@@ -1001,14 +998,6 @@ fun SettingsScreen(
                                         AutostartPermissionHelper.requestAutostartPermission(context)
                                     }
                                 },
-                                onMuteSelectionSoundChange = {
-                                    viewModel.changeMuteSelectionSound(it)
-                                    Toast.makeText(
-                                        context,
-                                        if (it) "Suara navigasi dinonaktifkan." else "Suara navigasi diaktifkan.",
-                                        Toast.LENGTH_SHORT
-                                    ).show()
-                                }
                             )
                             4 -> EducationContentPane(
                                 inputPath = inputEducationPathText,
@@ -1365,10 +1354,8 @@ fun DeviceControlPane(
 fun DisplayBootPane(
     activeRatio: String,
     autoStart: Boolean,
-    muteSelectionSound: Boolean,
     onRatioChange: (String) -> Unit,
-    onAutoStartChange: (Boolean) -> Unit,
-    onMuteSelectionSoundChange: (Boolean) -> Unit
+    onAutoStartChange: (Boolean) -> Unit
 ) {
     Column(
         modifier = Modifier
@@ -1439,34 +1426,6 @@ fun DisplayBootPane(
         }
 
         HorizontalDivider(color = Color(0xFF334155))
-
-        // Item Mute Selection Sound
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Column(modifier = Modifier.weight(1f)) {
-                Text("Suara Navigasi Home", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 14.sp)
-                Text("Matikan suara saat berpindah menu di halaman home.", color = Color.Gray, fontSize = 11.sp)
-            }
-
-            var isFocusedSound by remember { mutableStateOf(false) }
-            Switch(
-                checked = muteSelectionSound,
-                onCheckedChange = onMuteSelectionSoundChange,
-                modifier = Modifier
-                    .settingsFocusGlow(RoundedCornerShape(16.dp))
-                    .onFocusChanged { isFocusedSound = it.isFocused }
-                    .border(
-                        BorderStroke(
-                            1.dp,
-                            if (isFocusedSound) Color(0xFF6366F1) else Color.Transparent
-                        ),
-                        shape = RoundedCornerShape(16.dp)
-                    )
-            )
-        }
     }
 }
 
