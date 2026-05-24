@@ -65,7 +65,7 @@ fun SplashScreen(
         currentVersionName = UpdateManager.getCurrentVersionName(context)
 
         if (splashSoundId != 0) {
-            soundPool.play(splashSoundId, 0.38f, 0.42f, 1, 0, 1.0f)
+            soundPool.play(splashSoundId, 1.0f, 1.0f, 1, 0, 1.0f)
         }
 
         // Animate splash in

@@ -19,6 +19,10 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.foundation.focusable
 import com.example.rsdkiptvplayer.theme.RSDKIPTVPlayerTheme
 import com.example.rsdkiptvplayer.ui.channels.ChannelBrowserScreen
 import com.example.rsdkiptvplayer.ui.education.EducationScreen
@@ -31,6 +35,19 @@ import com.example.rsdkiptvplayer.data.api.UpdateCheckResponse
 import com.example.rsdkiptvplayer.util.UpdateManager
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.scale
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.type
+import androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.ui.text.style.TextOverflow
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -49,6 +66,8 @@ class MainActivity : ComponentActivity() {
                     var currentScreen by remember { mutableStateOf("splash") }
                     var activeSettingsTab by remember { mutableStateOf(0) }
                     var selectedChannelId by remember { mutableIntStateOf(-1) }
+                    var showExitConfirmDialog by remember { mutableStateOf(false) }
+                    val confirmNoFocusRequester = remember { FocusRequester() }
 
                     LaunchedEffect(Unit) {
                         app.repository.remoteCommandFlow.collect { (command, value) ->
@@ -80,6 +99,9 @@ class MainActivity : ComponentActivity() {
                             )
                         }
                         "home" -> {
+                            BackHandler {
+                                showExitConfirmDialog = true
+                            }
                             HomeScreen(
                                 onNavigateToPlayer = {
                                     selectedChannelId = -1
@@ -143,6 +165,88 @@ class MainActivity : ComponentActivity() {
                             )
                         }
                     }
+
+                    if (showExitConfirmDialog) {
+                        BackHandler(enabled = showExitConfirmDialog) {
+                            showExitConfirmDialog = false
+                        }
+                        
+                        LaunchedEffect(showExitConfirmDialog) {
+                            if (showExitConfirmDialog) {
+                                try {
+                                    confirmNoFocusRequester.requestFocus()
+                                } catch (e: Exception) {
+                                    e.printStackTrace()
+                                }
+                            }
+                        }
+
+                        Box(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .background(Color.Black.copy(alpha = 0.78f)),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Card(
+                                colors = CardDefaults.cardColors(containerColor = Color(0xF207111D)),
+                                border = BorderStroke(1.dp, Color(0xFFFFE9A6).copy(alpha = 0.30f)),
+                                shape = RoundedCornerShape(24.dp),
+                                modifier = Modifier
+                                    .width(360.dp)
+                                    .padding(16.dp)
+                            ) {
+                                Column(
+                                    modifier = Modifier.padding(24.dp),
+                                    horizontalAlignment = Alignment.CenterHorizontally
+                                ) {
+                                    Text(
+                                        text = "Keluar Aplikasi?",
+                                        color = Color.White,
+                                        fontSize = 20.sp,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                    
+                                    Spacer(modifier = Modifier.height(12.dp))
+                                    
+                                    Text(
+                                        text = "Apakah Anda yakin ingin keluar dari RSDK IPTV Player?",
+                                        color = Color.White.copy(alpha = 0.7f),
+                                        fontSize = 14.sp,
+                                        textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                                    )
+                                    
+                                    Spacer(modifier = Modifier.height(24.dp))
+                                    
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                                    ) {
+                                        ExitDialogButton(
+                                            text = "Ya",
+                                            onClick = {
+                                                finishAndRemoveTask()
+                                            },
+                                            modifier = Modifier
+                                                .weight(1f)
+                                                .height(44.dp)
+                                        )
+                                        
+                                        ExitDialogButton(
+                                            text = "Tidak",
+                                            primary = true,
+                                            focusRequester = confirmNoFocusRequester,
+                                            onClick = {
+                                                showExitConfirmDialog = false
+                                            },
+                                            modifier = Modifier
+                                                .weight(1f)
+                                                .height(44.dp)
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
                 }
             }
         }
@@ -177,5 +281,60 @@ class MainActivity : ComponentActivity() {
                     View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION or
                     View.SYSTEM_UI_FLAG_LAYOUT_STABLE
         }
+    }
+}
+
+@Composable
+private fun ExitDialogButton(
+    text: String,
+    modifier: Modifier = Modifier,
+    primary: Boolean = false,
+    focusRequester: FocusRequester? = null,
+    onClick: () -> Unit
+) {
+    var isFocused by remember { mutableStateOf(false) }
+    val background = when {
+        primary -> Color(0xFFFFE9A6)
+        isFocused -> Color(0xFF7DD3FC).copy(alpha = 0.24f)
+        else -> Color.Transparent
+    }
+    val textColor = if (primary && !isFocused) Color.Black else Color.White
+
+    Box(
+        modifier = modifier
+            .then(if (focusRequester != null) Modifier.focusRequester(focusRequester) else Modifier)
+            .onFocusChanged { isFocused = it.isFocused }
+            .onPreviewKeyEvent { keyEvent ->
+                if (keyEvent.type == KeyEventType.KeyDown &&
+                    (keyEvent.key == Key.DirectionCenter || keyEvent.key == Key.Enter)
+                ) {
+                    onClick()
+                    true
+                } else {
+                    false
+                }
+            }
+            .focusable()
+            .scale(if (isFocused) 1.03f else 1f)
+            .clip(RoundedCornerShape(10.dp))
+            .background(background)
+            .border(
+                BorderStroke(
+                    if (isFocused) 4.dp else 1.dp,
+                    if (isFocused) Color.White else Color.White.copy(alpha = 0.22f)
+                ),
+                RoundedCornerShape(10.dp)
+            )
+            .clickable(onClick = onClick),
+        contentAlignment = Alignment.Center
+    ) {
+        Text(
+            text = text,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            fontWeight = FontWeight.Bold,
+            color = textColor,
+            fontSize = 13.sp
+        )
     }
 }

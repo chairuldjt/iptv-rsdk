@@ -426,11 +426,12 @@ class IptvRepository(
     }
 
     fun getMacAddress(): String? {
+        var hardwareMac: String? = null
         try {
             val all = Collections.list(NetworkInterface.getNetworkInterfaces())
             for (nif in all) {
                 if (!nif.name.equals("wlan0", ignoreCase = true) && !nif.name.equals("eth0", ignoreCase = true)) continue
-                val macBytes = nif.hardwareAddress ?: return null
+                val macBytes = nif.hardwareAddress ?: continue
                 val res1 = StringBuilder()
                 for (b in macBytes) {
                     res1.append(String.format("%02X:", b))
@@ -438,11 +439,38 @@ class IptvRepository(
                 if (res1.isNotEmpty()) {
                     res1.deleteCharAt(res1.length - 1)
                 }
-                return res1.toString()
+                val formatted = res1.toString()
+                if (formatted.isNotEmpty() && formatted != "02:00:00:00:00:00") {
+                    return formatted
+                }
+                hardwareMac = formatted
             }
         } catch (ex: Exception) {
             ex.printStackTrace()
         }
-        return null
+
+        // Fallback to Settings.Secure.ANDROID_ID on Android 10+ or if hardware MAC is 02:00:00:00:00:00
+        try {
+            val androidId = android.provider.Settings.Secure.getString(
+                context.contentResolver,
+                android.provider.Settings.Secure.ANDROID_ID
+            )
+            if (!androidId.isNullOrEmpty()) {
+                val cleanId = androidId.filter { it.isDigit() || it.lowercaseChar() in 'a'..'f' }
+                    .padStart(10, '0')
+                    .takeLast(10)
+                    .uppercase()
+                val sb = StringBuilder("02")
+                for (i in 0 until 5) {
+                    sb.append(":")
+                    sb.append(cleanId.substring(i * 2, i * 2 + 2))
+                }
+                return sb.toString()
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+
+        return hardwareMac ?: "02:00:00:00:00:00"
     }
 }
