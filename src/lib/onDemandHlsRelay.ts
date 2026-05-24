@@ -1,10 +1,12 @@
 import { access, mkdir, readFile, rm } from 'fs/promises'
 import { spawn, type ChildProcessWithoutNullStreams } from 'child_process'
 import { slugifyChannelName } from '@/lib/playableStreams'
+import { getOnDemandHlsRelayConfig, type OnDemandHlsRelayConfig } from '@/lib/settings'
 
 type RelayProcess = {
   process: ChildProcessWithoutNullStreams
   outputSlug: string
+  outputRoot: string
   manifestPath: string
   lastAccessed: number
   cleanupTimer: NodeJS.Timeout
@@ -17,15 +19,6 @@ type StartRelayOptions = {
 }
 
 const relayProcesses = new Map<number, RelayProcess>()
-
-const FFMPEG_BIN = process.env.IPTV_ON_DEMAND_FFMPEG_BIN || process.env.FFMPEG_BIN || '/usr/bin/ffmpeg'
-const LOCALADDR = process.env.IPTV_ON_DEMAND_LOCALADDR || process.env.LOCALADDR || '10.0.0.199'
-const OUTPUT_ROOT = process.env.IPTV_ON_DEMAND_OUTPUT_ROOT || process.env.OUTPUT_ROOT || '/var/www/html/landingpage/relay'
-const HLS_TIME = process.env.IPTV_ON_DEMAND_HLS_TIME || '2'
-const HLS_LIST_SIZE = process.env.IPTV_ON_DEMAND_HLS_LIST_SIZE || '6'
-const FIFO_SIZE = process.env.IPTV_ON_DEMAND_FIFO_SIZE || process.env.FIFO_SIZE || '50000'
-const LOGLEVEL = process.env.IPTV_ON_DEMAND_LOGLEVEL || process.env.LOGLEVEL || 'warning'
-const IDLE_TIMEOUT_MS = Number.parseInt(process.env.IPTV_ON_DEMAND_IDLE_TIMEOUT_MS || '600000', 10)
 
 export async function getOnDemandHlsManifest(options: StartRelayOptions): Promise<string> {
   if (!options.streamUrl.trim().toLowerCase().startsWith('udp://')) {
@@ -50,7 +43,7 @@ export async function getOnDemandHlsSegment(channelId: number, fileName: string)
   }
 
   relay.lastAccessed = Date.now()
-  return readFile(`${OUTPUT_ROOT.replace(/\/$/, '')}/${relay.outputSlug}/${fileName}`)
+  return readFile(`${relay.outputRoot.replace(/\/$/, '')}/${relay.outputSlug}/${fileName}`)
 }
 
 async function ensureRelay(options: StartRelayOptions): Promise<RelayProcess> {
@@ -64,18 +57,20 @@ async function ensureRelay(options: StartRelayOptions): Promise<RelayProcess> {
     relayProcesses.delete(options.channelId)
   }
 
+  const config = await getOnDemandHlsRelayConfig()
   const outputSlug = getOutputSlug(options.channelId, options.name)
-  const outputDir = `${OUTPUT_ROOT.replace(/\/$/, '')}/${outputSlug}`
+  const outputRoot = config.outputRoot.replace(/\/$/, '')
+  const outputDir = `${outputRoot}/${outputSlug}`
   const manifestPath = `${outputDir}/index.m3u8`
 
   await mkdir(outputDir, { recursive: true })
   await rm(manifestPath, { force: true })
 
-  const inputUrl = appendUdpOptions(options.streamUrl)
-  const ffmpeg = spawn(FFMPEG_BIN, [
+  const inputUrl = appendUdpOptions(options.streamUrl, config)
+  const ffmpeg = spawn(config.ffmpegBin, [
     '-hide_banner',
     '-loglevel',
-    LOGLEVEL,
+    config.logLevel,
     '-y',
     '-i',
     inputUrl,
@@ -84,16 +79,16 @@ async function ensureRelay(options: StartRelayOptions): Promise<RelayProcess> {
     '-f',
     'hls',
     '-hls_time',
-    HLS_TIME,
+    config.hlsTime,
     '-hls_list_size',
-    HLS_LIST_SIZE,
+    config.hlsListSize,
     '-hls_flags',
     'delete_segments+append_list+omit_endlist',
     manifestPath,
   ])
 
   ffmpeg.stderr.on('data', (chunk) => {
-    if (LOGLEVEL !== 'quiet') {
+    if (config.logLevel !== 'quiet') {
       console.warn(`On-demand relay ${options.channelId}: ${chunk.toString().trim()}`)
     }
   })
@@ -118,17 +113,18 @@ async function ensureRelay(options: StartRelayOptions): Promise<RelayProcess> {
   const relay: RelayProcess = {
     process: ffmpeg,
     outputSlug,
+    outputRoot,
     manifestPath,
     lastAccessed: Date.now(),
-    cleanupTimer: scheduleCleanup(options.channelId),
+    cleanupTimer: scheduleCleanup(options.channelId, config.idleTimeoutMs),
   }
 
   relayProcesses.set(options.channelId, relay)
   return relay
 }
 
-function scheduleCleanup(channelId: number): NodeJS.Timeout {
-  const timeout = Number.isFinite(IDLE_TIMEOUT_MS) && IDLE_TIMEOUT_MS > 0 ? IDLE_TIMEOUT_MS : 600000
+function scheduleCleanup(channelId: number, idleTimeoutMs: number): NodeJS.Timeout {
+  const timeout = Number.isFinite(idleTimeoutMs) && idleTimeoutMs > 0 ? idleTimeoutMs : 600000
 
   return setInterval(() => {
     const relay = relayProcesses.get(channelId)
@@ -142,9 +138,9 @@ function scheduleCleanup(channelId: number): NodeJS.Timeout {
   }, Math.min(timeout, 60000))
 }
 
-function appendUdpOptions(streamUrl: string): string {
+function appendUdpOptions(streamUrl: string, config: OnDemandHlsRelayConfig): string {
   const separator = streamUrl.includes('?') ? '&' : '?'
-  return `${streamUrl}${separator}localaddr=${encodeURIComponent(LOCALADDR)}&reuse=1&overrun_nonfatal=1&fifo_size=${encodeURIComponent(FIFO_SIZE)}`
+  return `${streamUrl}${separator}localaddr=${encodeURIComponent(config.localAddr)}&reuse=1&overrun_nonfatal=1&fifo_size=${encodeURIComponent(config.fifoSize)}`
 }
 
 function getOutputSlug(channelId: number, name: string): string {

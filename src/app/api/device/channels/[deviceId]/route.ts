@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server'
 import prisma from '@/lib/db'
 import { getErrorMessage } from '@/lib/errors'
 import { createPlayableStreamUrl, createUdpOnDemandHlsPath, isUdpStreamUrl } from '@/lib/playableStreams'
-import { getHlsRelayBaseUrl } from '@/lib/settings'
+import { getAppPublicOrigin, getHlsRelayBaseUrl } from '@/lib/settings'
 
 export async function GET(
   request: Request,
@@ -90,7 +90,7 @@ export async function GET(
     })
 
     const shouldRelayStreams = config?.syncMode === 'api_relay'
-    const requestOrigin = getPublicOrigin(request)
+    const requestOrigin = await getPublicOrigin(request)
     const hlsRelayBaseUrl = shouldRelayStreams ? await getHlsRelayBaseUrl() : ''
 
     // Map channels to expected client schema
@@ -126,8 +126,8 @@ export async function GET(
   }
 }
 
-function getPublicOrigin(request: Request): string {
-  const configuredOrigin = process.env.APP_PUBLIC_ORIGIN || process.env.NEXT_PUBLIC_APP_URL
+async function getPublicOrigin(request: Request): Promise<string> {
+  const configuredOrigin = await getAppPublicOrigin()
   if (configuredOrigin) {
     return configuredOrigin.replace(/\/$/, '')
   }

@@ -113,6 +113,27 @@ DATABASE_URL="mysql://username:password@localhost:3306/iptv_rsdk"
 SESSION_SECRET="isi-random-panjang-minimal-32-karakter"
 ```
 
+Default konfigurasi untuk STB baru bisa diset lewat dashboard `Setup Defaults`. Jika belum ada nilai yang disimpan dari dashboard, backend akan memakai fallback dari `.env` berikut:
+
+```env
+IPTV_DEFAULT_SYNC_MODE="api_relay"
+IPTV_DEFAULT_CUSTOM_M3U_URL="http://10.0.0.1/iptv/iptv_rsdk.m3u"
+IPTV_DEFAULT_ASPECT_RATIO="fit"
+IPTV_DEFAULT_SYNC_INTERVAL="1800"
+IPTV_DEFAULT_START_SCREEN="live_tv"
+IPTV_DEFAULT_CATEGORY="National TV"
+IPTV_DEFAULT_CHANNEL_ID=""
+IPTV_DEFAULT_LOCK_SETTINGS="true"
+IPTV_DEFAULT_AUTO_START_ON_BOOT="false"
+IPTV_DEFAULT_TECHNICIAN_PIN="2468"
+IPTV_DEFAULT_EDUCATION_VIDEO_PATH="\\\\10.45.128.129\\edukasi"
+IPTV_DEFAULT_EDUCATION_SMB_USERNAME=""
+IPTV_DEFAULT_EDUCATION_SMB_PASSWORD=""
+IPTV_DEFAULT_EDUCATION_SMB_DOMAIN=""
+IPTV_DEFAULT_EDUCATION_REPEAT_MODE="all"
+IPTV_DEFAULT_EDUCATION_PLAY_ORDER="alphabetical"
+```
+
 ### Relay IPTV UDP Multicast ke HLS
 
 Jika playlist berisi URL `udp://@238.x.x.x:1234`, browser dan client di luar VLAN IPTV perlu HLS relay. Server Ubuntu dapat menjalankan relay otomatis dari M3U:
@@ -133,3 +154,5 @@ Dashboard Devices -> `HLS Relay Base URL` harus mengarah ke root relay, contoh:
 ```text
 http://10.55.1.5/relay
 ```
+
+Runtime relay on-demand dapat diatur dari dashboard `Setup Defaults` pada bagian `On-Demand HLS Relay Runtime`. Nilai dari web disimpan di database dan dipakai untuk relay baru berikutnya. Jika belum ada setting web, backend memakai fallback bawaan kode.

@@ -24,22 +24,22 @@ export type DefaultDeviceConfig = {
 }
 
 export const FALLBACK_DEFAULT_DEVICE_CONFIG: DefaultDeviceConfig = {
-  defaultCategory: 'National TV',
-  defaultChannelId: null,
-  aspectRatio: 'fit',
-  syncInterval: 1800,
-  syncMode: DEFAULT_SYNC_MODE,
-  customM3uUrl: DEFAULT_CUSTOM_M3U_URL,
-  startScreen: 'live_tv',
-  lockSettings: true,
-  autoStartOnBoot: false,
-  technicianPin: '2468',
-  educationVideoPath: '',
-  educationSmbUsername: '',
-  educationSmbPassword: '',
-  educationSmbDomain: '',
-  educationRepeatMode: 'all',
-  educationPlayOrder: 'alphabetical',
+  defaultCategory: process.env.IPTV_DEFAULT_CATEGORY || 'National TV',
+  defaultChannelId: envNullableInt('IPTV_DEFAULT_CHANNEL_ID'),
+  aspectRatio: process.env.IPTV_DEFAULT_ASPECT_RATIO || 'fit',
+  syncInterval: envInt('IPTV_DEFAULT_SYNC_INTERVAL', 1800),
+  syncMode: process.env.IPTV_DEFAULT_SYNC_MODE || DEFAULT_SYNC_MODE,
+  customM3uUrl: process.env.IPTV_DEFAULT_CUSTOM_M3U_URL || DEFAULT_CUSTOM_M3U_URL,
+  startScreen: process.env.IPTV_DEFAULT_START_SCREEN || 'live_tv',
+  lockSettings: envBoolean('IPTV_DEFAULT_LOCK_SETTINGS', true),
+  autoStartOnBoot: envBoolean('IPTV_DEFAULT_AUTO_START_ON_BOOT', false),
+  technicianPin: process.env.IPTV_DEFAULT_TECHNICIAN_PIN || '2468',
+  educationVideoPath: process.env.IPTV_DEFAULT_EDUCATION_VIDEO_PATH || '',
+  educationSmbUsername: process.env.IPTV_DEFAULT_EDUCATION_SMB_USERNAME || '',
+  educationSmbPassword: process.env.IPTV_DEFAULT_EDUCATION_SMB_PASSWORD || '',
+  educationSmbDomain: process.env.IPTV_DEFAULT_EDUCATION_SMB_DOMAIN || '',
+  educationRepeatMode: process.env.IPTV_DEFAULT_EDUCATION_REPEAT_MODE || 'all',
+  educationPlayOrder: process.env.IPTV_DEFAULT_EDUCATION_PLAY_ORDER || 'alphabetical',
 }
 
 export async function getDefaultDeviceConfig(): Promise<DefaultDeviceConfig> {
@@ -179,4 +179,28 @@ function intValue(formData: FormData, key: string, fallback: number): number {
 function nullableIntValue(formData: FormData, key: string): number | null {
   const value = formData.get(key)
   return typeof value === 'string' ? Number.parseInt(value, 10) : null
+}
+
+function envInt(key: string, fallback: number): number {
+  const value = process.env[key]
+  if (!value) return fallback
+
+  const parsed = Number.parseInt(value, 10)
+  return Number.isFinite(parsed) ? parsed : fallback
+}
+
+function envNullableInt(key: string): number | null {
+  const value = process.env[key]
+  if (!value) return null
+
+  const parsed = Number.parseInt(value, 10)
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : null
+}
+
+function envBoolean(key: string, fallback: boolean): boolean {
+  const value = process.env[key]?.trim().toLowerCase()
+  if (!value) return fallback
+  if (['1', 'true', 'yes', 'on'].includes(value)) return true
+  if (['0', 'false', 'no', 'off'].includes(value)) return false
+  return fallback
 }

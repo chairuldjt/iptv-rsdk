@@ -6,6 +6,12 @@ import {
   resetDefaultDeviceConfig,
   setDefaultDeviceConfig,
 } from '@/lib/defaultDeviceConfig'
+import {
+  getAppPublicOrigin,
+  getOnDemandHlsRelayConfig,
+  setAppPublicOrigin,
+  setOnDemandHlsRelayConfig,
+} from '@/lib/settings'
 
 export const revalidate = 0
 
@@ -25,15 +31,36 @@ async function resetDefaultSetupAction() {
   redirect('/dashboard/setup?reset=1')
 }
 
+async function saveRelayRuntimeAction(formData: FormData) {
+  'use server'
+
+  await setAppPublicOrigin(formData.get('appPublicOrigin') as string)
+  await setOnDemandHlsRelayConfig({
+    ffmpegBin: formData.get('ffmpegBin') as string,
+    localAddr: formData.get('localAddr') as string,
+    outputRoot: formData.get('outputRoot') as string,
+    hlsTime: formData.get('hlsTime') as string,
+    hlsListSize: formData.get('hlsListSize') as string,
+    fifoSize: formData.get('fifoSize') as string,
+    logLevel: formData.get('logLevel') as string,
+    idleTimeoutMs: Number.parseInt(formData.get('idleTimeoutMs') as string, 10),
+  })
+  revalidatePath('/dashboard/setup')
+  redirect('/dashboard/setup?relaySaved=1')
+}
+
 export default async function SetupPage({
   searchParams,
 }: {
-  searchParams: Promise<{ saved?: string; reset?: string }>
+  searchParams: Promise<{ saved?: string; reset?: string; relaySaved?: string }>
 }) {
   const resolvedSearchParams = await searchParams
   const config = await getDefaultDeviceConfig()
+  const relayConfig = await getOnDemandHlsRelayConfig()
+  const appPublicOrigin = await getAppPublicOrigin()
   const showSaved = resolvedSearchParams.saved === '1'
   const showReset = resolvedSearchParams.reset === '1'
+  const showRelaySaved = resolvedSearchParams.relaySaved === '1'
 
   return (
     <div className="space-y-8 animate-fade-in">
@@ -55,6 +82,136 @@ export default async function SetupPage({
           Default setup dikembalikan ke nilai bawaan aplikasi.
         </div>
       )}
+
+      {showRelaySaved && (
+        <div className="p-3 bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 rounded-xl text-xs font-bold">
+          Runtime relay setting saved. Relay baru akan memakai konfigurasi ini pada request berikutnya.
+        </div>
+      )}
+
+      <div className="glass-panel rounded-2xl border border-border p-6">
+        <form action={saveRelayRuntimeAction} className="space-y-6">
+          <div className="flex items-center justify-between gap-4 border-b border-border/60 pb-3">
+            <div>
+              <h3 className="font-bold text-white text-lg">On-Demand HLS Relay Runtime</h3>
+              <p className="text-xs text-slate-500 mt-1">
+                Pengganti env `IPTV_ON_DEMAND_*` dan `APP_PUBLIC_ORIGIN`. Env tetap dipakai sebagai fallback awal.
+              </p>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+            <Field label="APP Public Origin" wide>
+              <input
+                type="url"
+                name="appPublicOrigin"
+                defaultValue={appPublicOrigin}
+                placeholder="https://iptv.teknisirsdk.my.id"
+                className="w-full px-4 py-2 bg-slate-900 border border-slate-800 rounded-xl text-white text-sm focus:outline-none focus:border-primary font-mono"
+              />
+            </Field>
+
+            <Field label="FFmpeg Binary">
+              <input
+                type="text"
+                name="ffmpegBin"
+                defaultValue={relayConfig.ffmpegBin}
+                required
+                className="w-full px-4 py-2 bg-slate-900 border border-slate-800 rounded-xl text-white text-sm focus:outline-none focus:border-primary font-mono"
+              />
+            </Field>
+
+            <Field label="UDP Local Address">
+              <input
+                type="text"
+                name="localAddr"
+                defaultValue={relayConfig.localAddr}
+                required
+                className="w-full px-4 py-2 bg-slate-900 border border-slate-800 rounded-xl text-white text-sm focus:outline-none focus:border-primary font-mono"
+              />
+            </Field>
+
+            <Field label="Output Root" wide>
+              <input
+                type="text"
+                name="outputRoot"
+                defaultValue={relayConfig.outputRoot}
+                required
+                className="w-full px-4 py-2 bg-slate-900 border border-slate-800 rounded-xl text-white text-sm focus:outline-none focus:border-primary font-mono"
+              />
+            </Field>
+
+            <Field label="HLS Time">
+              <input
+                type="number"
+                step="0.5"
+                min={0.5}
+                name="hlsTime"
+                defaultValue={relayConfig.hlsTime}
+                required
+                className="w-full px-4 py-2 bg-slate-900 border border-slate-800 rounded-xl text-white text-sm focus:outline-none focus:border-primary"
+              />
+            </Field>
+
+            <Field label="HLS List Size">
+              <input
+                type="number"
+                min={1}
+                name="hlsListSize"
+                defaultValue={relayConfig.hlsListSize}
+                required
+                className="w-full px-4 py-2 bg-slate-900 border border-slate-800 rounded-xl text-white text-sm focus:outline-none focus:border-primary"
+              />
+            </Field>
+
+            <Field label="UDP FIFO Size">
+              <input
+                type="number"
+                min={1}
+                name="fifoSize"
+                defaultValue={relayConfig.fifoSize}
+                required
+                className="w-full px-4 py-2 bg-slate-900 border border-slate-800 rounded-xl text-white text-sm focus:outline-none focus:border-primary"
+              />
+            </Field>
+
+            <Field label="Idle Timeout (ms)">
+              <input
+                type="number"
+                min={10000}
+                name="idleTimeoutMs"
+                defaultValue={relayConfig.idleTimeoutMs}
+                required
+                className="w-full px-4 py-2 bg-slate-900 border border-slate-800 rounded-xl text-white text-sm focus:outline-none focus:border-primary"
+              />
+            </Field>
+
+            <Field label="FFmpeg Log Level">
+              <select
+                name="logLevel"
+                defaultValue={relayConfig.logLevel}
+                className="w-full px-4 py-2 bg-slate-900 border border-slate-800 rounded-xl text-white text-sm focus:outline-none focus:border-primary"
+              >
+                <option value="quiet">quiet</option>
+                <option value="panic">panic</option>
+                <option value="fatal">fatal</option>
+                <option value="error">error</option>
+                <option value="warning">warning</option>
+                <option value="info">info</option>
+                <option value="verbose">verbose</option>
+                <option value="debug">debug</option>
+              </select>
+            </Field>
+          </div>
+
+          <button
+            type="submit"
+            className="w-full py-3 rounded-xl bg-primary hover:bg-indigo-500 font-bold text-white text-sm transition-all duration-200 cursor-pointer text-center glow-indigo"
+          >
+            Save Relay Runtime
+          </button>
+        </form>
+      </div>
 
       <div className="glass-panel rounded-2xl border border-border p-6">
         <form action={saveDefaultSetupAction} className="space-y-8">
