@@ -3,12 +3,15 @@ import prisma from '@/lib/db'
 import { getErrorMessage } from '@/lib/errors'
 import { writeFile, mkdir } from 'fs/promises'
 import path from 'path'
+import { normalizeAppUpdateChannel } from '@/lib/appUpdateChannels'
 
 export async function POST(request: Request) {
   try {
     const formData = await request.formData()
+    const updateChannel = normalizeAppUpdateChannel(formData.get('updateChannel') as string | null)
     const versionCodeStr = formData.get('versionCode') as string
     const versionName = formData.get('versionName') as string
+    const packageNameRaw = formData.get('packageName') as string | null
     const changelog = formData.get('changelog') as string
     const apkFile = formData.get('apkFile') as File
 
@@ -44,7 +47,8 @@ export async function POST(request: Request) {
       )
     }
 
-    const safeFileName = `${versionCode}_${apkFile.name.replace(/[^a-zA-Z0-9.\-_]/g, '')}`
+    const packageName = packageNameRaw?.trim() || null
+    const safeFileName = `${updateChannel}_${versionCode}_${apkFile.name.replace(/[^a-zA-Z0-9.\-_]/g, '')}`
     const filePath = path.join(uploadDir, safeFileName)
 
     // Try to write file with permission fallback check
@@ -65,9 +69,11 @@ export async function POST(request: Request) {
     try {
       await prisma.appUpdate.create({
         data: {
+          updateChannel,
           versionCode,
           versionName,
           apkFileName: safeFileName,
+          packageName,
           changelog: changelog || null,
           isMandatory: true,
           isDeployed: false,

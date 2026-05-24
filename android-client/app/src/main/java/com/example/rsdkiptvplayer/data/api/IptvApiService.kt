@@ -166,7 +166,10 @@ interface IptvApiService {
     suspend fun sendErrorLog(@Body request: LogRequest): Response<LogResponse>
 
     @GET("api/app-update/check")
-    suspend fun checkUpdate(@Query("versionCode") currentCode: Int): Response<UpdateCheckResponse>
+    suspend fun checkUpdate(
+        @Query("versionCode") currentCode: Int,
+        @Query("channel") updateChannel: String
+    ): Response<UpdateCheckResponse>
 
     @GET("api/device/remote/poll")
     suspend fun pollCommands(@Query("deviceId") deviceId: String): Response<PollResponse>
@@ -183,11 +186,13 @@ interface IptvApiService {
 
 data class UpdateCheckResponse(
     val status: Boolean,
+    val channel: String? = null,
     val update_available: Boolean,
     val version_name: String?,
     val version_code: Int?,
     val apk_url: String?,
     val apk_file_name: String?,
+    val package_name: String? = null,
     val is_mandatory: Boolean?,
     val changelog: String?
 )

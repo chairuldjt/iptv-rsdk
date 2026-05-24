@@ -185,12 +185,17 @@ model SoundPreference {
 
 model AppUpdate {
   id           Int      @id @default(autoincrement())
-  versionCode  Int      @unique
+  updateChannel String  @default("production")
+  versionCode  Int
   versionName  String
   apkFileName  String
+  packageName  String?
   changelog    String?  @db.Text
   isMandatory  Boolean  @default(false)
   isDeployed   Boolean  @default(false)
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
+
+  @@unique([updateChannel, versionCode])
+  @@index([updateChannel, isDeployed, versionCode])
 }

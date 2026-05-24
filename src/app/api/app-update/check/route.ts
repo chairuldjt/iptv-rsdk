@@ -1,11 +1,13 @@
 import { NextResponse } from 'next/server'
 import prisma from '@/lib/db'
 import { getErrorMessage } from '@/lib/errors'
+import { normalizeAppUpdateChannel } from '@/lib/appUpdateChannels'
 
 export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url)
     const versionCodeStr = searchParams.get('versionCode')
+    const updateChannel = normalizeAppUpdateChannel(searchParams.get('channel'))
 
     if (!versionCodeStr) {
       return NextResponse.json(
@@ -24,7 +26,10 @@ export async function GET(request: Request) {
 
     // Get the currently active deployed update
     const activeUpdate = await prisma.appUpdate.findFirst({
-      where: { isDeployed: true },
+      where: {
+        isDeployed: true,
+        updateChannel,
+      },
       orderBy: { versionCode: 'desc' }, // fallback in case multiple are set
     })
 
@@ -33,6 +38,7 @@ export async function GET(request: Request) {
         status: true,
         update_available: false,
         message: 'No deployed updates found',
+        channel: updateChannel,
       })
     }
 
@@ -45,11 +51,13 @@ export async function GET(request: Request) {
 
     return NextResponse.json({
       status: true,
+      channel: updateChannel,
       update_available: updateAvailable,
       version_name: activeUpdate.versionName,
       version_code: activeUpdate.versionCode,
       apk_url: apkUrl,
       apk_file_name: activeUpdate.apkFileName,
+      package_name: activeUpdate.packageName,
       is_mandatory: activeUpdate.isMandatory,
       changelog: activeUpdate.changelog,
     })

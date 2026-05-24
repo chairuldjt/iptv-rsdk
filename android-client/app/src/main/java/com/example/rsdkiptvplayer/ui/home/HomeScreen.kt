@@ -52,6 +52,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.rsdkiptvplayer.R
+import com.example.rsdkiptvplayer.BuildConfig
 import com.example.rsdkiptvplayer.ui.player.PlayerViewModel
 import kotlinx.coroutines.delay
 import kotlin.math.abs
@@ -1167,7 +1168,7 @@ private fun InfoAplikasiDialog(
                 return
             }
             val apiService = RetrofitClient.getService(serverUrl)
-            val response = apiService.checkUpdate(currentVersionCode)
+            val response = apiService.checkUpdate(currentVersionCode, BuildConfig.UPDATE_CHANNEL)
             if (response.isSuccessful) {
                 val body = response.body()
                 if (body != null && body.update_available) {
