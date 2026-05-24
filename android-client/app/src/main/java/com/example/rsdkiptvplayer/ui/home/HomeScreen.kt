@@ -2,8 +2,6 @@ package com.example.rsdkiptvplayer.ui.home
 
 import androidx.activity.compose.BackHandler
 
-import android.media.AudioAttributes
-import android.media.SoundPool
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.Crossfade
 import androidx.compose.animation.core.animateDpAsState
@@ -465,22 +463,7 @@ private fun HospitalityMenuBar(
 
     var selectedIndex by remember { mutableIntStateOf(2) }
     var dragAmount by remember { mutableFloatStateOf(0f) }
-    var hasPlayedSelectionSound by remember { mutableStateOf(false) }
     val carouselFocusRequester = menuFocusRequester
-    val app = context.applicationContext as com.example.rsdkiptvplayer.IptvApplication
-    val muteSelectionSound by app.dataStoreManager.muteSelectionSoundFlow.collectAsState(initial = false)
-    val soundPool = remember {
-        SoundPool.Builder()
-            .setMaxStreams(2)
-            .setAudioAttributes(
-                AudioAttributes.Builder()
-                    .setUsage(AudioAttributes.USAGE_MEDIA)
-                    .setContentType(AudioAttributes.CONTENT_TYPE_MUSIC)
-                    .build()
-            )
-            .build()
-    }
-    var selectionSoundId by remember { mutableIntStateOf(0) }
     val menuItems = listOf(
         HospitalityCarouselItem(
             iconRes = R.drawable.ic_home_education,
@@ -538,26 +521,12 @@ private fun HospitalityMenuBar(
         )
     )
 
-    DisposableEffect(Unit) {
-        selectionSoundId = soundPool.load(context, R.raw.home_selection_chime, 1)
-        onDispose {
-            soundPool.release()
-        }
-    }
-
     LaunchedEffect(Unit) {
         carouselFocusRequester.requestFocus()
     }
 
-    LaunchedEffect(selectedIndex, selectionSoundId) {
+    LaunchedEffect(selectedIndex) {
         onSelectionChanged(menuItems[selectedIndex])
-        if (!hasPlayedSelectionSound) {
-            hasPlayedSelectionSound = true
-            return@LaunchedEffect
-        }
-        if (selectionSoundId != 0 && !muteSelectionSound) {
-            soundPool.play(selectionSoundId, 0.38f, 0.42f, 1, 0, 1.0f)
-        }
     }
 
     fun moveSelection(delta: Int) {
