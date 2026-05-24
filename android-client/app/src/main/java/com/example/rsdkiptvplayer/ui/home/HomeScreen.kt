@@ -1,5 +1,7 @@
 package com.example.rsdkiptvplayer.ui.home
 
+import androidx.activity.compose.BackHandler
+
 import android.media.AudioAttributes
 import android.media.SoundPool
 import androidx.compose.animation.animateColorAsState
@@ -88,6 +90,18 @@ fun HomeScreen(
     var currentVersionName by remember { mutableStateOf("") }
     var currentVersionCode by remember { mutableIntStateOf(0) }
     var showInfoDialog by remember { mutableStateOf(false) }
+    val menuFocusRequester = remember { FocusRequester() }
+
+    LaunchedEffect(showInfoDialog) {
+        if (!showInfoDialog) {
+            delay(100)
+            try {
+                menuFocusRequester.requestFocus()
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+        }
+    }
     var selectedHomeBackground by remember { mutableIntStateOf(R.drawable.home_bg_tv) }
 
     LaunchedEffect(Unit) {
@@ -159,41 +173,42 @@ fun HomeScreen(
 
             Spacer(modifier = Modifier.weight(1f))
 
-                HospitalityMenuBar(
-                    channelsCount = channels.size,
-                    serverUrl = serverUrl,
-                    educationPath = educationPath,
-                    onEducationClick = {
-                        val currentEducationPath = educationPath
-                        if (currentEducationPath == null) {
-                            Toast.makeText(context, "Memuat pengaturan edukasi...", Toast.LENGTH_SHORT).show()
-                        } else if (currentEducationPath.isBlank()) {
-                            Toast.makeText(context, "Video edukasi belum disetting.", Toast.LENGTH_SHORT).show()
-                        } else {
-                            onNavigateToEducation()
-                        }
-                    },
-                    onTvClick = {
-                        if (channelsLoading) {
-                            Toast.makeText(context, "Memuat daftar saluran...", Toast.LENGTH_SHORT).show()
-                        } else if (channels.isEmpty()) {
-                            Toast.makeText(context, "Saluran TV belum tersedia.", Toast.LENGTH_SHORT).show()
-                        } else {
-                            onNavigateToPlayer()
-                        }
-                    },
-                    onServiceClick = {
-                        Toast.makeText(context, "Layanan belum tersedia.", Toast.LENGTH_SHORT).show()
-                    },
-                    onYoutubeClick = {
-                        Toast.makeText(context, "YouTube belum tersedia.", Toast.LENGTH_SHORT).show()
-                    },
-                    onSettingsClick = { onNavigateToSettings(0) },
-                    onInfoClick = { showInfoDialog = true },
-                    onSelectionChanged = { item ->
-                        selectedHomeBackground = item.backgroundRes
+            HospitalityMenuBar(
+                channelsCount = channels.size,
+                serverUrl = serverUrl,
+                educationPath = educationPath,
+                onEducationClick = {
+                    val currentEducationPath = educationPath
+                    if (currentEducationPath == null) {
+                        Toast.makeText(context, "Memuat pengaturan edukasi...", Toast.LENGTH_SHORT).show()
+                    } else if (currentEducationPath.isBlank()) {
+                        Toast.makeText(context, "Video edukasi belum disetting.", Toast.LENGTH_SHORT).show()
+                    } else {
+                        onNavigateToEducation()
                     }
-                )
+                },
+                onTvClick = {
+                    if (channelsLoading) {
+                        Toast.makeText(context, "Memuat daftar saluran...", Toast.LENGTH_SHORT).show()
+                    } else if (channels.isEmpty()) {
+                        Toast.makeText(context, "Saluran TV belum tersedia.", Toast.LENGTH_SHORT).show()
+                    } else {
+                        onNavigateToPlayer()
+                    }
+                },
+                onServiceClick = {
+                    Toast.makeText(context, "Layanan belum tersedia.", Toast.LENGTH_SHORT).show()
+                },
+                onYoutubeClick = {
+                    Toast.makeText(context, "YouTube belum tersedia.", Toast.LENGTH_SHORT).show()
+                },
+                onSettingsClick = { onNavigateToSettings(0) },
+                onInfoClick = { showInfoDialog = true },
+                menuFocusRequester = menuFocusRequester,
+                onSelectionChanged = { item ->
+                    selectedHomeBackground = item.backgroundRes
+                }
+            )
         }
 
         if (showInfoDialog) {
@@ -324,6 +339,7 @@ private fun HospitalityMenuBar(
     onYoutubeClick: () -> Unit,
     onSettingsClick: () -> Unit,
     onInfoClick: () -> Unit,
+    menuFocusRequester: FocusRequester,
     onSelectionChanged: (HospitalityCarouselItem) -> Unit
 ) {
     val context = LocalContext.current
@@ -333,7 +349,7 @@ private fun HospitalityMenuBar(
     var selectedIndex by remember { mutableIntStateOf(2) }
     var dragAmount by remember { mutableFloatStateOf(0f) }
     var hasPlayedSelectionSound by remember { mutableStateOf(false) }
-    val carouselFocusRequester = remember { FocusRequester() }
+    val carouselFocusRequester = menuFocusRequester
     val soundPool = remember {
         SoundPool.Builder()
             .setMaxStreams(2)
@@ -1026,6 +1042,9 @@ private fun InfoAplikasiDialog(
     currentVersionName: String,
     onDismiss: () -> Unit
 ) {
+    BackHandler {
+        onDismiss()
+    }
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
     val configuration = androidx.compose.ui.platform.LocalConfiguration.current
