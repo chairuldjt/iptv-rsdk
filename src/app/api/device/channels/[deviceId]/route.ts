@@ -97,7 +97,7 @@ export async function GET(
     const mappedChannels = channels.map((c) => ({
       id: c.id,
       name: c.name,
-      logo: c.logoUrl,
+      logo: c.logoUrl ? (c.logoUrl.startsWith('/') ? `${requestOrigin}${c.logoUrl}` : c.logoUrl) : null,
       group: c.category?.name || 'Uncategorized',
       stream_url: shouldRelayStreams
         ? createRelayedClientStreamUrl({
