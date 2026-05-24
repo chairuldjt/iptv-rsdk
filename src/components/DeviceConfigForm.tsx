@@ -107,6 +107,39 @@ export default function DeviceConfigForm({
           </div>
         </div>
 
+        <div className="pt-4 border-t border-border/60 space-y-4">
+          <div className="flex items-center gap-2 text-amber-400">
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            <span className="text-xs font-extrabold uppercase tracking-wider">Konten Hiburan</span>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-1">Judul Custom Konten</label>
+              <input
+                type="text"
+                name="entertainmentCustomTitle"
+                defaultValue={editingDevice.config?.entertainmentCustomTitle || 'Custom Konten'}
+                className="w-full px-4 py-2 bg-slate-900 border border-slate-800 rounded-xl text-white text-sm focus:outline-none focus:border-primary"
+              />
+            </div>
+
+            <div>
+              <label className="block text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-1">URL Custom Konten</label>
+              <input
+                type="url"
+                name="entertainmentCustomUrl"
+                defaultValue={editingDevice.config?.entertainmentCustomUrl || ''}
+                placeholder="https://contoh-rs.local/hiburan"
+                className="w-full px-4 py-2 bg-slate-900 border border-slate-800 rounded-xl text-white text-sm focus:outline-none focus:border-primary font-mono"
+              />
+            </div>
+          </div>
+        </div>
+
         {/* SMB Education Settings Block */}
         <div className="pt-4 border-t border-border/60 space-y-4">
           <div className="flex items-center gap-2 text-indigo-400">

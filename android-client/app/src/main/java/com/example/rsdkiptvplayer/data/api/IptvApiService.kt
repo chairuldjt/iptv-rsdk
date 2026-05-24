@@ -60,7 +60,9 @@ data class ConfigData(
     val education_play_order: String? = "alphabetical",
     val education_source: String? = "smb",
     val education_playback_mode: String? = "copy",
-    val education_force_sync: Boolean? = false
+    val education_force_sync: Boolean? = false,
+    val entertainment_custom_title: String? = "Custom Konten",
+    val entertainment_custom_url: String? = ""
 )
 
 data class EducationVideoResponse(

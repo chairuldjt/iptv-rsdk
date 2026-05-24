@@ -36,6 +36,8 @@ class DataStoreManager(private val context: Context) {
         val EDUCATION_PLAY_ORDER = stringPreferencesKey("education_play_order")
         val EDUCATION_SOURCE = stringPreferencesKey("education_source")
         val EDUCATION_PLAYBACK_MODE = stringPreferencesKey("education_playback_mode")
+        val ENTERTAINMENT_CUSTOM_TITLE = stringPreferencesKey("entertainment_custom_title")
+        val ENTERTAINMENT_CUSTOM_URL = stringPreferencesKey("entertainment_custom_url")
         val TECHNICIAN_PIN = stringPreferencesKey("technician_pin")
     }
 
@@ -187,6 +189,14 @@ class DataStoreManager(private val context: Context) {
         prefs[EDUCATION_PLAYBACK_MODE] ?: "copy"
     }
 
+    val entertainmentCustomTitleFlow: Flow<String> = context.dataStore.data.map { prefs ->
+        prefs[ENTERTAINMENT_CUSTOM_TITLE] ?: "Custom Konten"
+    }
+
+    val entertainmentCustomUrlFlow: Flow<String> = context.dataStore.data.map { prefs ->
+        prefs[ENTERTAINMENT_CUSTOM_URL] ?: ""
+    }
+
     suspend fun getEducationSource(): String {
         val prefs = context.dataStore.data.first()
         return prefs[EDUCATION_SOURCE] ?: "smb"
@@ -214,6 +224,19 @@ class DataStoreManager(private val context: Context) {
                 prefs[EDUCATION_PLAYBACK_MODE] = mode
             }
             addLog("Education playback mode changed to: $mode")
+        }
+    }
+
+    suspend fun setEntertainmentCustomContent(title: String, url: String) {
+        val safeTitle = title.trim().ifBlank { "Custom Konten" }
+        val safeUrl = url.trim()
+        val prefs = context.dataStore.data.first()
+        if (prefs[ENTERTAINMENT_CUSTOM_TITLE] != safeTitle || prefs[ENTERTAINMENT_CUSTOM_URL] != safeUrl) {
+            context.dataStore.edit { p ->
+                p[ENTERTAINMENT_CUSTOM_TITLE] = safeTitle
+                p[ENTERTAINMENT_CUSTOM_URL] = safeUrl
+            }
+            addLog("Entertainment custom content updated.")
         }
     }
 

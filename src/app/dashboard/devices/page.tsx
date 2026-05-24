@@ -148,6 +148,8 @@ async function saveDeviceConfigAction(formData: FormData) {
   const educationSource = formData.get('educationSource') as string
   const educationPlaybackMode = formData.get('educationPlaybackMode') as string
   const educationForceSyncTrigger = formData.get('educationForceSyncTrigger') === 'true'
+  const entertainmentCustomTitle = formData.get('entertainmentCustomTitle') as string
+  const entertainmentCustomUrl = formData.get('entertainmentCustomUrl') as string
 
   const lockSettings = formData.get('lockSettings') === 'on'
   const forceSync = true // Always force sync on any configuration change
@@ -182,6 +184,8 @@ async function saveDeviceConfigAction(formData: FormData) {
         educationPlayOrder: educationPlayOrder || 'alphabetical',
         educationSource: educationSource || 'smb',
         educationPlaybackMode: educationPlaybackMode || 'copy',
+        entertainmentCustomTitle: entertainmentCustomTitle || 'Custom Konten',
+        entertainmentCustomUrl: entertainmentCustomUrl || '',
         ...(educationForceSyncTrigger ? { educationForceSync: true } : {}),
       },
     })

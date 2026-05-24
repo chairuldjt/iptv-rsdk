@@ -129,6 +129,8 @@ Konfigurasi per device. Setiap device baru dibuatkan config dari default global 
 | `educationSource` | String | Sumber video edukasi (`smb` atau `web`). |
 | `educationPlaybackMode` | String | Mode putar video (`copy` atau `stream`). |
 | `educationForceSync` | Boolean | Trigger sync edukasi sekali pakai. |
+| `entertainmentCustomTitle` | String | Label opsi Custom Konten pada menu Hiburan Android. |
+| `entertainmentCustomUrl` | Text/null | URL WebView untuk opsi Custom Konten. |
 
 Catatan: default global **tidak** lagi disimpan sebagai `device_configs.deviceId = NULL`. Default global disimpan di `app_settings` dengan key `device.defaultConfig`, lalu disalin ke `device_configs` saat device baru register.
 

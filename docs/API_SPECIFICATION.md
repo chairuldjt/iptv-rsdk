@@ -76,7 +76,9 @@ Server juga mencoba mencocokkan `mac_address` saat `device_id` baru belum ditemu
     "education_play_order": "alphabetical",
     "education_source": "smb",
     "education_playback_mode": "copy",
-    "education_force_sync": false
+    "education_force_sync": false,
+    "entertainment_custom_title": "Custom Konten",
+    "entertainment_custom_url": "https://contoh-rs.local/hiburan"
   }
 }
 ```
@@ -96,6 +98,8 @@ Device tidak ditemukan mengembalikan HTTP `404` dengan message `Device not found
 | `education_source` | String | Sumber video edukasi (`smb` atau `web`). |
 | `education_playback_mode` | String | Mode putar video edukasi (`copy` ke lokal atau `stream` langsung). |
 | `education_*` | String | Path SMB, kredensial, repeat mode, dan urutan playlist edukasi. |
+| `entertainment_custom_title` | String | Label opsi Custom Konten pada menu Hiburan Android. |
+| `entertainment_custom_url` | String | URL WebView untuk opsi Custom Konten. |
 
 ---
 

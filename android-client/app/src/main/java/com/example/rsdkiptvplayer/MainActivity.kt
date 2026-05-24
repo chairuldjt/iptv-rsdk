@@ -26,6 +26,7 @@ import androidx.compose.foundation.focusable
 import com.example.rsdkiptvplayer.theme.RSDKIPTVPlayerTheme
 import com.example.rsdkiptvplayer.ui.channels.ChannelBrowserScreen
 import com.example.rsdkiptvplayer.ui.education.EducationScreen
+import com.example.rsdkiptvplayer.ui.entertainment.EntertainmentScreen
 import com.example.rsdkiptvplayer.ui.home.HomeScreen
 import com.example.rsdkiptvplayer.ui.player.PlayerScreen
 import com.example.rsdkiptvplayer.ui.settings.SettingsScreen
@@ -109,6 +110,7 @@ class MainActivity : ComponentActivity() {
                                     currentScreen = "player"
                                 },
                                 onNavigateToEducation = { currentScreen = "education" },
+                                onNavigateToEntertainment = { currentScreen = "entertainment" },
                                 onNavigateToSettings = { tabIdx ->
                                     activeSettingsTab = tabIdx
                                     currentScreen = "settings"
@@ -141,6 +143,14 @@ class MainActivity : ComponentActivity() {
                                     activeSettingsTab = 4
                                     currentScreen = "settings"
                                 }
+                            )
+                        }
+                        "entertainment" -> {
+                            BackHandler {
+                                currentScreen = "home"
+                            }
+                            EntertainmentScreen(
+                                onBack = { currentScreen = "home" }
                             )
                         }
                         "player" -> {

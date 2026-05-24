@@ -103,6 +103,8 @@ model DeviceConfig {
   educationSource       String   @default("smb")          // "smb", "web"
   educationPlaybackMode String   @default("copy")         // "copy", "stream"
   educationForceSync    Boolean  @default(false)
+  entertainmentCustomTitle String  @default("Custom Konten")
+  entertainmentCustomUrl   String? @db.Text
   createdAt             DateTime @default(now())
   updatedAt             DateTime @updatedAt
 }

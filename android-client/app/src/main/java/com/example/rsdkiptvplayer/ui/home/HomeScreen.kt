@@ -69,6 +69,7 @@ import java.net.URI
 fun HomeScreen(
     onNavigateToPlayer: () -> Unit,
     onNavigateToEducation: () -> Unit,
+    onNavigateToEntertainment: () -> Unit,
     onNavigateToSettings: (activeTab: Int) -> Unit,
     playerViewModel: PlayerViewModel = viewModel()
 ) {
@@ -199,9 +200,7 @@ fun HomeScreen(
                 onServiceClick = {
                     Toast.makeText(context, "Layanan belum tersedia.", Toast.LENGTH_SHORT).show()
                 },
-                onYoutubeClick = {
-                    Toast.makeText(context, "YouTube belum tersedia.", Toast.LENGTH_SHORT).show()
-                },
+                onEntertainmentClick = onNavigateToEntertainment,
                 onSettingsClick = { onNavigateToSettings(0) },
                 onInfoClick = { showInfoDialog = true },
                 menuFocusRequester = menuFocusRequester,
@@ -336,7 +335,7 @@ private fun HospitalityMenuBar(
     onEducationClick: () -> Unit,
     onTvClick: () -> Unit,
     onServiceClick: () -> Unit,
-    onYoutubeClick: () -> Unit,
+    onEntertainmentClick: () -> Unit,
     onSettingsClick: () -> Unit,
     onInfoClick: () -> Unit,
     menuFocusRequester: FocusRequester,
@@ -393,11 +392,11 @@ private fun HospitalityMenuBar(
         ),
         HospitalityCarouselItem(
             iconRes = R.drawable.ic_home_media,
-            title = "MEDIA",
-            subtitle = "YouTube",
+            title = "HIBURAN",
+            subtitle = "Konten & Musik",
             accent = Color(0xFFFF9A76),
             backgroundRes = R.drawable.home_bg_youtube,
-            action = onYoutubeClick
+            action = onEntertainmentClick
         ),
         HospitalityCarouselItem(
             iconRes = R.drawable.ic_home_info,

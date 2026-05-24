@@ -23,6 +23,8 @@ export type DefaultDeviceConfig = {
   educationPlayOrder: string
   educationSource: string
   educationPlaybackMode: string
+  entertainmentCustomTitle: string
+  entertainmentCustomUrl: string
 }
 
 export const FALLBACK_DEFAULT_DEVICE_CONFIG: DefaultDeviceConfig = {
@@ -44,6 +46,8 @@ export const FALLBACK_DEFAULT_DEVICE_CONFIG: DefaultDeviceConfig = {
   educationPlayOrder: process.env.IPTV_DEFAULT_EDUCATION_PLAY_ORDER || 'alphabetical',
   educationSource: process.env.IPTV_DEFAULT_EDUCATION_SOURCE || 'smb',
   educationPlaybackMode: process.env.IPTV_DEFAULT_EDUCATION_PLAYBACK_MODE || 'copy',
+  entertainmentCustomTitle: process.env.IPTV_DEFAULT_ENTERTAINMENT_CUSTOM_TITLE || 'Custom Konten',
+  entertainmentCustomUrl: process.env.IPTV_DEFAULT_ENTERTAINMENT_CUSTOM_URL || '',
 }
 
 export async function getDefaultDeviceConfig(): Promise<DefaultDeviceConfig> {
@@ -116,6 +120,8 @@ export function defaultDeviceConfigFromFormData(formData: FormData): DefaultDevi
     educationPlayOrder: stringValue(formData, 'educationPlayOrder', FALLBACK_DEFAULT_DEVICE_CONFIG.educationPlayOrder),
     educationSource: stringValue(formData, 'educationSource', FALLBACK_DEFAULT_DEVICE_CONFIG.educationSource),
     educationPlaybackMode: stringValue(formData, 'educationPlaybackMode', FALLBACK_DEFAULT_DEVICE_CONFIG.educationPlaybackMode),
+    entertainmentCustomTitle: stringValue(formData, 'entertainmentCustomTitle', FALLBACK_DEFAULT_DEVICE_CONFIG.entertainmentCustomTitle),
+    entertainmentCustomUrl: stringValue(formData, 'entertainmentCustomUrl', ''),
   })
 }
 
@@ -141,6 +147,8 @@ function normalizeDefaultDeviceConfig(value: unknown): DefaultDeviceConfig {
     educationPlayOrder: oneOf(source.educationPlayOrder, ['alphabetical', 'random', 'shuffle'], FALLBACK_DEFAULT_DEVICE_CONFIG.educationPlayOrder),
     educationSource: oneOf(source.educationSource, ['smb', 'web'], FALLBACK_DEFAULT_DEVICE_CONFIG.educationSource),
     educationPlaybackMode: oneOf(source.educationPlaybackMode, ['copy', 'stream'], FALLBACK_DEFAULT_DEVICE_CONFIG.educationPlaybackMode),
+    entertainmentCustomTitle: safeString(source.entertainmentCustomTitle, FALLBACK_DEFAULT_DEVICE_CONFIG.entertainmentCustomTitle),
+    entertainmentCustomUrl: safeOptionalString(source.entertainmentCustomUrl),
   }
 }
 
@@ -152,6 +160,10 @@ function safeString(value: unknown, fallback: string): string {
   if (typeof value !== 'string') return fallback
   const trimmed = value.trim()
   return trimmed || fallback
+}
+
+function safeOptionalString(value: unknown): string {
+  return typeof value === 'string' ? value.trim() : ''
 }
 
 function safeBoolean(value: unknown, fallback: boolean): boolean {
