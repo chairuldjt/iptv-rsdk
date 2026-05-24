@@ -4,6 +4,7 @@ import { slugifyChannelName } from '@/lib/playableStreams'
 
 type RelayProcess = {
   process: ChildProcessWithoutNullStreams
+  outputSlug: string
   manifestPath: string
   lastAccessed: number
   cleanupTimer: NodeJS.Timeout
@@ -13,7 +14,6 @@ type StartRelayOptions = {
   channelId: number
   name: string
   streamUrl: string
-  segmentBaseUrl: string
 }
 
 const relayProcesses = new Map<number, RelayProcess>()
@@ -36,7 +36,21 @@ export async function getOnDemandHlsManifest(options: StartRelayOptions): Promis
   relay.lastAccessed = Date.now()
 
   const manifest = await waitForPlayableManifest(relay.manifestPath)
-  return rewriteManifestSegments(manifest, options.segmentBaseUrl, getOutputSlug(options.channelId, options.name))
+  return rewriteManifestSegments(manifest)
+}
+
+export async function getOnDemandHlsSegment(channelId: number, fileName: string): Promise<Buffer> {
+  const relay = relayProcesses.get(channelId)
+  if (!relay || relay.process.killed || relay.process.exitCode !== null) {
+    throw new Error('On-demand relay is not active for this channel.')
+  }
+
+  if (!isSafeSegmentFileName(fileName)) {
+    throw new Error('Invalid HLS segment file name.')
+  }
+
+  relay.lastAccessed = Date.now()
+  return readFile(`${OUTPUT_ROOT.replace(/\/$/, '')}/${relay.outputSlug}/${fileName}`)
 }
 
 async function ensureRelay(options: StartRelayOptions): Promise<RelayProcess> {
@@ -103,6 +117,7 @@ async function ensureRelay(options: StartRelayOptions): Promise<RelayProcess> {
 
   const relay: RelayProcess = {
     process: ffmpeg,
+    outputSlug,
     manifestPath,
     lastAccessed: Date.now(),
     cleanupTimer: scheduleCleanup(options.channelId),
@@ -170,9 +185,7 @@ async function fileExists(filePath: string): Promise<boolean> {
   }
 }
 
-function rewriteManifestSegments(manifest: string, segmentBaseUrl: string, outputSlug: string): string {
-  const baseUrl = segmentBaseUrl.replace(/\/$/, '')
-
+function rewriteManifestSegments(manifest: string): string {
   return manifest
     .split(/\r?\n/)
     .map((line) => {
@@ -183,7 +196,11 @@ function rewriteManifestSegments(manifest: string, segmentBaseUrl: string, outpu
 
       const prefixLength = line.length - line.trimStart().length
       const prefix = line.slice(0, prefixLength)
-      return `${prefix}${baseUrl}/${outputSlug}/${encodeURIComponent(trimmed)}`
+      return `${prefix}segments/${encodeURIComponent(trimmed)}`
     })
     .join('\n')
+}
+
+function isSafeSegmentFileName(fileName: string): boolean {
+  return /^[a-zA-Z0-9._-]+$/.test(fileName) && !fileName.includes('..')
 }

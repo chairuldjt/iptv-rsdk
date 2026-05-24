@@ -1,7 +1,6 @@
 import { NextResponse } from 'next/server'
 import prisma from '@/lib/db'
 import { getOnDemandHlsManifest } from '@/lib/onDemandHlsRelay'
-import { getHlsRelayBaseUrl } from '@/lib/settings'
 
 export const revalidate = 0
 export const runtime = 'nodejs'
@@ -40,7 +39,6 @@ export async function GET(request: Request) {
       channelId: channel.id,
       name: channel.name,
       streamUrl: channel.streamUrl,
-      segmentBaseUrl: await getHlsRelayBaseUrl(),
     })
 
     return new Response(manifest, {
