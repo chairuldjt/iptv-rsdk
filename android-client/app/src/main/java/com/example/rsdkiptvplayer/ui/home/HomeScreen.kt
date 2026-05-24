@@ -70,8 +70,9 @@ fun HomeScreen(
     val dataStoreManager = app.dataStoreManager
 
     val channels by playerViewModel.channels.collectAsState()
+    val channelsLoading by playerViewModel.isLoading.collectAsState()
     val serverUrl by dataStoreManager.serverUrlFlow.collectAsState(initial = "")
-    val educationPath by dataStoreManager.educationVideoPathFlow.collectAsState(initial = "")
+    val educationPath by dataStoreManager.educationVideoPathFlow.collectAsState(initial = null)
 
     var resolvedDeviceId by remember { mutableStateOf("STB-RSDK-DEVICE") }
     var macAddress by remember { mutableStateOf("Tidak tersedia") }
@@ -151,14 +152,19 @@ fun HomeScreen(
                     serverUrl = serverUrl,
                     educationPath = educationPath,
                     onEducationClick = {
-                        if (educationPath.isBlank()) {
+                        val currentEducationPath = educationPath
+                        if (currentEducationPath == null) {
+                            Toast.makeText(context, "Memuat pengaturan edukasi...", Toast.LENGTH_SHORT).show()
+                        } else if (currentEducationPath.isBlank()) {
                             Toast.makeText(context, "Video edukasi belum disetting.", Toast.LENGTH_SHORT).show()
                         } else {
                             onNavigateToEducation()
                         }
                     },
                     onTvClick = {
-                        if (channels.isEmpty()) {
+                        if (channelsLoading) {
+                            Toast.makeText(context, "Memuat daftar saluran...", Toast.LENGTH_SHORT).show()
+                        } else if (channels.isEmpty()) {
                             Toast.makeText(context, "Saluran TV belum tersedia.", Toast.LENGTH_SHORT).show()
                         } else {
                             onNavigateToPlayer()
@@ -303,7 +309,7 @@ private fun InfoChip(text: String, isSmallScreen: Boolean = false) {
 private fun HospitalityMenuBar(
     channelsCount: Int,
     serverUrl: String,
-    educationPath: String,
+    educationPath: String?,
     onEducationClick: () -> Unit,
     onTvClick: () -> Unit,
     onServiceClick: () -> Unit,
@@ -321,7 +327,11 @@ private fun HospitalityMenuBar(
         HospitalityCarouselItem(
             icon = "EDU",
             title = "EDUKASI",
-            subtitle = if (educationPath.isBlank()) "Set path" else "Video RS",
+            subtitle = when {
+                educationPath == null -> "Memuat..."
+                educationPath.isBlank() -> "Set path"
+                else -> "Video RS"
+            },
             accent = Color(0xFF86EFAC),
             action = onEducationClick
         ),

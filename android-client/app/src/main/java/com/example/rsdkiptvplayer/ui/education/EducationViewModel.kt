@@ -168,12 +168,19 @@ class EducationViewModel(application: Application) : AndroidViewModel(applicatio
                     if (videos.isEmpty()) {
                         _isLoading.value = false
                         val currentSyncState = com.example.rsdkiptvplayer.util.EducationSyncManager.syncState.value
-                        if (currentSyncState !is com.example.rsdkiptvplayer.util.EducationSyncManager.SyncState.Syncing) {
+                        val currentPath = _folderPath.value.trim()
+                        if (currentPath.isBlank()) {
+                            _errorMessage.value = "Path folder video edukasi kosong."
+                            return@onSuccess
+                        }
+
+                        if (currentSyncState !is com.example.rsdkiptvplayer.util.EducationSyncManager.SyncState.Checking &&
+                            currentSyncState !is com.example.rsdkiptvplayer.util.EducationSyncManager.SyncState.Syncing) {
                             viewModelScope.launch {
                                 com.example.rsdkiptvplayer.util.EducationSyncManager.sync(getApplication())
                             }
                         }
-                        _errorMessage.value = "Belum ada video edukasi disalin. Memulai sinkronisasi otomatis..."
+                        _errorMessage.value = null
                         dataStoreManager.addLog("Local education folder is empty. Triggering auto-sync.")
                         return@onSuccess
                     }
