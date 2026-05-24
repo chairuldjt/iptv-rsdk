@@ -90,7 +90,7 @@ export async function GET(
     })
 
     const shouldRelayStreams = config?.syncMode === 'api_relay'
-    const requestOrigin = new URL(request.url).origin
+    const requestOrigin = getPublicOrigin(request)
     const hlsRelayBaseUrl = shouldRelayStreams ? await getHlsRelayBaseUrl() : ''
 
     // Map channels to expected client schema
@@ -124,6 +124,21 @@ export async function GET(
       { status: 500 }
     )
   }
+}
+
+function getPublicOrigin(request: Request): string {
+  const configuredOrigin = process.env.APP_PUBLIC_ORIGIN || process.env.NEXT_PUBLIC_APP_URL
+  if (configuredOrigin) {
+    return configuredOrigin.replace(/\/$/, '')
+  }
+
+  const forwardedHost = request.headers.get('x-forwarded-host')
+  const forwardedProto = request.headers.get('x-forwarded-proto') || 'https'
+  if (forwardedHost) {
+    return `${forwardedProto.split(',')[0]}://${forwardedHost.split(',')[0]}`.replace(/\/$/, '')
+  }
+
+  return new URL(request.url).origin
 }
 
 function createRelayedClientStreamUrl({
