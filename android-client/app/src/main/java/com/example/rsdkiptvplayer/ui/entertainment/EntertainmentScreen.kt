@@ -48,6 +48,8 @@ import androidx.media3.common.util.UnstableApi
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.ui.PlayerView
 import coil.compose.AsyncImage
+import coil.ImageLoader
+import coil.decode.SvgDecoder
 import com.example.rsdkiptvplayer.IptvApplication
 import com.example.rsdkiptvplayer.data.api.EntertainmentItemData
 import com.example.rsdkiptvplayer.data.api.RetrofitClient
@@ -230,6 +232,14 @@ private fun EntertainmentOptionCard(
     focusOnStart: Boolean,
     onClick: () -> Unit
 ) {
+    val context = LocalContext.current
+    val imageLoader = remember {
+        ImageLoader.Builder(context)
+            .components {
+                add(SvgDecoder.Factory())
+            }
+            .build()
+    }
     var isFocused by remember { mutableStateOf(false) }
     val focusRequester = remember { FocusRequester() }
     val accent = when (option.contentType) {
@@ -280,6 +290,7 @@ private fun EntertainmentOptionCard(
                 AsyncImage(
                     model = thumbnail,
                     contentDescription = null,
+                    imageLoader = imageLoader,
                     modifier = Modifier.fillMaxSize(),
                     contentScale = androidx.compose.ui.layout.ContentScale.Crop
                 )
