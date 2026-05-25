@@ -24,6 +24,10 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -65,6 +69,7 @@ import com.example.rsdkiptvplayer.data.api.EntertainmentItemData
 import com.example.rsdkiptvplayer.data.api.RetrofitClient
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.net.HttpURLConnection
 import java.net.URL
@@ -106,6 +111,12 @@ fun EntertainmentScreen(onBack: () -> Unit) {
     var isLoading by remember { mutableStateOf(true) }
     var activeOption by remember { mutableStateOf<EntertainmentOption?>(null) }
 
+    val configuration = LocalConfiguration.current
+    val screenWidth = configuration.screenWidthDp
+    val screenHeight = configuration.screenHeightDp
+    val isSmallScreen = screenWidth < 760 || screenHeight < 500
+    val isUltraCompact = screenWidth < 680
+
     LaunchedEffect(serverUrl) {
         isLoading = true
         items = loadEntertainmentItems(serverUrl).ifEmpty { fallbackItems }
@@ -132,7 +143,10 @@ fun EntertainmentScreen(onBack: () -> Unit) {
                 )
             )
             .safeDrawingPadding()
-            .padding(horizontal = 42.dp, vertical = 26.dp)
+            .padding(
+                horizontal = if (isSmallScreen) 20.dp else 42.dp,
+                vertical = if (isSmallScreen) 12.dp else 26.dp
+            )
     ) {
         Header()
 
@@ -147,22 +161,37 @@ fun EntertainmentScreen(onBack: () -> Unit) {
                 Text(
                     text = "Belum ada konten hiburan aktif.",
                     color = Color.White.copy(alpha = 0.72f),
-                    fontSize = 18.sp,
+                    fontSize = if (isSmallScreen) 15.sp else 18.sp,
                     fontWeight = FontWeight.Bold,
                     modifier = Modifier.align(Alignment.Center)
                 )
             }
             else -> {
-                Row(
-                    modifier = Modifier.align(Alignment.Center),
-                    horizontalArrangement = Arrangement.spacedBy(22.dp),
+                val listState = rememberLazyListState()
+                val coroutineScope = rememberCoroutineScope()
+                LazyRow(
+                    state = listState,
+                    modifier = Modifier
+                        .align(Alignment.Center)
+                        .fillMaxWidth()
+                        .padding(horizontal = if (isUltraCompact) 4.dp else if (isSmallScreen) 8.dp else 16.dp),
+                    horizontalArrangement = Arrangement.spacedBy(
+                        if (isUltraCompact) 8.dp else if (isSmallScreen) 12.dp else 22.dp,
+                        Alignment.CenterHorizontally
+                    ),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    items.take(5).forEachIndexed { index, option ->
+                    itemsIndexed(items) { index, option ->
                         EntertainmentOptionCard(
                             option = option,
                             serverUrl = serverUrl,
                             focusOnStart = index == 0,
+                            isSmallScreen = isSmallScreen,
+                            onFocused = {
+                                coroutineScope.launch {
+                                    listState.animateScrollToItem(index)
+                                }
+                            },
                             onClick = { activeOption = option }
                         )
                     }
@@ -173,7 +202,7 @@ fun EntertainmentScreen(onBack: () -> Unit) {
         Text(
             text = "Tekan kembali untuk ke menu utama",
             color = Color.White.copy(alpha = 0.55f),
-            fontSize = 11.sp,
+            fontSize = if (isSmallScreen) 9.sp else 11.sp,
             fontWeight = FontWeight.Medium,
             modifier = Modifier.align(Alignment.BottomCenter)
         )
@@ -182,6 +211,8 @@ fun EntertainmentScreen(onBack: () -> Unit) {
 
 @Composable
 private fun Header() {
+    val configuration = LocalConfiguration.current
+    val isSmallScreen = configuration.screenWidthDp < 760 || configuration.screenHeightDp < 500
     Row(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.SpaceBetween,
@@ -191,14 +222,14 @@ private fun Header() {
             Text(
                 text = "HIBURAN",
                 color = Color(0xFFFFE9A6),
-                fontSize = 28.sp,
+                fontSize = if (isSmallScreen) 20.sp else 28.sp,
                 fontWeight = FontWeight.ExtraBold,
                 letterSpacing = 2.sp
             )
             Text(
                 text = "Pilih konten hiburan untuk pasien dan tamu",
                 color = Color.White.copy(alpha = 0.72f),
-                fontSize = 13.sp,
+                fontSize = if (isSmallScreen) 10.sp else 13.sp,
                 fontWeight = FontWeight.SemiBold
             )
         }
@@ -210,6 +241,8 @@ private fun EntertainmentOptionCard(
     option: EntertainmentOption,
     serverUrl: String,
     focusOnStart: Boolean,
+    isSmallScreen: Boolean,
+    onFocused: () -> Unit,
     onClick: () -> Unit
 ) {
     val context = LocalContext.current
@@ -228,6 +261,14 @@ private fun EntertainmentOptionCard(
         else -> Color(0xFFFF9A76)
     }
 
+    val configuration = LocalConfiguration.current
+    val screenWidth = configuration.screenWidthDp
+    val isUltraCompact = screenWidth < 680
+
+    val cardWidth = if (isUltraCompact) 136.dp else if (isSmallScreen) 186.dp else 236.dp
+    val cardHeight = if (isUltraCompact) 102.dp else if (isSmallScreen) 138.dp else 178.dp
+    val cardShape = RoundedCornerShape(if (isUltraCompact) 10.dp else if (isSmallScreen) 16.dp else 24.dp)
+
     LaunchedEffect(Unit) {
         if (focusOnStart) {
             delay(180)
@@ -237,20 +278,25 @@ private fun EntertainmentOptionCard(
 
     Card(
         colors = CardDefaults.cardColors(containerColor = Color(0xD90B1220)),
-        border = BorderStroke(if (isFocused) 3.dp else 1.dp, if (isFocused) accent else Color.White.copy(alpha = 0.14f)),
-        shape = RoundedCornerShape(24.dp),
+        border = BorderStroke(if (isFocused) (if (isUltraCompact) 2.dp else 3.dp) else 1.dp, if (isFocused) accent else Color.White.copy(alpha = 0.14f)),
+        shape = cardShape,
         modifier = Modifier
-            .width(236.dp)
-            .height(178.dp)
+            .width(cardWidth)
+            .height(cardHeight)
             .scale(if (isFocused) 1.06f else 1f)
             .shadow(
-                elevation = if (isFocused) 24.dp else 6.dp,
-                shape = RoundedCornerShape(24.dp),
+                elevation = if (isFocused) (if (isUltraCompact) 12.dp else 24.dp) else (if (isUltraCompact) 3.dp else 6.dp),
+                shape = cardShape,
                 ambientColor = accent.copy(alpha = if (isFocused) 0.45f else 0.12f),
                 spotColor = accent.copy(alpha = if (isFocused) 0.45f else 0.12f)
             )
             .focusRequester(focusRequester)
-            .onFocusChanged { isFocused = it.isFocused }
+            .onFocusChanged { 
+                isFocused = it.isFocused 
+                if (it.isFocused) {
+                    onFocused()
+                }
+            }
             .onPreviewKeyEvent { keyEvent ->
                 if (keyEvent.type == KeyEventType.KeyDown &&
                     (keyEvent.key == Key.DirectionCenter || keyEvent.key == Key.Enter || keyEvent.key == Key.NumPadEnter)
@@ -286,10 +332,10 @@ private fun EntertainmentOptionCard(
             Column(
                 modifier = Modifier
                     .align(Alignment.BottomStart)
-                    .padding(18.dp)
+                    .padding(if (isUltraCompact) 8.dp else if (isSmallScreen) 12.dp else 18.dp)
             ) {
-                Text(option.title, color = Color.White, fontSize = 20.sp, fontWeight = FontWeight.ExtraBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                Text(option.subtitle, color = Color.White.copy(alpha = 0.76f), fontSize = 11.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text(option.title, color = Color.White, fontSize = if (isUltraCompact) 13.sp else if (isSmallScreen) 16.sp else 20.sp, fontWeight = FontWeight.ExtraBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text(option.subtitle, color = Color.White.copy(alpha = 0.76f), fontSize = if (isUltraCompact) 8.sp else if (isSmallScreen) 9.sp else 11.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
         }
     }

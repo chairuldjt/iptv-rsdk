@@ -16,6 +16,7 @@ class DataStoreManager(private val context: Context) {
 
     companion object {
         val DEVICE_ID = stringPreferencesKey("device_id")
+        val STB_NAME = stringPreferencesKey("stb_name")
         val SERVER_URL_OVERRIDE = stringPreferencesKey("server_url_override")
         val SERVER_API_ENABLED = booleanPreferencesKey("server_api_enabled")
         val LAST_SELECTED_CHANNEL_ID = intPreferencesKey("last_selected_channel_id")
@@ -49,6 +50,26 @@ class DataStoreManager(private val context: Context) {
             addLog("Device ID generated: $currentId")
         }
         return currentId
+    }
+
+    val stbNameFlow: Flow<String> = context.dataStore.data.map { prefs ->
+        prefs[STB_NAME] ?: ""
+    }
+
+    suspend fun getStbName(): String {
+        val prefs = context.dataStore.data.first()
+        return prefs[STB_NAME] ?: ""
+    }
+
+    suspend fun setStbName(name: String) {
+        val normalizedName = name.trim()
+        val current = getStbName()
+        if (current != normalizedName) {
+            context.dataStore.edit { prefs ->
+                prefs[STB_NAME] = normalizedName
+            }
+            addLog("STB name updated to: ${normalizedName.ifBlank { "(default device name)" }}")
+        }
     }
 
     // Get dynamic server URL (override or buildConfig)

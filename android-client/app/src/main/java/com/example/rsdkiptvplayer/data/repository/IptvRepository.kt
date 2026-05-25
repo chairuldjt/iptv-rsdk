@@ -27,6 +27,11 @@ class IptvRepository(
     private val channelDao: ChannelDao,
     private val dataStoreManager: DataStoreManager
 ) {
+    private fun defaultDeviceName(): String = "${Build.MANUFACTURER} ${Build.MODEL}".trim()
+
+    suspend fun getEffectiveDeviceName(): String {
+        return dataStoreManager.getStbName().ifBlank { defaultDeviceName() }
+    }
 
     val allChannelsFlow: Flow<List<ChannelEntity>> = channelDao.getAllChannelsFlow()
     val allCategoriesFlow: Flow<List<String>> = channelDao.getAllCategoriesFlow()
@@ -54,10 +59,11 @@ class IptvRepository(
 
         val deviceId = dataStoreManager.getDeviceId()
         val serverUrl = dataStoreManager.getServerUrl()
+        val deviceName = getEffectiveDeviceName()
 
         val request = RegisterRequest(
             device_id = deviceId,
-            device_name = "${Build.MANUFACTURER} ${Build.MODEL}",
+            device_name = deviceName,
             app_version = BuildConfig.VERSION_NAME,
             android_version = Build.VERSION.RELEASE,
             mac_address = getMacAddress(),
@@ -363,11 +369,12 @@ class IptvRepository(
         return try {
             val apiService = RetrofitClient.getService(targetUrl)
             val deviceId = dataStoreManager.getDeviceId()
+            val deviceName = getEffectiveDeviceName()
             
             // Register/handshake the device on this server first so it is present in the database
             val request = RegisterRequest(
                 device_id = deviceId,
-                device_name = "${Build.MANUFACTURER} ${Build.MODEL}",
+                device_name = deviceName,
                 app_version = BuildConfig.VERSION_NAME,
                 android_version = Build.VERSION.RELEASE,
                 mac_address = getMacAddress(),

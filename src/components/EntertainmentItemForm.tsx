@@ -21,6 +21,12 @@ type ChannelOption = {
   relayUrl: string
 }
 
+type PlaylistOption = {
+  id: number
+  name: string
+  totalChannels: number
+}
+
 type EntertainmentItemFormProps = {
   editingItem?: {
     id: number
@@ -34,22 +40,47 @@ type EntertainmentItemFormProps = {
   } | null
   videoOptions: VideoOption[]
   channelOptions: ChannelOption[]
+  playlistOptions: PlaylistOption[]
+  publicOrigin: string
 }
 
-type ContentType = 'webview' | 'media_player' | 'm3u_player'
-type M3uSource = 'manual' | 'api' | 'relay'
+type ContentType = 'webview' | 'media_player' | 'm3u_player' | 'm3u_playlist'
 
 export default function EntertainmentItemForm({
   editingItem,
   videoOptions,
   channelOptions,
+  playlistOptions,
+  publicOrigin,
 }: EntertainmentItemFormProps) {
   const [message, setMessage] = useState<{ success: boolean; text: string } | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [contentType, setContentType] = useState<ContentType>((editingItem?.contentType as ContentType) || 'webview')
-  const [m3uSource, setM3uSource] = useState<M3uSource>('manual')
-  const [selectedVideoId, setSelectedVideoId] = useState('')
-  const [selectedChannelId, setSelectedChannelId] = useState('')
+  
+  const initialVideoId = useMemo(() => {
+    if (!editingItem || editingItem.contentType !== 'media_player') return ''
+    const match = videoOptions.find((video) => video.videoUrl === editingItem.url)
+    return match ? String(match.id) : ''
+  }, [editingItem, videoOptions])
+
+  const initialChannelId = useMemo(() => {
+    if (!editingItem || editingItem.contentType !== 'm3u_player') return ''
+    const match = channelOptions.find((ch) => ch.streamUrl === editingItem.url || ch.relayUrl === editingItem.url)
+    return match ? String(match.id) : ''
+  }, [editingItem, channelOptions])
+
+  const initialPlaylistId = useMemo(() => {
+    if (!editingItem || editingItem.contentType !== 'm3u_playlist') return ''
+    const match = playlistOptions.find((pl) => {
+      const expectedUrl = `${publicOrigin}/api/playlist/export/${pl.id}`
+      return editingItem.url === expectedUrl
+    })
+    return match ? String(match.id) : ''
+  }, [editingItem, playlistOptions, publicOrigin])
+
+  const [selectedVideoId, setSelectedVideoId] = useState(initialVideoId)
+  const [selectedChannelId, setSelectedChannelId] = useState(initialChannelId)
+  const [selectedPlaylistId, setSelectedPlaylistId] = useState(initialPlaylistId)
   const [title, setTitle] = useState(editingItem?.title || '')
   const [subtitle, setSubtitle] = useState(editingItem?.subtitle || '')
   const [url, setUrl] = useState(editingItem?.url || '')
@@ -63,6 +94,10 @@ export default function EntertainmentItemForm({
     () => channelOptions.find((channel) => String(channel.id) === selectedChannelId) || null,
     [selectedChannelId, channelOptions]
   )
+  const selectedPlaylist = useMemo(
+    () => playlistOptions.find((playlist) => String(playlist.id) === selectedPlaylistId) || null,
+    [selectedPlaylistId, playlistOptions]
+  )
 
   const applyVideo = (videoId: string) => {
     setSelectedVideoId(videoId)
@@ -75,31 +110,49 @@ export default function EntertainmentItemForm({
     if (video.thumbnailUrl) setThumbnailUrl((current) => current || video.thumbnailUrl || '')
   }
 
-  const applyChannel = (channelId: string, source: M3uSource = m3uSource) => {
+  const applyChannel = (channelId: string) => {
     setSelectedChannelId(channelId)
     const channel = channelOptions.find((item) => String(item.id) === channelId)
-    if (!channel || source === 'manual') return
+    if (!channel) return
 
     setTitle((current) => current || channel.name)
-    setSubtitle((current) => current || `${source === 'relay' ? 'Relay' : 'API Server'} - ${channel.categoryName}`)
-    setUrl(source === 'relay' ? channel.relayUrl : channel.apiUrl)
+    setSubtitle((current) => current || `Channel - ${channel.categoryName}`)
+    
+    // Use relay URL if it is a UDP stream, otherwise use direct stream URL
+    const isUdp = channel.streamUrl.trim().toLowerCase().startsWith('udp://')
+    setUrl(isUdp ? channel.relayUrl : channel.streamUrl)
+  }
+
+  const applyPlaylist = (playlistId: string) => {
+    setSelectedPlaylistId(playlistId)
+    const playlist = playlistOptions.find((item) => String(item.id) === playlistId)
+    if (!playlist) return
+
+    setTitle((current) => current || playlist.name)
+    setSubtitle((current) => current || `Playlist - ${playlist.totalChannels} Channels`)
+    setUrl(`${publicOrigin}/api/playlist/export/${playlist.id}`)
   }
 
   const changeContentType = (nextType: ContentType) => {
     setContentType(nextType)
     if (nextType === 'media_player') {
-      setM3uSource('manual')
       if (selectedVideo) setUrl(selectedVideo.videoUrl)
-    }
-    if (nextType === 'm3u_player' && selectedChannel && m3uSource !== 'manual') {
-      setUrl(m3uSource === 'relay' ? selectedChannel.relayUrl : selectedChannel.apiUrl)
-    }
-  }
-
-  const changeM3uSource = (source: M3uSource) => {
-    setM3uSource(source)
-    if (source !== 'manual' && selectedChannel) {
-      setUrl(source === 'relay' ? selectedChannel.relayUrl : selectedChannel.apiUrl)
+      else setUrl('')
+    } else if (nextType === 'm3u_player') {
+      if (selectedChannel) {
+        const isUdp = selectedChannel.streamUrl.trim().toLowerCase().startsWith('udp://')
+        setUrl(isUdp ? selectedChannel.relayUrl : selectedChannel.streamUrl)
+      } else {
+        setUrl('')
+      }
+    } else if (nextType === 'm3u_playlist') {
+      if (selectedPlaylist) {
+        setUrl(`${publicOrigin}/api/playlist/export/${selectedPlaylist.id}`)
+      } else {
+        setUrl('')
+      }
+    } else {
+      setUrl('')
     }
   }
 
@@ -114,8 +167,14 @@ export default function EntertainmentItemForm({
       return
     }
 
-    if (contentType === 'm3u_player' && m3uSource !== 'manual' && !url.trim()) {
-      setMessage({ success: false, text: 'Pilih channel dari API Server atau Relay terlebih dahulu.' })
+    if (contentType === 'm3u_player' && !url.trim()) {
+      setMessage({ success: false, text: 'Pilih channel terlebih dahulu.' })
+      setIsSubmitting(false)
+      return
+    }
+
+    if (contentType === 'm3u_playlist' && !url.trim()) {
+      setMessage({ success: false, text: 'Pilih playlist terlebih dahulu.' })
       setIsSubmitting(false)
       return
     }
@@ -123,7 +182,15 @@ export default function EntertainmentItemForm({
     try {
       const result = await saveEntertainmentItemAction(new FormData(event.currentTarget))
       if (result) setMessage({ success: result.success, text: result.message || '' })
-    } catch {
+    } catch (err: unknown) {
+      const isRedirect =
+        err instanceof Error && (err.message.includes('NEXT_REDIRECT') || 'digest' in err && String((err as { digest?: string }).digest).includes('NEXT_REDIRECT'))
+      if (isRedirect) {
+        // Redirection error is thrown by Next.js redirect() to initiate page navigation.
+        // We catch it and silently ignore to let Next.js handle the redirection.
+        return
+      }
+      console.error('Save entertainment item error:', err)
       setMessage({ success: false, text: 'Terjadi kesalahan saat menyimpan.' })
     } finally {
       setIsSubmitting(false)
@@ -151,10 +218,11 @@ export default function EntertainmentItemForm({
 
         <div>
           <span className="block text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-2">Mode Konten</span>
-          <div className="grid grid-cols-3 gap-2">
+          <div className="grid grid-cols-2 gap-2">
             <ModeButton active={contentType === 'webview'} label="WebView" onClick={() => changeContentType('webview')} />
             <ModeButton active={contentType === 'media_player'} label="Media" onClick={() => changeContentType('media_player')} />
-            <ModeButton active={contentType === 'm3u_player'} label="M3U" onClick={() => changeContentType('m3u_player')} />
+            <ModeButton active={contentType === 'm3u_player'} label="M3U Channel" onClick={() => changeContentType('m3u_player')} />
+            <ModeButton active={contentType === 'm3u_playlist'} label="M3U Playlist" onClick={() => changeContentType('m3u_playlist')} />
           </div>
         </div>
 
@@ -185,55 +253,66 @@ export default function EntertainmentItemForm({
 
           {contentType === 'm3u_player' && (
             <>
-              <div>
-                <span className="block text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-2">Sumber M3U / Stream</span>
-                <div className="grid grid-cols-3 gap-2">
-                  <ModeButton active={m3uSource === 'manual'} label="URL" onClick={() => changeM3uSource('manual')} />
-                  <ModeButton active={m3uSource === 'api'} label="API" onClick={() => changeM3uSource('api')} />
-                  <ModeButton active={m3uSource === 'relay'} label="Relay" onClick={() => changeM3uSource('relay')} />
-                </div>
-              </div>
-
-              {m3uSource !== 'manual' && (
-                <>
-                  <Field label="Pilih Channel">
-                    <select
-                      value={selectedChannelId}
-                      onChange={(event) => applyChannel(event.target.value, m3uSource)}
-                      className="field-input"
-                    >
-                      <option value="">Pilih channel...</option>
-                      {channelOptions.map((channel) => (
-                        <option key={channel.id} value={channel.id}>
-                          {channel.playlistName} / {channel.categoryName} / {channel.name}
-                        </option>
-                      ))}
-                    </select>
-                  </Field>
-                  {channelOptions.length === 0 && (
-                    <p className="text-xs text-amber-200/80 rounded-xl bg-amber-500/10 border border-amber-500/15 px-3 py-2">
-                      Belum ada channel aktif dari playlist/API Server.
-                    </p>
-                  )}
-                </>
+              <Field label="Pilih Channel">
+                <select
+                  value={selectedChannelId}
+                  onChange={(event) => applyChannel(event.target.value)}
+                  className="field-input"
+                >
+                  <option value="">Pilih channel...</option>
+                  {channelOptions.map((channel) => (
+                    <option key={channel.id} value={channel.id}>
+                      {channel.playlistName} / {channel.categoryName} / {channel.name}
+                    </option>
+                  ))}
+                </select>
+              </Field>
+              {channelOptions.length === 0 && (
+                <p className="text-xs text-amber-200/80 rounded-xl bg-amber-500/10 border border-amber-500/15 px-3 py-2">
+                  Belum ada channel aktif dari playlist/API Server.
+                </p>
               )}
             </>
           )}
 
-          {(contentType === 'webview' || contentType === 'm3u_player') && (
-            <Field label={contentType === 'webview' ? 'URL WebView' : 'URL M3U / Stream'}>
+          {contentType === 'm3u_playlist' && (
+            <>
+              <Field label="Pilih Playlist">
+                <select
+                  value={selectedPlaylistId}
+                  onChange={(event) => applyPlaylist(event.target.value)}
+                  className="field-input"
+                >
+                  <option value="">Pilih playlist...</option>
+                  {playlistOptions.map((playlist) => (
+                    <option key={playlist.id} value={playlist.id}>
+                      {playlist.name} ({playlist.totalChannels} Channels)
+                    </option>
+                  ))}
+                </select>
+              </Field>
+              {playlistOptions.length === 0 && (
+                <p className="text-xs text-amber-200/80 rounded-xl bg-amber-500/10 border border-amber-500/15 px-3 py-2">
+                  Playlist repository masih kosong. Tambahkan playlist dari menu Playlist Repository dulu.
+                </p>
+              )}
+            </>
+          )}
+
+          {contentType === 'webview' && (
+            <Field label="URL WebView">
               <input
                 name="url"
                 type="text"
                 value={url}
                 onChange={(event) => setUrl(event.target.value)}
-                placeholder={contentType === 'webview' ? 'https://...' : 'https://... atau udp://...'}
+                placeholder="https://..."
                 className="field-input font-mono"
               />
             </Field>
           )}
 
-          {contentType === 'media_player' && (
+          {(contentType === 'media_player' || contentType === 'm3u_player' || contentType === 'm3u_playlist') && (
             <input type="hidden" name="url" value={url} />
           )}
 

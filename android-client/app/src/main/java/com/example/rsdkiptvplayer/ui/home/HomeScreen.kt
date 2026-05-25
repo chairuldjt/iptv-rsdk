@@ -4,6 +4,7 @@ import androidx.activity.compose.BackHandler
 
 import android.media.AudioAttributes
 import android.media.SoundPool
+import android.os.Build
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.Crossfade
 import androidx.compose.animation.core.animateDpAsState
@@ -63,8 +64,12 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.rsdkiptvplayer.R
 import com.example.rsdkiptvplayer.BuildConfig
+import com.example.rsdkiptvplayer.ui.components.KeyboardLayoutProvider
+import com.example.rsdkiptvplayer.ui.components.RemoteKeyboardDialog
+import com.example.rsdkiptvplayer.ui.components.RemoteKeyboardKeySpec
 import com.example.rsdkiptvplayer.ui.player.PlayerViewModel
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.Job
 import kotlin.math.abs
 import java.text.SimpleDateFormat
 import java.util.*
@@ -90,10 +95,12 @@ fun HomeScreen(
     val context = LocalContext.current
     val app = context.applicationContext as com.example.rsdkiptvplayer.IptvApplication
     val dataStoreManager = app.dataStoreManager
+    val coroutineScope = rememberCoroutineScope()
 
     val channels by playerViewModel.channels.collectAsState()
     val channelsLoading by playerViewModel.isLoading.collectAsState()
     val serverUrl by dataStoreManager.serverUrlFlow.collectAsState(initial = "")
+    val storedStbName by dataStoreManager.stbNameFlow.collectAsState(initial = "")
     val educationPath by dataStoreManager.educationVideoPathFlow.collectAsState(initial = null)
     val educationSource by dataStoreManager.educationSourceFlow.collectAsState(initial = null)
     val educationPlaybackMode by dataStoreManager.educationPlaybackModeFlow.collectAsState(initial = null)
@@ -107,10 +114,12 @@ fun HomeScreen(
     var currentVersionName by remember { mutableStateOf("") }
     var currentVersionCode by remember { mutableIntStateOf(0) }
     var showInfoDialog by remember { mutableStateOf(false) }
+    var showStbNameDialog by remember { mutableStateOf(false) }
     val menuFocusRequester = remember { FocusRequester() }
+    val displayedStbName = storedStbName.ifBlank { "${Build.MANUFACTURER} ${Build.MODEL}".trim() }
 
-    LaunchedEffect(showInfoDialog) {
-        if (!showInfoDialog) {
+    LaunchedEffect(showInfoDialog, showStbNameDialog) {
+        if (!showInfoDialog && !showStbNameDialog) {
             delay(100)
             try {
                 menuFocusRequester.requestFocus()
@@ -231,7 +240,11 @@ fun HomeScreen(
         }
 
         val configuration = androidx.compose.ui.platform.LocalConfiguration.current
-        val isSmallScreen = configuration.screenWidthDp < 760 || configuration.screenHeightDp < 500
+        val screenWidth = configuration.screenWidthDp
+        val screenHeight = configuration.screenHeightDp
+        val isSmallScreen = screenWidth < 760 || screenHeight < 500
+        val isUltraCompact = screenWidth < 600 || screenHeight < 400
+        val showFiveItems = screenWidth >= 760 && screenHeight >= 440
 
         Box(
             modifier = Modifier
@@ -252,11 +265,12 @@ fun HomeScreen(
                 .fillMaxSize()
                 .safeDrawingPadding()
                 .padding(
-                    horizontal = if (isSmallScreen) 18.dp else 34.dp,
-                    vertical = if (isSmallScreen) 10.dp else 18.dp
+                    horizontal = if (isUltraCompact) 12.dp else if (isSmallScreen) 18.dp else 34.dp,
+                    vertical = if (isUltraCompact) 6.dp else if (isSmallScreen) 10.dp else 18.dp
                 )
         ) {
             HospitalityHeader(
+                stbName = displayedStbName,
                 deviceId = resolvedDeviceId,
                 ipAddress = localIpAddress,
                 channelCount = channels.size,
@@ -306,7 +320,10 @@ fun HomeScreen(
                 onEntertainmentClick = onNavigateToEntertainment,
                 onSettingsClick = { onNavigateToSettings(0) },
                 onInfoClick = { showInfoDialog = true },
+                onOpenStbNameMenu = { showStbNameDialog = true },
                 menuFocusRequester = menuFocusRequester,
+                showFiveItems = showFiveItems,
+                isUltraCompact = isUltraCompact,
                 onSelectionChanged = { item ->
                     selectedHomeBackground = item.backgroundRes
                 }
@@ -323,11 +340,32 @@ fun HomeScreen(
                 onDismiss = { showInfoDialog = false }
             )
         }
+
+        if (showStbNameDialog) {
+            StbNameDialog(
+                currentName = storedStbName,
+                fallbackName = displayedStbName,
+                onDismiss = { showStbNameDialog = false },
+                onSave = { newName ->
+                    coroutineScope.launch {
+                        dataStoreManager.setStbName(newName)
+                        app.repository.registerDevice()
+                        showStbNameDialog = false
+                        Toast.makeText(
+                            context,
+                            if (newName.isBlank()) "Nama STB dikembalikan ke default." else "Nama STB berhasil disimpan.",
+                            Toast.LENGTH_SHORT
+                        ).show()
+                    }
+                }
+            )
+        }
     }
 }
 
 @Composable
 private fun HospitalityHeader(
+    stbName: String,
     deviceId: String,
     ipAddress: String,
     channelCount: Int,
@@ -337,7 +375,11 @@ private fun HospitalityHeader(
     weather: String
 ) {
     val configuration = androidx.compose.ui.platform.LocalConfiguration.current
-    val isSmallScreen = configuration.screenWidthDp < 760 || configuration.screenHeightDp < 500
+    val screenWidth = configuration.screenWidthDp
+    val screenHeight = configuration.screenHeightDp
+    val isSmallScreen = screenWidth < 760 || screenHeight < 500
+    val isUltraCompact = screenWidth < 600 || screenHeight < 400
+    val showCenterHeader = screenWidth >= 920 && screenHeight >= 520
 
     Row(
         modifier = Modifier.fillMaxWidth(),
@@ -348,12 +390,12 @@ private fun HospitalityHeader(
         Column(
             modifier = Modifier.weight(1f),
             horizontalAlignment = Alignment.Start,
-            verticalArrangement = Arrangement.spacedBy(if (isSmallScreen) 2.dp else 4.dp)
+            verticalArrangement = Arrangement.spacedBy(if (isUltraCompact) 1.dp else if (isSmallScreen) 2.dp else 4.dp)
         ) {
             Text(
                 text = "Selamat Datang",
                 color = Color.White,
-                fontSize = if (isSmallScreen) 13.sp else 17.sp,
+                fontSize = if (isUltraCompact) 11.sp else if (isSmallScreen) 13.sp else 17.sp,
                 fontWeight = FontWeight.Bold,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
@@ -361,16 +403,24 @@ private fun HospitalityHeader(
             Text(
                 text = "Premium IPTV Hospitality",
                 color = Color(0xFFE7D8A0),
-                fontSize = if (isSmallScreen) 9.sp else 12.sp,
+                fontSize = if (isUltraCompact) 8.sp else if (isSmallScreen) 9.sp else 12.sp,
                 fontWeight = FontWeight.SemiBold,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+            Text(
+                text = stbName,
+                color = Color.White.copy(alpha = 0.88f),
+                fontSize = if (isUltraCompact) 7.sp else if (isSmallScreen) 8.sp else 10.sp,
+                fontWeight = FontWeight.Bold,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )
         }
 
-        // Center column (only if not small screen)
-        if (!isSmallScreen) {
-            val isMediumHeight = configuration.screenHeightDp < 600
+        // Center column (only if screen is large enough)
+        if (showCenterHeader) {
+            val isMediumHeight = screenHeight < 600
             Column(
                 modifier = Modifier.weight(1.2f),
                 horizontalAlignment = Alignment.CenterHorizontally
@@ -412,7 +462,7 @@ private fun HospitalityHeader(
             Text(
                 text = time,
                 color = Color.White,
-                fontSize = if (isSmallScreen) 22.sp else 30.sp,
+                fontSize = if (isUltraCompact) 18.sp else if (isSmallScreen) 22.sp else 30.sp,
                 fontWeight = FontWeight.ExtraBold,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
@@ -420,16 +470,16 @@ private fun HospitalityHeader(
             Text(
                 text = date,
                 color = Color.White.copy(alpha = 0.82f),
-                fontSize = if (isSmallScreen) 8.sp else 11.sp,
+                fontSize = if (isUltraCompact) 7.sp else if (isSmallScreen) 8.sp else 11.sp,
                 fontWeight = FontWeight.SemiBold,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )
-            Spacer(modifier = Modifier.height(if (isSmallScreen) 2.dp else 4.dp))
+            Spacer(modifier = Modifier.height(if (isUltraCompact) 1.dp else if (isSmallScreen) 2.dp else 4.dp))
             Text(
                 text = weather,
                 color = Color(0xFFFFE9A6),
-                fontSize = if (isSmallScreen) 8.sp else 10.sp,
+                fontSize = if (isUltraCompact) 7.sp else if (isSmallScreen) 8.sp else 10.sp,
                 fontWeight = FontWeight.Bold,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
@@ -474,12 +524,18 @@ private fun HospitalityMenuBar(
     onEntertainmentClick: () -> Unit,
     onSettingsClick: () -> Unit,
     onInfoClick: () -> Unit,
+    onOpenStbNameMenu: () -> Unit,
     menuFocusRequester: FocusRequester,
+    showFiveItems: Boolean,
+    isUltraCompact: Boolean,
     onSelectionChanged: (HospitalityCarouselItem) -> Unit
 ) {
     val context = LocalContext.current
+    val coroutineScope = rememberCoroutineScope()
     val configuration = androidx.compose.ui.platform.LocalConfiguration.current
-    val isSmallScreen = configuration.screenWidthDp < 760 || configuration.screenHeightDp < 500
+    val screenWidth = configuration.screenWidthDp
+    val screenHeight = configuration.screenHeightDp
+    val isSmallScreen = screenWidth < 760 || screenHeight < 500
     val lowEffectMode = BuildConfig.HOME_LOW_EFFECT_MODE
     var hasPlayedSelectionSound by remember { mutableStateOf(false) }
     val soundPool = remember {
@@ -497,6 +553,8 @@ private fun HospitalityMenuBar(
 
     var selectedIndex by remember { mutableIntStateOf(2) }
     var dragAmount by remember { mutableFloatStateOf(0f) }
+    var okHoldJob by remember { mutableStateOf<Job?>(null) }
+    var okLongPressTriggered by remember { mutableStateOf(false) }
     val carouselFocusRequester = menuFocusRequester
     val menuItems = listOf(
         HospitalityCarouselItem(
@@ -558,6 +616,7 @@ private fun HospitalityMenuBar(
     DisposableEffect(Unit) {
         selectionSoundId = soundPool.load(context, R.raw.home_selection_chime, 1)
         onDispose {
+            okHoldJob?.cancel()
             soundPool.release()
         }
     }
@@ -583,7 +642,7 @@ private fun HospitalityMenuBar(
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(if (isSmallScreen) 140.dp else 190.dp)
+                .height(if (isUltraCompact) 115.dp else if (isSmallScreen) 140.dp else 190.dp)
                 .focusRequester(carouselFocusRequester)
                 .focusable()
                 .onPreviewKeyEvent { keyEvent ->
@@ -593,15 +652,44 @@ private fun HospitalityMenuBar(
 
                     when (keyEvent.key) {
                         Key.DirectionLeft -> {
+                            okHoldJob?.cancel()
+                            okHoldJob = null
                             moveSelection(-1)
                             true
                         }
                         Key.DirectionRight -> {
+                            okHoldJob?.cancel()
+                            okHoldJob = null
                             moveSelection(1)
                             true
                         }
-                        Key.DirectionCenter, Key.Enter, Key.NumPadEnter -> {
-                            menuItems[selectedIndex].action()
+                        else -> false
+                    }
+                }
+                .onPreviewKeyEvent { keyEvent ->
+                    if (!isConfirmKey(keyEvent.key)) {
+                        return@onPreviewKeyEvent false
+                    }
+
+                    when (keyEvent.type) {
+                        KeyEventType.KeyDown -> {
+                            if (okHoldJob == null) {
+                                okLongPressTriggered = false
+                                okHoldJob = coroutineScope.launch {
+                                    delay(3000)
+                                    okLongPressTriggered = true
+                                    onOpenStbNameMenu()
+                                }
+                            }
+                            true
+                        }
+                        KeyEventType.KeyUp -> {
+                            okHoldJob?.cancel()
+                            okHoldJob = null
+                            if (!okLongPressTriggered) {
+                                menuItems[selectedIndex].action()
+                            }
+                            okLongPressTriggered = false
                             true
                         }
                         else -> false
@@ -628,8 +716,8 @@ private fun HospitalityMenuBar(
                     }
                 }
                 .padding(
-                    horizontal = if (isSmallScreen) 12.dp else 24.dp,
-                    vertical = if (isSmallScreen) 2.dp else 4.dp
+                    horizontal = if (isUltraCompact) 6.dp else if (isSmallScreen) 12.dp else 24.dp,
+                    vertical = if (isUltraCompact) 1.dp else if (isSmallScreen) 2.dp else 4.dp
                 ),
             contentAlignment = Alignment.Center
         ) {
@@ -652,10 +740,10 @@ private fun HospitalityMenuBar(
                     .zIndex(4f)
             )
 
-            val offsets = if (isSmallScreen) listOf(-1, 0, 1) else listOf(-2, -1, 0, 1, 2)
+            val offsets = if (showFiveItems) listOf(-2, -1, 0, 1, 2) else listOf(-1, 0, 1)
             Row(
                 horizontalArrangement = Arrangement.spacedBy(
-                    if (isSmallScreen) 10.dp else 18.dp,
+                    if (isUltraCompact) 6.dp else if (isSmallScreen) 10.dp else 18.dp,
                     Alignment.CenterHorizontally
                 ),
                 verticalAlignment = Alignment.CenterVertically,
@@ -669,6 +757,7 @@ private fun HospitalityMenuBar(
                         offset = offset,
                         lowEffectMode = lowEffectMode,
                         isSmallScreen = isSmallScreen,
+                        isUltraCompact = isUltraCompact,
                         onClick = {
                             if (offset == 0) {
                                 item.action()
@@ -681,21 +770,22 @@ private fun HospitalityMenuBar(
             }
         }
 
-        Spacer(modifier = Modifier.height(if (isSmallScreen) 4.dp else 8.dp))
+        Spacer(modifier = Modifier.height(if (isUltraCompact) 2.dp else if (isSmallScreen) 4.dp else 8.dp))
         SelectedMenuLabel(
             item = menuItems[selectedIndex],
-            isSmallScreen = isSmallScreen
+            isSmallScreen = isSmallScreen,
+            isUltraCompact = isUltraCompact
         )
-        Spacer(modifier = Modifier.height(if (isSmallScreen) 8.dp else 12.dp))
+        Spacer(modifier = Modifier.height(if (isUltraCompact) 4.dp else if (isSmallScreen) 8.dp else 12.dp))
         Row(
-            horizontalArrangement = Arrangement.spacedBy(7.dp),
+            horizontalArrangement = Arrangement.spacedBy(if (isUltraCompact) 4.dp else 7.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             menuItems.indices.forEach { index ->
                 Box(
                     modifier = Modifier
-                        .width(if (index == selectedIndex) 22.dp else 7.dp)
-                        .height(7.dp)
+                        .width(if (index == selectedIndex) (if (isUltraCompact) 14.dp else 22.dp) else (if (isUltraCompact) 5.dp else 7.dp))
+                        .height(if (isUltraCompact) 5.dp else 7.dp)
                         .clip(RoundedCornerShape(10.dp))
                         .background(
                             if (index == selectedIndex) menuItems[selectedIndex].accent
@@ -704,11 +794,12 @@ private fun HospitalityMenuBar(
                 )
             }
         }
-        Spacer(modifier = Modifier.height(8.dp))
+        Spacer(modifier = Modifier.height(if (isUltraCompact) 4.dp else 8.dp))
         Text(
-            text = "Gunakan kiri/kanan remote untuk memutar menu, OK untuk memilih",
+            text = if (isUltraCompact) "Kiri/Kanan: Putar • OK: Pilih • Tahan OK 3s: Nama STB"
+                   else "Gunakan kiri/kanan remote untuk memutar menu, OK untuk memilih, tahan OK 3 detik untuk ubah nama STB",
             color = Color.White.copy(alpha = 0.62f),
-            fontSize = if (isSmallScreen) 8.sp else 10.sp,
+            fontSize = if (isUltraCompact) 7.sp else if (isSmallScreen) 8.sp else 10.sp,
             fontWeight = FontWeight.Medium
         )
     }
@@ -730,26 +821,27 @@ private fun wrapCarouselIndex(index: Int, size: Int): Int {
 @Composable
 private fun SelectedMenuLabel(
     item: HospitalityCarouselItem,
-    isSmallScreen: Boolean
+    isSmallScreen: Boolean,
+    isUltraCompact: Boolean
 ) {
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
         modifier = Modifier
-            .clip(RoundedCornerShape(if (isSmallScreen) 10.dp else 14.dp))
+            .clip(RoundedCornerShape(if (isUltraCompact) 6.dp else if (isSmallScreen) 10.dp else 14.dp))
             .background(Color.Black.copy(alpha = 0.42f))
             .border(
                 BorderStroke(1.dp, item.accent.copy(alpha = 0.34f)),
-                RoundedCornerShape(if (isSmallScreen) 10.dp else 14.dp)
+                RoundedCornerShape(if (isUltraCompact) 6.dp else if (isSmallScreen) 10.dp else 14.dp)
             )
             .padding(
-                horizontal = if (isSmallScreen) 14.dp else 20.dp,
-                vertical = if (isSmallScreen) 4.dp else 7.dp
+                horizontal = if (isUltraCompact) 10.dp else if (isSmallScreen) 14.dp else 20.dp,
+                vertical = if (isUltraCompact) 2.dp else if (isSmallScreen) 4.dp else 7.dp
             )
     ) {
         Text(
             text = item.title,
             color = item.accent,
-            fontSize = if (isSmallScreen) 12.sp else 17.sp,
+            fontSize = if (isUltraCompact) 10.sp else if (isSmallScreen) 12.sp else 17.sp,
             fontWeight = FontWeight.ExtraBold,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
@@ -764,7 +856,7 @@ private fun SelectedMenuLabel(
         Text(
             text = item.subtitle,
             color = Color.White.copy(alpha = 0.84f),
-            fontSize = if (isSmallScreen) 8.sp else 10.sp,
+            fontSize = if (isUltraCompact) 7.sp else if (isSmallScreen) 8.sp else 10.sp,
             fontWeight = FontWeight.SemiBold,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
@@ -820,6 +912,7 @@ private fun HospitalityCarouselCard(
     offset: Int,
     lowEffectMode: Boolean,
     isSmallScreen: Boolean,
+    isUltraCompact: Boolean,
     onClick: () -> Unit
 ) {
     val isActive = offset == 0
@@ -836,44 +929,44 @@ private fun HospitalityCarouselCard(
         )
         val cardWidth by animateDpAsState(
             targetValue = when (distance) {
-                0 -> if (isSmallScreen) 126.dp else 164.dp
-                1 -> if (isSmallScreen) 92.dp else 112.dp
-                else -> if (isSmallScreen) 68.dp else 82.dp
+                0 -> if (isUltraCompact) 96.dp else if (isSmallScreen) 126.dp else 164.dp
+                1 -> if (isUltraCompact) 74.dp else if (isSmallScreen) 92.dp else 112.dp
+                else -> if (isUltraCompact) 56.dp else if (isSmallScreen) 68.dp else 82.dp
             },
             animationSpec = tween(durationMillis = 160),
             label = "hospitality_carousel_width_debug_step1"
         )
         val iconBoxSize by animateDpAsState(
             targetValue = when (distance) {
-                0 -> if (isSmallScreen) 88.dp else 116.dp
-                1 -> if (isSmallScreen) 56.dp else 72.dp
-                else -> if (isSmallScreen) 40.dp else 50.dp
+                0 -> if (isUltraCompact) 66.dp else if (isSmallScreen) 88.dp else 116.dp
+                1 -> if (isUltraCompact) 44.dp else if (isSmallScreen) 56.dp else 72.dp
+                else -> if (isUltraCompact) 32.dp else if (isSmallScreen) 40.dp else 50.dp
             },
             animationSpec = tween(durationMillis = 160),
             label = "hospitality_carousel_box_size_debug_step1"
         )
         val iconSize = when (distance) {
-            0 -> if (isSmallScreen) 38.dp else 54.dp
-            1 -> if (isSmallScreen) 26.dp else 36.dp
-            else -> if (isSmallScreen) 20.dp else 26.dp
+            0 -> if (isUltraCompact) 28.dp else if (isSmallScreen) 38.dp else 54.dp
+            1 -> if (isUltraCompact) 20.dp else if (isSmallScreen) 26.dp else 36.dp
+            else -> if (isUltraCompact) 14.dp else if (isSmallScreen) 20.dp else 26.dp
         }
         val iconPlateSize = when (distance) {
-            0 -> if (isSmallScreen) 48.dp else 62.dp
-            1 -> if (isSmallScreen) 30.dp else 40.dp
-            else -> if (isSmallScreen) 22.dp else 30.dp
+            0 -> if (isUltraCompact) 36.dp else if (isSmallScreen) 48.dp else 62.dp
+            1 -> if (isUltraCompact) 24.dp else if (isSmallScreen) 30.dp else 40.dp
+            else -> if (isUltraCompact) 16.dp else if (isSmallScreen) 22.dp else 30.dp
         }
         val offsetY by animateDpAsState(
             targetValue = if (isActive) {
-                if (isSmallScreen) (-8).dp else (-12).dp
+                if (isUltraCompact) (-6).dp else if (isSmallScreen) (-8).dp else (-12).dp
             } else {
-                if (isSmallScreen) 6.dp else 10.dp
+                if (isUltraCompact) 4.dp else if (isSmallScreen) 6.dp else 10.dp
             },
             animationSpec = tween(durationMillis = 160),
             label = "hospitality_carousel_offset_y_debug_step2"
         )
         val borderWidth by animateDpAsState(
             targetValue = if (isActive) {
-                if (isSmallScreen) 2.dp else 3.dp
+                if (isUltraCompact) 2.dp else if (isSmallScreen) 3.dp else 4.dp
             } else {
                 1.dp
             },
@@ -885,12 +978,12 @@ private fun HospitalityCarouselCard(
             animationSpec = tween(durationMillis = 160),
             label = "hospitality_carousel_border_color_debug_step1"
         )
-        val cardShape = RoundedCornerShape(if (isActive) 16.dp else 12.dp)
+        val cardShape = RoundedCornerShape(if (isActive) (if (isUltraCompact) 10.dp else 16.dp) else (if (isUltraCompact) 8.dp else 12.dp))
         val shadowElevation by animateDpAsState(
             targetValue = if (isActive) {
-                if (isSmallScreen) 6.dp else 8.dp
+                if (isUltraCompact) 4.dp else if (isSmallScreen) 6.dp else 8.dp
             } else {
-                if (isSmallScreen) 2.dp else 3.dp
+                if (isUltraCompact) 1.dp else if (isSmallScreen) 2.dp else 3.dp
             },
             animationSpec = tween(durationMillis = 160),
             label = "hospitality_carousel_shadow_debug_step3"
@@ -959,9 +1052,9 @@ private fun HospitalityCarouselCard(
                 Box(
                     modifier = Modifier
                         .align(Alignment.TopCenter)
-                        .padding(top = if (isSmallScreen) 5.dp else 7.dp)
+                        .padding(top = if (isUltraCompact) 3.dp else if (isSmallScreen) 5.dp else 7.dp)
                         .width(if (isActive) iconBoxSize * 0.52f else iconBoxSize * 0.40f)
-                        .height(if (isSmallScreen) 3.dp else 4.dp)
+                        .height(if (isUltraCompact) 2.dp else if (isSmallScreen) 3.dp else 4.dp)
                         .clip(RoundedCornerShape(999.dp))
                         .background(item.accent.copy(alpha = if (isActive) 0.78f else 0.36f))
                 )
@@ -975,13 +1068,13 @@ private fun HospitalityCarouselCard(
                 )
             }
 
-            Spacer(modifier = Modifier.height(if (isActive) 8.dp else 4.dp))
+            Spacer(modifier = Modifier.height(if (isActive) (if (isUltraCompact) 4.dp else 8.dp) else (if (isUltraCompact) 2.dp else 4.dp)))
 
             if (!isActive) {
                 Text(
                     text = item.title,
                     color = Color.White.copy(alpha = 0.76f),
-                    fontSize = if (isSmallScreen) 8.sp else 10.sp,
+                    fontSize = if (isUltraCompact) 7.sp else if (isSmallScreen) 8.sp else 10.sp,
                     fontWeight = FontWeight.Bold,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
@@ -1008,29 +1101,29 @@ private fun HospitalityCarouselCard(
     )
     val cardWidth by animateDpAsState(
         targetValue = when (distance) {
-            0 -> if (isSmallScreen) 126.dp else 164.dp
-            1 -> if (isSmallScreen) 92.dp else 112.dp
-            else -> if (isSmallScreen) 68.dp else 82.dp
+            0 -> if (isUltraCompact) 96.dp else if (isSmallScreen) 126.dp else 164.dp
+            1 -> if (isUltraCompact) 74.dp else if (isSmallScreen) 92.dp else 112.dp
+            else -> if (isUltraCompact) 56.dp else if (isSmallScreen) 68.dp else 82.dp
         },
         animationSpec = if (lowEffectMode) tween(durationMillis = 0) else tween(durationMillis = 220),
         label = "hospitality_carousel_width"
     )
     val iconBoxSize by animateDpAsState(
         targetValue = when (distance) {
-            0 -> if (isSmallScreen) 88.dp else 116.dp
-            1 -> if (isSmallScreen) 56.dp else 72.dp
-            else -> if (isSmallScreen) 40.dp else 50.dp
+            0 -> if (isUltraCompact) 66.dp else if (isSmallScreen) 88.dp else 116.dp
+            1 -> if (isUltraCompact) 44.dp else if (isSmallScreen) 56.dp else 72.dp
+            else -> if (isUltraCompact) 32.dp else if (isSmallScreen) 40.dp else 50.dp
         },
         animationSpec = if (lowEffectMode) tween(durationMillis = 0) else tween(durationMillis = 220),
         label = "hospitality_carousel_box_size"
     )
     val offsetY by animateDpAsState(
-        targetValue = if (isActive) (if (isSmallScreen) (-16).dp else (-28).dp) else (if (isSmallScreen) 10.dp else 16.dp),
+        targetValue = if (isActive) (if (isUltraCompact) (-10).dp else if (isSmallScreen) (-16).dp else (-28).dp) else (if (isUltraCompact) 6.dp else if (isSmallScreen) 10.dp else 16.dp),
         animationSpec = if (lowEffectMode) tween(durationMillis = 0) else tween(durationMillis = 220),
         label = "hospitality_carousel_offset_y"
     )
     val borderWidth by animateDpAsState(
-        targetValue = if (isActive) (if (isSmallScreen) 3.dp else 4.dp) else (if (isSmallScreen) 1.8.dp else 2.5.dp),
+        targetValue = if (isActive) (if (isUltraCompact) 2.dp else if (isSmallScreen) 3.dp else 4.dp) else (if (isUltraCompact) 1.dp else if (isSmallScreen) 1.8.dp else 2.5.dp),
         animationSpec = if (lowEffectMode) tween(durationMillis = 0) else tween(durationMillis = 220),
         label = "hospitality_carousel_border_width"
     )
@@ -1040,14 +1133,14 @@ private fun HospitalityCarouselCard(
         label = "hospitality_carousel_border_color"
     )
     val cornerRadius by animateDpAsState(
-        targetValue = if (isActive) (if (isSmallScreen) 16.dp else 24.dp) else (if (isSmallScreen) 12.dp else 18.dp),
+        targetValue = if (isActive) (if (isUltraCompact) 10.dp else if (isSmallScreen) 16.dp else 24.dp) else (if (isUltraCompact) 8.dp else if (isSmallScreen) 12.dp else 18.dp),
         animationSpec = if (lowEffectMode) tween(durationMillis = 0) else tween(durationMillis = 220),
         label = "hospitality_carousel_corner_radius"
     )
     val cardShape = RoundedCornerShape(cornerRadius)
 
     val shadowElevation by animateDpAsState(
-        targetValue = if (lowEffectMode) 0.dp else if (isActive) (if (isSmallScreen) 16.dp else 24.dp) else (if (isSmallScreen) 5.dp else 7.dp),
+        targetValue = if (lowEffectMode) 0.dp else if (isActive) (if (isUltraCompact) 10.dp else if (isSmallScreen) 16.dp else 24.dp) else (if (isUltraCompact) 3.dp else if (isSmallScreen) 5.dp else 7.dp),
         animationSpec = if (lowEffectMode) tween(durationMillis = 0) else tween(durationMillis = 220),
         label = "hospitality_carousel_shadow_elevation"
     )
@@ -1076,7 +1169,7 @@ private fun HospitalityCarouselCard(
             if (isActive) {
                 Box(
                     modifier = Modifier
-                        .size(iconBoxSize + (if (isSmallScreen) 54.dp else 78.dp))
+                        .size(iconBoxSize + (if (isUltraCompact) 36.dp else if (isSmallScreen) 54.dp else 78.dp))
                         .background(
                             Brush.radialGradient(
                                 colors = listOf(
@@ -1142,16 +1235,20 @@ private fun HospitalityCarouselCard(
                     tint = Color.White.copy(alpha = if (isActive) 1f else 0.76f),
                     modifier = Modifier.size(
                         when (distance) {
-                            0 -> if (isSmallScreen) 34.dp else 48.dp
-                            1 -> if (isSmallScreen) 24.dp else 32.dp
-                            else -> if (isSmallScreen) 18.dp else 24.dp
+                            0 -> if (isUltraCompact) 26.dp else if (isSmallScreen) 34.dp else 48.dp
+                            1 -> if (isUltraCompact) 18.dp else if (isSmallScreen) 24.dp else 32.dp
+                            else -> if (isUltraCompact) 14.dp else if (isSmallScreen) 18.dp else 24.dp
                         }
                     )
                 )
             }
         }
         val textSpacerHeight by animateDpAsState(
-            targetValue = if (isActive) (if (isSmallScreen) 8.dp else 14.dp) else (if (isSmallScreen) 4.dp else 6.dp),
+            targetValue = if (isActive) {
+                if (isUltraCompact) 4.dp else if (isSmallScreen) 8.dp else 14.dp
+            } else {
+                if (isUltraCompact) 2.dp else if (isSmallScreen) 4.dp else 6.dp
+            },
             label = "hospitality_carousel_text_spacer"
         )
         Spacer(modifier = Modifier.height(textSpacerHeight))
@@ -1167,23 +1264,23 @@ private fun HospitalityCarouselCard(
             )
             val titleHorizontalPadding by animateDpAsState(
                 targetValue = if (isActive) {
-                    if (isSmallScreen) 8.dp else 12.dp
+                    if (isUltraCompact) 6.dp else if (isSmallScreen) 8.dp else 12.dp
                 } else {
-                    if (isSmallScreen) 5.dp else 8.dp
+                    if (isUltraCompact) 4.dp else if (isSmallScreen) 5.dp else 8.dp
                 },
                 label = "hospitality_carousel_title_padding_h"
             )
             val titleVerticalPadding by animateDpAsState(
                 targetValue = if (isActive) {
-                    if (isSmallScreen) 2.5.dp else 4.dp
+                    if (isUltraCompact) 1.5.dp else if (isSmallScreen) 2.5.dp else 4.dp
                 } else {
-                    if (isSmallScreen) 1.5.dp else 2.5.dp
+                    if (isUltraCompact) 1.dp else if (isSmallScreen) 1.5.dp else 2.5.dp
                 },
                 label = "hospitality_carousel_title_padding_v"
             )
             Box(
                 modifier = Modifier
-                    .clip(RoundedCornerShape(if (isSmallScreen) 7.dp else 10.dp))
+                    .clip(RoundedCornerShape(if (isUltraCompact) 5.dp else if (isSmallScreen) 7.dp else 10.dp))
                     .background(Color.Black.copy(alpha = titleBgAlpha))
                     .padding(horizontal = titleHorizontalPadding, vertical = titleVerticalPadding)
             ) {
@@ -1191,9 +1288,9 @@ private fun HospitalityCarouselCard(
                     text = item.title,
                     color = if (isActive) item.accent else Color.White.copy(alpha = 0.76f),
                     fontSize = if (isActive) {
-                        if (isSmallScreen) 12.sp else 16.sp
+                        if (isUltraCompact) 9.sp else if (isSmallScreen) 12.sp else 16.sp
                     } else {
-                        if (isSmallScreen) 8.sp else 10.sp
+                        if (isUltraCompact) 7.sp else if (isSmallScreen) 8.sp else 10.sp
                     },
                     fontWeight = FontWeight.ExtraBold,
                     maxLines = 1,
@@ -1211,9 +1308,9 @@ private fun HospitalityCarouselCard(
                 text = item.subtitle,
                 color = Color.White.copy(alpha = if (isActive) 0.86f else 0.54f),
                 fontSize = if (isActive) {
-                    if (isSmallScreen) 8.sp else 10.sp
+                    if (isUltraCompact) 7.sp else if (isSmallScreen) 8.sp else 10.sp
                 } else {
-                    if (isSmallScreen) 6.sp else 7.5.sp
+                    if (isUltraCompact) 5.5.sp else if (isSmallScreen) 6.sp else 7.5.sp
                 },
                 fontWeight = if (isActive) FontWeight.SemiBold else FontWeight.Medium,
                 maxLines = 1,
@@ -1699,6 +1796,52 @@ private fun resolveUpdateApkUrl(serverUrl: String, apiUrl: String?, fileName: St
     } catch (e: Exception) {
         candidate
     }
+}
+
+private fun isConfirmKey(key: Key): Boolean {
+    return key == Key.DirectionCenter || key == Key.Enter || key == Key.NumPadEnter
+}
+
+@Composable
+private fun StbNameDialog(
+    currentName: String,
+    fallbackName: String,
+    onDismiss: () -> Unit,
+    onSave: (String) -> Unit
+) {
+    RemoteKeyboardDialog(
+        title = "Nama STB",
+        helperText = "Tahan OK selama 3 detik dari home untuk membuka menu ini. Nama yang disimpan akan tampil di home dan web admin.",
+        initialValue = currentName,
+        onCommit = { onSave(it.trim()) },
+        onDismiss = onDismiss,
+        obscureText = false,
+        maxLength = 32,
+        keyboardTitle = "",
+        blankPreviewText = fallbackName,
+        supportingText = { value ->
+            if (value.isBlank()) "Kosong = pakai nama default perangkat" else "${value.length}/32 karakter"
+        },
+        layoutProvider = KeyboardLayoutProvider { _, symbolMode ->
+            if (symbolMode) {
+                listOf(
+                    listOf("1", "2", "3", "4", "5", "6", "7", "8", "9", "0"),
+                    listOf("-", "_", ".", "/", "\\", ":", "@", "#"),
+                    listOf("(", ")", "[", "]", "{", "}", "!", "?")
+                ).map { row -> row.map { value -> RemoteKeyboardKeySpec(value) } }
+            } else {
+                listOf(
+                    "ABCDEFGH".map { value -> RemoteKeyboardKeySpec(value.toString()) },
+                    "IJKLMNOP".map { value -> RemoteKeyboardKeySpec(value.toString()) },
+                    "QRSTUVWX".map { value -> RemoteKeyboardKeySpec(value.toString()) },
+                    "YZ".map { value -> RemoteKeyboardKeySpec(value.toString(), weight = 1.4f) } +
+                        ('0'..'9').map { value -> RemoteKeyboardKeySpec(value.toString()) } +
+                        listOf(RemoteKeyboardKeySpec("-", weight = 1.2f), RemoteKeyboardKeySpec("_", weight = 1.2f), RemoteKeyboardKeySpec(".", weight = 1.2f))
+                )
+            }
+        },
+        clearLabel = "Reset"
+    )
 }
 
 @Composable

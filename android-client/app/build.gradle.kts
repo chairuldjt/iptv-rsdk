@@ -9,6 +9,13 @@ plugins {
   alias(libs.plugins.legacy.kapt)
 }
 
+val rootEnv = Properties().apply {
+    val envFile = rootProject.layout.projectDirectory.file("../.env").asFile
+    if (envFile.exists()) {
+        envFile.inputStream().use(::load)
+    }
+}
+
 val releaseEnv = Properties().apply {
     val envFile = rootProject.file(".env")
     if (envFile.exists()) {
@@ -16,10 +23,33 @@ val releaseEnv = Properties().apply {
     }
 }
 
+fun optionalRootEnv(name: String): String? =
+    normalizeEnvValue(rootEnv.getProperty(name))
+        ?: normalizeEnvValue(providers.environmentVariable(name).orNull)
+
+fun optionalReleaseEnv(name: String): String? =
+    normalizeEnvValue(releaseEnv.getProperty(name))
+        ?: normalizeEnvValue(providers.environmentVariable(name).orNull)
+
 fun releaseEnv(name: String): String =
-    releaseEnv.getProperty(name)
-        ?: providers.environmentVariable(name).orNull
+    optionalReleaseEnv(name)
         ?: error("$name must be set in android-client/.env or environment variables")
+
+fun rootEnvBoolean(name: String, fallback: Boolean): Boolean =
+    when (optionalRootEnv(name)?.lowercase()) {
+        "1", "true", "yes", "on" -> true
+        "0", "false", "no", "off" -> false
+        else -> fallback
+    }
+
+val defaultApiBaseUrl = optionalRootEnv("DEFAULT_API_BASE_URL")
+    ?: "https://iptv.teknisirsdk.my.id"
+val homeLowEffectMode = rootEnvBoolean("HOME_LOW_EFFECT_MODE", true)
+
+fun normalizeEnvValue(value: String?): String? {
+    val trimmed = value?.trim()?.takeIf { it.isNotEmpty() } ?: return null
+    return trimmed.removeSurrounding("\"").removeSurrounding("'").trim().takeIf { it.isNotEmpty() }
+}
 
 val gitVersionCode: Int = try {
     providers.exec {
@@ -47,8 +77,8 @@ android {
         versionCode = gitVersionCode
         versionName = gitVersionName
         
-        buildConfigField("String", "DEFAULT_API_BASE_URL", "\"https://iptv.teknisirsdk.my.id\"")
-        buildConfigField("boolean", "HOME_LOW_EFFECT_MODE", "true")
+        buildConfigField("String", "DEFAULT_API_BASE_URL", "\"$defaultApiBaseUrl\"")
+        buildConfigField("boolean", "HOME_LOW_EFFECT_MODE", homeLowEffectMode.toString())
     }
 
     signingConfigs {

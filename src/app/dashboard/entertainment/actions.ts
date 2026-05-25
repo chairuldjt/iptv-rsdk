@@ -9,7 +9,7 @@ import { getErrorMessage } from '@/lib/errors'
 
 const THUMB_UPLOAD_DIR = path.join(process.cwd(), 'public', 'uploads', 'entertainment-thumbnails')
 const THUMB_URL_PREFIX = '/uploads/entertainment-thumbnails/'
-const CONTENT_TYPES = ['webview', 'media_player', 'm3u_player'] as const
+const CONTENT_TYPES = ['webview', 'media_player', 'm3u_player', 'm3u_playlist'] as const
 
 export async function saveEntertainmentItemAction(formData: FormData) {
   const id = parseInt((formData.get('itemId') as string) || '', 10)

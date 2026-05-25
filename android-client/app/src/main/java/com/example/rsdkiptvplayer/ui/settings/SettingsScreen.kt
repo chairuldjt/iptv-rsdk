@@ -13,7 +13,9 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import kotlinx.coroutines.launch
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -36,8 +38,10 @@ import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -51,6 +55,7 @@ import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.ui.text.style.TextAlign
 import com.example.rsdkiptvplayer.ui.components.PinGridButton
+import com.example.rsdkiptvplayer.ui.components.RemoteKeyboardDialog
 
 private fun remoteDigitFromKey(key: Key): String? = when (key) {
     Key.Zero -> "0"
@@ -234,176 +239,18 @@ private fun RemoteTextKeyboardDialog(
     onCommit: (String) -> Unit,
     onDismiss: () -> Unit
 ) {
-    var text by remember(initialValue) { mutableStateOf(initialValue) }
-    var shift by remember { mutableStateOf(false) }
-    val firstKeyFocusRequester = remember { FocusRequester() }
-    val keys = remember(shift) {
-        val letters = listOf("qwertyuiop", "asdfghjkl", "zxcvbnm")
-            .flatMap { row -> row.map { if (shift) it.uppercaseChar().toString() else it.toString() } }
-        letters + listOf("0", "1", "2", "3", "4", "5", "6", "7", "8", "9", ".", "-", "_", "/", "\\", ":", "@")
-    }
-
-    LaunchedEffect(Unit) {
-        firstKeyFocusRequester.requestFocus()
-    }
-
-    Dialog(onDismissRequest = onDismiss) {
-        Card(
-            modifier = Modifier
-                .widthIn(min = 520.dp, max = 760.dp)
-                .wrapContentHeight()
-                .border(1.dp, Color(0xFF334155), RoundedCornerShape(20.dp))
-                .onPreviewKeyEvent { keyEvent ->
-                    if (keyEvent.type != KeyEventType.KeyDown) {
-                        return@onPreviewKeyEvent false
-                    }
-
-                    when (keyEvent.key) {
-                        Key.Backspace -> {
-                            text = text.dropLast(1)
-                            true
-                        }
-                        else -> remoteDigitFromKey(keyEvent.key)?.let {
-                            text += it
-                            true
-                        } ?: false
-                    }
-                },
-            shape = RoundedCornerShape(20.dp),
-            colors = CardDefaults.cardColors(containerColor = Color(0xF20F172A))
-        ) {
-            Column(
-                modifier = Modifier.padding(22.dp),
-                verticalArrangement = Arrangement.spacedBy(14.dp)
-            ) {
-                Text(title, color = Color.White, fontWeight = FontWeight.Bold, fontSize = 18.sp)
-
-                Surface(
-                    modifier = Modifier.fillMaxWidth().heightIn(min = 54.dp),
-                    shape = RoundedCornerShape(10.dp),
-                    color = Color(0xFF020617),
-                    border = BorderStroke(1.dp, Color(0xFF334155))
-                ) {
-                    Text(
-                        text = if (obscureText && text.isNotEmpty()) "*".repeat(text.length) else text.ifBlank { " " },
-                        color = Color.White,
-                        fontSize = 18.sp,
-                        modifier = Modifier.padding(horizontal = 14.dp, vertical = 14.dp),
-                        maxLines = 1
-                    )
-                }
-
-                LazyVerticalGrid(
-                    columns = GridCells.Fixed(10),
-                    userScrollEnabled = false,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp),
-                    modifier = Modifier.height(224.dp)
-                ) {
-                    items(keys.size) { index ->
-                        RemoteKeyboardKey(
-                            text = keys[index],
-                            modifier = if (index == 0) Modifier.focusRequester(firstKeyFocusRequester) else Modifier
-                        ) {
-                            text += keys[index]
-                        }
-                    }
-                }
-
-                Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
-                    Button(
-                        onClick = { shift = !shift },
-                        colors = ButtonDefaults.buttonColors(containerColor = if (shift) Color(0xFF6366F1) else Color(0xFF334155)),
-                        shape = RoundedCornerShape(10.dp),
-                        modifier = Modifier.weight(1f).height(48.dp).settingsFocusGlow()
-                    ) { Text("Shift") }
-
-                    Button(
-                        onClick = { text += " " },
-                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF334155)),
-                        shape = RoundedCornerShape(10.dp),
-                        modifier = Modifier.weight(1f).height(48.dp).settingsFocusGlow()
-                    ) { Text("Spasi") }
-
-                    Button(
-                        onClick = { text = text.dropLast(1) },
-                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF475569)),
-                        shape = RoundedCornerShape(10.dp),
-                        modifier = Modifier.weight(1f).height(48.dp).settingsFocusGlow()
-                    ) { Text("Hapus") }
-
-                    OutlinedButton(
-                        onClick = onDismiss,
-                        colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.White),
-                        border = BorderStroke(1.dp, Color(0xFF475569)),
-                        shape = RoundedCornerShape(10.dp),
-                        modifier = Modifier.weight(1f).height(48.dp).settingsFocusGlow()
-                    ) { Text("Batal") }
-
-                    Button(
-                        onClick = { onCommit(text) },
-                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF10B981)),
-                        shape = RoundedCornerShape(10.dp),
-                        modifier = Modifier.weight(1f).height(48.dp).settingsFocusGlow()
-                    ) { Text("Selesai") }
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun RemoteKeyboardKey(
-    text: String,
-    modifier: Modifier = Modifier,
-    onClick: () -> Unit
-) {
-    var isFocused by remember { mutableStateOf(false) }
-
-    Box(
-        contentAlignment = Alignment.Center,
-        modifier = modifier
-            .onFocusChanged { isFocused = it.isFocused }
-            .onPreviewKeyEvent { keyEvent ->
-                if (keyEvent.type == KeyEventType.KeyDown &&
-                    (keyEvent.key == Key.DirectionCenter || keyEvent.key == Key.Enter)
-                ) {
-                    onClick()
-                    true
-                } else {
-                    false
-                }
-            }
-            .focusable()
-            .shadow(
-                elevation = if (isFocused) 30.dp else 0.dp,
-                shape = RoundedCornerShape(8.dp),
-                ambientColor = Color.White.copy(alpha = if (isFocused) 1f else 0f),
-                spotColor = Color.White.copy(alpha = if (isFocused) 1f else 0f)
-            )
-            .scale(if (isFocused) 1.06f else 1f)
-            .height(38.dp)
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(8.dp))
-            .background(if (isFocused) Color(0xFF6366F1) else Color(0xFF1E293B))
-            .border(
-                BorderStroke(
-                    width = if (isFocused) 4.dp else 1.dp,
-                    color = if (isFocused) Color.White else Color(0xFF334155)
-                ),
-                RoundedCornerShape(8.dp)
-            )
-            .clickable(onClick = onClick)
-    ) {
-        Text(
-            text = text,
-            fontSize = 16.sp,
-            fontWeight = FontWeight.Bold,
-            color = Color.White,
-            textAlign = TextAlign.Center,
-            maxLines = 1
-        )
-    }
+    RemoteKeyboardDialog(
+        title = title,
+        helperText = "Navigasi dengan D-pad. Tombol angka remote bisa dipakai langsung. Backspace untuk hapus cepat.",
+        initialValue = initialValue,
+        onCommit = onCommit,
+        onDismiss = onDismiss,
+        obscureText = obscureText,
+        maxLength = 160,
+        keyboardTitle = "",
+        blankPreviewText = "Tekan tombol huruf, angka, atau pilih dari keyboard",
+        clearLabel = "Clear"
+    )
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -415,6 +262,11 @@ fun SettingsScreen(
 ) {
     val context = LocalContext.current
     val focusManager = LocalFocusManager.current
+    val configuration = LocalConfiguration.current
+    val screenWidth = configuration.screenWidthDp
+    val screenHeight = configuration.screenHeightDp
+    val isSmallScreen = screenWidth < 760 || screenHeight < 500
+    val isCompactHeight = screenHeight < 450
     val deviceId by viewModel.deviceId.collectAsState()
     val serverUrl by viewModel.serverUrl.collectAsState()
     val serverApiEnabled by viewModel.serverApiEnabled.collectAsState()
@@ -446,6 +298,8 @@ fun SettingsScreen(
     var inputEducationSource by remember { mutableStateOf("smb") }
     var inputEducationPlaybackMode by remember { mutableStateOf("copy") }
     var isTextInputFocused by remember { mutableStateOf(false) }
+    val sidebarListState = rememberLazyListState()
+    val coroutineScope = rememberCoroutineScope()
 
     var isUnlockedSession by remember { mutableStateOf(false) }
     var enteredPin by remember { mutableStateOf("") }
@@ -542,11 +396,17 @@ fun SettingsScreen(
     fun moveSidebarFocus(delta: Int) {
         focusedMenuIdx = (focusedMenuIdx + delta).coerceIn(menus.indices)
         menuFocusRequesters[focusedMenuIdx].requestFocus()
+        coroutineScope.launch {
+            sidebarListState.animateScrollToItem(focusedMenuIdx)
+        }
     }
 
     fun selectFocusedMenu() {
         activeMenuIdx = focusedMenuIdx
         menuFocusRequesters[focusedMenuIdx].requestFocus()
+        coroutineScope.launch {
+            sidebarListState.animateScrollToItem(focusedMenuIdx)
+        }
     }
 
     Box(
@@ -588,47 +448,47 @@ fun SettingsScreen(
             ) {
                 Card(
                     modifier = Modifier
-                        .width(420.dp)
+                        .width(if (isSmallScreen) 330.dp else 420.dp)
                         .wrapContentHeight()
-                        .border(1.dp, SettingsAccent.copy(alpha = 0.30f), RoundedCornerShape(28.dp)),
-                    shape = RoundedCornerShape(28.dp),
+                        .border(1.dp, SettingsAccent.copy(alpha = 0.30f), RoundedCornerShape(if (isSmallScreen) 16.dp else 28.dp)),
+                    shape = RoundedCornerShape(if (isSmallScreen) 16.dp else 28.dp),
                     colors = CardDefaults.cardColors(containerColor = Color(0xE607111D))
                 ) {
                     Column(
                         modifier = Modifier
-                            .padding(32.dp)
+                            .padding(if (isSmallScreen) 16.dp else 32.dp)
                             .fillMaxWidth(),
                         horizontalAlignment = Alignment.CenterHorizontally
                     ) {
                         if (!showPinKeypad) {
                             Box(
                                 modifier = Modifier
-                                    .size(86.dp)
-                                    .clip(RoundedCornerShape(22.dp))
+                                    .size(if (isSmallScreen) 54.dp else 86.dp)
+                                    .clip(RoundedCornerShape(if (isSmallScreen) 14.dp else 22.dp))
                                     .background(SettingsAccent.copy(alpha = 0.12f))
-                                    .border(1.dp, SettingsAccent.copy(alpha = 0.36f), RoundedCornerShape(22.dp)),
+                                    .border(1.dp, SettingsAccent.copy(alpha = 0.36f), RoundedCornerShape(if (isSmallScreen) 14.dp else 22.dp)),
                                 contentAlignment = Alignment.Center
                             ) {
                                 Icon(
                                     painter = painterResource(id = R.drawable.ic_home_settings),
                                     contentDescription = null,
                                     tint = Color.White,
-                                    modifier = Modifier.size(42.dp)
+                                    modifier = Modifier.size(if (isSmallScreen) 26.dp else 42.dp)
                                 )
                             }
-                            Spacer(modifier = Modifier.height(18.dp))
+                            Spacer(modifier = Modifier.height(if (isSmallScreen) 10.dp else 18.dp))
                             Text(
                                 text = "AKSES TEKNISI",
-                                fontSize = 22.sp,
+                                fontSize = if (isSmallScreen) 16.sp else 22.sp,
                                 fontWeight = FontWeight.ExtraBold,
                                 color = Color.White
                             )
                             Text(
                                 text = "Masukkan PIN untuk membuka konfigurasi perangkat.",
-                                fontSize = 14.sp,
+                                fontSize = if (isSmallScreen) 11.sp else 14.sp,
                                 color = Color(0xFF94A3B8),
                                 textAlign = TextAlign.Center,
-                                modifier = Modifier.padding(top = 8.dp, bottom = 28.dp)
+                                modifier = Modifier.padding(top = if (isSmallScreen) 4.dp else 8.dp, bottom = if (isSmallScreen) 14.dp else 28.dp)
                             )
 
                             Button(
@@ -637,14 +497,14 @@ fun SettingsScreen(
                                 shape = RoundedCornerShape(12.dp),
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .height(54.dp)
+                                    .height(if (isSmallScreen) 42.dp else 54.dp)
                                     .settingsFocusGlow(RoundedCornerShape(12.dp))
                                     .focusRequester(firstButtonFocusRequester)
                             ) {
-                                Text("BUKA KUNCI", fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                                Text("BUKA KUNCI", fontWeight = FontWeight.Bold, fontSize = if (isSmallScreen) 13.sp else 16.sp)
                             }
 
-                            Spacer(modifier = Modifier.height(12.dp))
+                            Spacer(modifier = Modifier.height(if (isSmallScreen) 8.dp else 12.dp))
 
                             OutlinedButton(
                                 onClick = onBack,
@@ -653,24 +513,24 @@ fun SettingsScreen(
                                 shape = RoundedCornerShape(12.dp),
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .height(54.dp)
+                                    .height(if (isSmallScreen) 42.dp else 54.dp)
                                     .settingsFocusGlow(RoundedCornerShape(12.dp))
                             ) {
-                                Text("Kembali")
+                                Text("Kembali", fontSize = if (isSmallScreen) 13.sp else 16.sp)
                             }
                         } else {
                             // PIN Input UI
                             Text(
                                 text = "MASUKKAN PIN TEKNISI",
-                                fontSize = 18.sp,
+                                fontSize = if (isSmallScreen) 14.sp else 18.sp,
                                 fontWeight = FontWeight.Bold,
                                 color = Color.White
                             )
                             Text(
                                 text = "Masukkan PIN untuk akses penuh",
-                                fontSize = 12.sp,
+                                fontSize = if (isSmallScreen) 10.sp else 12.sp,
                                 color = Color(0xFF94A3B8),
-                                modifier = Modifier.padding(top = 4.dp, bottom = 20.dp)
+                                modifier = Modifier.padding(top = 4.dp, bottom = if (isSmallScreen) 10.dp else 20.dp)
                             )
 
                             LaunchedEffect(showPinKeypad) {
@@ -680,44 +540,44 @@ fun SettingsScreen(
                             }
 
                             Row(
-                                horizontalArrangement = Arrangement.spacedBy(10.dp, Alignment.CenterHorizontally),
+                                horizontalArrangement = Arrangement.spacedBy(if (isSmallScreen) 6.dp else 10.dp, Alignment.CenterHorizontally),
                                 modifier = Modifier.fillMaxWidth()
                             ) {
                                 repeat(pinLength) { index ->
                                     Box(
                                         modifier = Modifier
-                                            .size(46.dp)
-                                            .clip(RoundedCornerShape(10.dp))
+                                            .size(if (isSmallScreen) 36.dp else 46.dp)
+                                            .clip(RoundedCornerShape(if (isSmallScreen) 6.dp else 10.dp))
                                             .background(Color(0xFF0F172A))
                                             .border(
                                                 BorderStroke(
                                                     2.dp,
                                                     if (index == enteredPin.length) SettingsAccent else Color.White.copy(alpha = 0.18f)
                                                 ),
-                                                RoundedCornerShape(10.dp)
+                                                RoundedCornerShape(if (isSmallScreen) 6.dp else 10.dp)
                                             ),
                                         contentAlignment = Alignment.Center
                                     ) {
                                         Text(
                                             text = if (index < enteredPin.length) "*" else "",
                                             color = Color.White,
-                                            fontSize = 22.sp,
+                                            fontSize = if (isSmallScreen) 16.sp else 22.sp,
                                             fontWeight = FontWeight.Bold
                                         )
                                     }
                                 }
                             }
 
-                            Spacer(modifier = Modifier.height(16.dp))
+                            Spacer(modifier = Modifier.height(if (isSmallScreen) 10.dp else 16.dp))
 
                             LazyVerticalGrid(
                                 columns = GridCells.Fixed(3),
                                 userScrollEnabled = false,
-                                horizontalArrangement = Arrangement.spacedBy(10.dp),
-                                verticalArrangement = Arrangement.spacedBy(10.dp),
+                                horizontalArrangement = Arrangement.spacedBy(if (isSmallScreen) 6.dp else 10.dp),
+                                verticalArrangement = Arrangement.spacedBy(if (isSmallScreen) 6.dp else 10.dp),
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .height(260.dp)
+                                    .height(if (isSmallScreen) 185.dp else 260.dp)
                                     .onPreviewKeyEvent { keyEvent ->
                                         if (keyEvent.type != KeyEventType.KeyDown) {
                                             return@onPreviewKeyEvent false
@@ -752,13 +612,13 @@ fun SettingsScreen(
                             }
 
                             if (pinError) {
-                                Spacer(modifier = Modifier.height(10.dp))
+                                Spacer(modifier = Modifier.height(if (isSmallScreen) 6.dp else 10.dp))
                                 Text(
                                     text = "PIN salah! Silakan coba lagi.",
                                     color = Color(0xFFEF4444),
-                                    fontSize = 12.sp,
+                                    fontSize = 11.sp,
                                     fontWeight = FontWeight.SemiBold,
-                                    modifier = Modifier.padding(bottom = 12.dp)
+                                    modifier = Modifier.padding(bottom = if (isSmallScreen) 6.dp else 12.dp)
                                 )
                             }
 
@@ -823,11 +683,12 @@ fun SettingsScreen(
                     border = BorderStroke(1.dp, Color.White.copy(alpha = 0.12f))
                 ) {
                     LazyColumn(
+                        state = sidebarListState,
                         modifier = Modifier
                             .fillMaxSize()
                             .onPreviewKeyEvent { keyEvent ->
                                 if (keyEvent.type != KeyEventType.KeyDown) {
-                                    return@onPreviewKeyEvent false
+                                     return@onPreviewKeyEvent false
                                 }
 
                                 when (keyEvent.key) {
@@ -846,8 +707,8 @@ fun SettingsScreen(
                                     else -> false
                                 }
                             }
-                            .padding(10.dp),
-                        verticalArrangement = Arrangement.spacedBy(6.dp)
+                            .padding(if (isSmallScreen) 6.dp else 10.dp),
+                        verticalArrangement = Arrangement.spacedBy(if (isSmallScreen) 4.dp else 6.dp)
                     ) {
                         itemsIndexed(menus) { index, item ->
                             val isSelected = index == activeMenuIdx
@@ -857,9 +718,9 @@ fun SettingsScreen(
                             Box(
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .padding(vertical = if (isFocused) 2.dp else 0.dp)
+                                    .padding(vertical = if (isFocused) (if (isSmallScreen) 1.dp else 2.dp) else 0.dp)
                                     .shadow(
-                                        elevation = if (isFocused) 34.dp else 0.dp,
+                                        elevation = if (isFocused) (if (isSmallScreen) 16.dp else 34.dp) else 0.dp,
                                         shape = RoundedCornerShape(14.dp),
                                         ambientColor = Color.White.copy(alpha = if (isFocused) 1f else 0f),
                                         spotColor = Color.White.copy(alpha = if (isFocused) 1f else 0f)
@@ -868,12 +729,12 @@ fun SettingsScreen(
                                     .background(if (isFocused) SettingsAccent.copy(alpha = 0.14f) else Color.Transparent)
                                     .border(
                                         BorderStroke(
-                                            if (isFocused) 4.dp else 0.dp,
+                                            if (isFocused) (if (isSmallScreen) 2.dp else 4.dp) else 0.dp,
                                             if (isFocused) Color.White else Color.Transparent
                                         ),
                                         shape = RoundedCornerShape(14.dp)
                                     )
-                                    .padding(if (isFocused) 3.dp else 0.dp)
+                                    .padding(if (isFocused) (if (isSmallScreen) 1.5.dp else 3.dp) else 0.dp)
                             ) {
                                 Row(
                                     modifier = Modifier
@@ -905,7 +766,10 @@ fun SettingsScreen(
                                                 focusedMenuIdx = index
                                             }
                                         }
-                                        .padding(horizontal = 14.dp, vertical = 10.dp),
+                                        .padding(
+                                            horizontal = if (isSmallScreen) 10.dp else 14.dp,
+                                            vertical = if (isSmallScreen) 6.dp else 10.dp
+                                        ),
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
                                     Text(
@@ -914,7 +778,7 @@ fun SettingsScreen(
                                         else if (isSelected) Color.White
                                         else Color(0xFF94A3B8),
                                         fontWeight = if (isSelected || isFocused) FontWeight.ExtraBold else FontWeight.Medium,
-                                        fontSize = 14.sp
+                                        fontSize = if (isSmallScreen) 12.sp else 14.sp
                                     )
                                 }
                             }
@@ -1071,6 +935,9 @@ fun ConnectionServerPane(
     isTesting: Boolean,
     onInputFocusChanged: (Boolean) -> Unit
 ) {
+    val configuration = LocalConfiguration.current
+    val isSmallWidth = configuration.screenWidthDp < 680
+
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -1099,6 +966,7 @@ fun ConnectionServerPane(
             }
             
             var isFocused by remember { mutableStateOf(false) }
+            var isFocusedBorder by remember { mutableStateOf(false) }
             Switch(
                 checked = serverApiEnabled,
                 onCheckedChange = onServerApiEnabledChange,
@@ -1130,38 +998,76 @@ fun ConnectionServerPane(
                 onFocusChanged = onInputFocusChanged
             )
 
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                Button(
-                    onClick = onSave,
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = Color(0xFF6366F1)
-                    ),
-                    modifier = Modifier.settingsFocusGlow()
+            if (isSmallWidth) {
+                Column(
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                    modifier = Modifier.fillMaxWidth()
                 ) {
-                    Text("Simpan URL")
-                }
+                    Button(
+                        onClick = onSave,
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = Color(0xFF6366F1)
+                        ),
+                        modifier = Modifier.fillMaxWidth().settingsFocusGlow()
+                    ) {
+                        Text("Simpan URL")
+                    }
 
-                OutlinedButton(
-                    onClick = onRestore,
-                    colors = ButtonDefaults.outlinedButtonColors(
-                        contentColor = Color.White
-                    ),
-                    border = BorderStroke(1.dp, Color(0xFF334155)),
-                    modifier = Modifier.settingsFocusGlow()
-                ) {
-                    Text("Restore Default")
+                    OutlinedButton(
+                        onClick = onRestore,
+                        colors = ButtonDefaults.outlinedButtonColors(
+                            contentColor = Color.White
+                        ),
+                        border = BorderStroke(1.dp, Color(0xFF334155)),
+                        modifier = Modifier.fillMaxWidth().settingsFocusGlow()
+                    ) {
+                        Text("Restore Default")
+                    }
+                    
+                    Button(
+                        onClick = onTest,
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = Color(0xFF10B981)
+                        ),
+                        modifier = Modifier.fillMaxWidth().settingsFocusGlow()
+                    ) {
+                        Text(if (isTesting) "Menguji..." else "Uji Koneksi")
+                    }
                 }
-                
-                Button(
-                    onClick = onTest,
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = Color(0xFF10B981)
-                    ),
-                    modifier = Modifier.settingsFocusGlow()
+            } else {
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
-                    Text(if (isTesting) "Menguji..." else "Uji Koneksi Server")
+                    Button(
+                        onClick = onSave,
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = Color(0xFF6366F1)
+                        ),
+                        modifier = Modifier.settingsFocusGlow()
+                    ) {
+                        Text("Simpan URL")
+                    }
+
+                    OutlinedButton(
+                        onClick = onRestore,
+                        colors = ButtonDefaults.outlinedButtonColors(
+                            contentColor = Color.White
+                        ),
+                        border = BorderStroke(1.dp, Color(0xFF334155)),
+                        modifier = Modifier.settingsFocusGlow()
+                    ) {
+                        Text("Restore Default")
+                    }
+                    
+                    Button(
+                        onClick = onTest,
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = Color(0xFF10B981)
+                        ),
+                        modifier = Modifier.settingsFocusGlow()
+                    ) {
+                        Text(if (isTesting) "Menguji..." else "Uji Koneksi Server")
+                    }
                 }
             }
 
@@ -1203,33 +1109,66 @@ fun DiagnosticLogsPane(
     onClear: () -> Unit,
     onForceSync: () -> Unit
 ) {
+    val configuration = LocalConfiguration.current
+    val isSmallWidth = configuration.screenWidthDp < 680
+
     Column(
         modifier = Modifier.fillMaxSize(),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Text("Diagnostik & Log Aktivitas", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = Color.White)
-            
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Button(
-                    onClick = onForceSync,
-                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF6366F1)),
-                    modifier = Modifier.settingsFocusGlow()
+        if (isSmallWidth) {
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Text("Diagnostik & Log Aktivitas", fontSize = 15.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    Text("Sync Manual", fontSize = 12.sp)
-                }
+                    Button(
+                        onClick = onForceSync,
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF6366F1)),
+                        modifier = Modifier.weight(1f).settingsFocusGlow()
+                    ) {
+                        Text("Sync Manual", fontSize = 11.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    }
 
-                OutlinedButton(
-                    onClick = onClear,
-                    colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.White),
-                    border = BorderStroke(1.dp, Color(0xFF334155)),
-                    modifier = Modifier.settingsFocusGlow()
-                ) {
-                    Text("Hapus Log", fontSize = 12.sp)
+                    OutlinedButton(
+                        onClick = onClear,
+                        colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.White),
+                        border = BorderStroke(1.dp, Color(0xFF334155)),
+                        modifier = Modifier.weight(1f).settingsFocusGlow()
+                    ) {
+                        Text("Hapus Log", fontSize = 11.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    }
+                }
+            }
+        } else {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text("Diagnostik & Log Aktivitas", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Button(
+                        onClick = onForceSync,
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF6366F1)),
+                        modifier = Modifier.settingsFocusGlow()
+                    ) {
+                        Text("Sync Manual", fontSize = 12.sp)
+                    }
+
+                    OutlinedButton(
+                        onClick = onClear,
+                        colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.White),
+                        border = BorderStroke(1.dp, Color(0xFF334155)),
+                        modifier = Modifier.settingsFocusGlow()
+                    ) {
+                        Text("Hapus Log", fontSize = 12.sp)
+                    }
                 }
             }
         }
@@ -1447,6 +1386,9 @@ fun EducationContentPane(
     onInputFocusChanged: (Boolean) -> Unit,
     onSave: () -> Unit
 ) {
+    val configuration = LocalConfiguration.current
+    val isSmallWidth = configuration.screenWidthDp < 680
+
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -1523,15 +1465,12 @@ fun EducationContentPane(
 
             Text("Login SMB / Windows Share", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 13.sp)
 
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(10.dp),
-                modifier = Modifier.fillMaxWidth()
-            ) {
+            if (isSmallWidth) {
                 SettingsOutlinedTextField(
                     value = inputUsername,
                     onValueChange = onUsernameChange,
                     label = "Username / kosongkan untuk guest",
-                    modifier = Modifier.weight(1f),
+                    modifier = Modifier.fillMaxWidth(),
                     onFocusChanged = onInputFocusChanged
                 )
 
@@ -1539,9 +1478,30 @@ fun EducationContentPane(
                     value = inputDomain,
                     onValueChange = onDomainChange,
                     label = "Domain / WORKGROUP",
-                    modifier = Modifier.weight(0.75f),
+                    modifier = Modifier.fillMaxWidth(),
                     onFocusChanged = onInputFocusChanged
                 )
+            } else {
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    SettingsOutlinedTextField(
+                        value = inputUsername,
+                        onValueChange = onUsernameChange,
+                        label = "Username / kosongkan untuk guest",
+                        modifier = Modifier.weight(1f),
+                        onFocusChanged = onInputFocusChanged
+                    )
+
+                    SettingsOutlinedTextField(
+                        value = inputDomain,
+                        onValueChange = onDomainChange,
+                        label = "Domain / WORKGROUP",
+                        modifier = Modifier.weight(0.75f),
+                        onFocusChanged = onInputFocusChanged
+                    )
+                }
             }
 
             SettingsOutlinedTextField(
@@ -1610,6 +1570,9 @@ fun CustomM3uPane(
     isSyncing: Boolean,
     onInputFocusChanged: (Boolean) -> Unit
 ) {
+    val configuration = LocalConfiguration.current
+    val isSmallWidth = configuration.screenWidthDp < 680
+
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -1626,25 +1589,53 @@ fun CustomM3uPane(
 
         // Sync Mode Selector
         Text("Pilih Sumber Playlist", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 14.sp)
-        Row(
-            horizontalArrangement = Arrangement.spacedBy(12.dp)
-        ) {
-            val modes = listOf("api" to "API Server (Terpusat)", "custom" to "Playlist M3U Kustom")
-            modes.forEach { (modeKey, modeLabel) ->
-                val isSelected = syncMode == modeKey
-                var isFocused by remember { mutableStateOf(false) }
+        
+        if (isSmallWidth) {
+            Column(
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                val modes = listOf("api" to "API Server (Terpusat)", "custom" to "Playlist M3U Kustom")
+                modes.forEach { (modeKey, modeLabel) ->
+                    val isSelected = syncMode == modeKey
+                    var isFocused by remember { mutableStateOf(false) }
 
-                Button(
-                    onClick = { onSaveMode(modeKey) },
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = if (isSelected) Color(0xFF6366F1) else if (isFocused) Color(0xFF334155) else Color(0xFF1E293B)
-                    ),
-                    border = BorderStroke(1.dp, if (isFocused) Color(0xFF6366F1) else Color(0xFF334155)),
-                    modifier = Modifier
-                        .settingsFocusGlow()
-                        .onFocusChanged { isFocused = it.isFocused }
-                ) {
-                    Text(modeLabel)
+                    Button(
+                        onClick = { onSaveMode(modeKey) },
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = if (isSelected) Color(0xFF6366F1) else if (isFocused) Color(0xFF334155) else Color(0xFF1E293B)
+                        ),
+                        border = BorderStroke(1.dp, if (isFocused) Color(0xFF6366F1) else Color(0xFF334155)),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .settingsFocusGlow()
+                            .onFocusChanged { isFocused = it.isFocused }
+                    ) {
+                        Text(modeLabel)
+                    }
+                }
+            }
+        } else {
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                val modes = listOf("api" to "API Server (Terpusat)", "custom" to "Playlist M3U Kustom")
+                modes.forEach { (modeKey, modeLabel) ->
+                    val isSelected = syncMode == modeKey
+                    var isFocused by remember { mutableStateOf(false) }
+
+                    Button(
+                        onClick = { onSaveMode(modeKey) },
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = if (isSelected) Color(0xFF6366F1) else if (isFocused) Color(0xFF334155) else Color(0xFF1E293B)
+                        ),
+                        border = BorderStroke(1.dp, if (isFocused) Color(0xFF6366F1) else Color(0xFF334155)),
+                        modifier = Modifier
+                            .settingsFocusGlow()
+                            .onFocusChanged { isFocused = it.isFocused }
+                    ) {
+                        Text(modeLabel)
+                    }
                 }
             }
         }
@@ -1663,18 +1654,31 @@ fun CustomM3uPane(
                 onFocusChanged = onInputFocusChanged
             )
 
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
+            if (isSmallWidth) {
                 Button(
                     onClick = {
                         onSaveUrl()
                         onSync()
                     },
                     colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF10B981)),
-                    modifier = Modifier.settingsFocusGlow()
+                    modifier = Modifier.fillMaxWidth().settingsFocusGlow()
                 ) {
                     Text(if (isSyncing) "Mensinkronkan..." else "Simpan & Sinkronisasi Playlist")
+                }
+            } else {
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    Button(
+                        onClick = {
+                            onSaveUrl()
+                            onSync()
+                        },
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF10B981)),
+                        modifier = Modifier.settingsFocusGlow()
+                    ) {
+                        Text(if (isSyncing) "Mensinkronkan..." else "Simpan & Sinkronisasi Playlist")
+                    }
                 }
             }
 

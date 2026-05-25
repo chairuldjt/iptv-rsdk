@@ -11,11 +11,22 @@ Beberapa nilai default tertanam di dalam kode untuk mendukung fitur **Auto-Activ
 ### A. Default API Server URL
 Alamat server backend utama yang akan dihubungi aplikasi saat pertama kali dijalankan.
 - **Lokasi File**: `android-client/app/build.gradle.kts`
+- **Env Android yang dipakai**:
+  ```env
+  DEFAULT_API_BASE_URL=https://iptv.teknisirsdk.my.id
+  ```
+- **Lokasi Env**: `.env` root proyek
 - **Kode**:
   ```kotlin
-  buildConfigField("String", "DEFAULT_API_BASE_URL", "\"https://iptv.teknisirsdk.my.id\"")
+  val defaultApiBaseUrl = optionalRootEnv("DEFAULT_API_BASE_URL")
+      ?: "https://iptv.teknisirsdk.my.id"
+
+  buildConfigField("String", "DEFAULT_API_BASE_URL", "\"$defaultApiBaseUrl\"")
   ```
-- **Catatan**: Ubah value tersebut sebelum build APK jika deployment memakai server lain. Untuk server lokal, gunakan IP yang bisa dijangkau STB, misalnya `http://10.55.1.5:9000`, bukan `localhost`.
+- **Catatan**:
+  - Isi di `.env` root proyek atau environment variable shell sebelum build.
+  - Untuk server lokal, gunakan IP/hostname yang bisa dijangkau STB, misalnya `http://10.55.1.5:9000`, bukan `localhost`.
+  - Nilai ini menjadi fallback BuildConfig. Setelah app terpasang, teknisi masih bisa override URL server dari Settings di STB.
 
 ### B. Default M3U Custom URL
 Jika aplikasi digunakan dalam mode M3U (bukan mode API Server), Anda bisa menyetel URL playlist default.
@@ -39,9 +50,55 @@ Menentukan apakah APK bawaan langsung mencari playlist dari Server API atau dari
   // Jika ingin default langsung pakai API Server:
   prefs[SYNC_MODE] ?: "api"
   ```
-- **Catatan**: Walaupun default-nya `custom`, Android tetap melakukan config sync ke Web Admin. Jadi admin masih bisa mengubah device ke `API Server` dari remote config.
+- **Pilihan value yang valid di sistem**:
+  - `api` = channel diambil dari global playlist backend apa adanya.
+  - `api_relay` = channel diambil dari global playlist backend, tetapi URL stream diarahkan ke HLS relay server. Ini cocok untuk UDP multicast, browser dashboard, atau client yang tidak satu VLAN dengan sumber IPTV.
+  - `custom` = device mengabaikan global playlist dan memakai `customM3uUrl` miliknya sendiri.
+- **Catatan penting**: APK Android bawaan saat ini tetap fallback ke `custom` di sisi client lokal (`DEFAULT_SYNC_MODE` di `src/lib/defaults.ts` untuk web/backend juga `custom`), tetapi perangkat baru yang register ke backend akan mengikuti `IPTV_DEFAULT_SYNC_MODE` atau nilai yang disimpan di dashboard **Setup Defaults**. Jadi bila `.env` backend Anda diisi `api_relay`, device baru akan menerima mode itu saat sync config pertama.
 
-### D. Default Status Koneksi Server API (Enabled / Disabled)
+### D. Nilai Env Device Default yang Valid
+Nilai di bawah ini dibaca backend dari `.env` root proyek saat belum ada override dari dashboard **Setup Defaults**.
+
+```env
+IPTV_DEFAULT_SYNC_MODE="api_relay"
+IPTV_DEFAULT_CUSTOM_M3U_URL="http://10.0.0.1/iptv/iptv_rsdk.m3u"
+IPTV_DEFAULT_ASPECT_RATIO="fit"
+IPTV_DEFAULT_SYNC_INTERVAL="1800"
+IPTV_DEFAULT_START_SCREEN="home_screen"
+IPTV_DEFAULT_CATEGORY="Semua"
+IPTV_DEFAULT_CHANNEL_ID=""
+IPTV_DEFAULT_LOCK_SETTINGS="true"
+IPTV_DEFAULT_AUTO_START_ON_BOOT="true"
+IPTV_DEFAULT_TECHNICIAN_PIN="2468"
+IPTV_DEFAULT_EDUCATION_VIDEO_PATH=""
+IPTV_DEFAULT_EDUCATION_SMB_USERNAME=""
+IPTV_DEFAULT_EDUCATION_SMB_PASSWORD=""
+IPTV_DEFAULT_EDUCATION_SMB_DOMAIN=""
+IPTV_DEFAULT_EDUCATION_REPEAT_MODE="all"
+IPTV_DEFAULT_EDUCATION_PLAY_ORDER="alphabetical"
+IPTV_DEFAULT_EDUCATION_SOURCE="smb"
+IPTV_DEFAULT_EDUCATION_PLAYBACK_MODE="copy"
+IPTV_HLS_RELAY_BASE_URL="http://10.55.1.5/relay"
+```
+
+Keterangan pilihan value:
+- `IPTV_DEFAULT_SYNC_MODE`: `api`, `api_relay`, `custom`
+- `IPTV_DEFAULT_ASPECT_RATIO`: `fit`, `stretch`, `zoom`, `16_9`, `4_3`
+- `IPTV_DEFAULT_START_SCREEN`: `live_tv`, `category_list`, `home_screen`
+- `IPTV_DEFAULT_LOCK_SETTINGS`: `true` / `false`
+- `IPTV_DEFAULT_AUTO_START_ON_BOOT`: `true` / `false`
+- `IPTV_DEFAULT_EDUCATION_REPEAT_MODE`: `all`, `one`, `none`
+- `IPTV_DEFAULT_EDUCATION_PLAY_ORDER`: `alphabetical`, `random`, `shuffle`
+- `IPTV_DEFAULT_EDUCATION_SOURCE`: `smb`, `web`
+- `IPTV_DEFAULT_EDUCATION_PLAYBACK_MODE`: `copy`, `stream`
+- `IPTV_DEFAULT_CHANNEL_ID`: kosongkan untuk `null`, atau isi ID channel numerik yang sudah ada di database
+
+- **Rekomendasi operasional**:
+  - Pakai `api_relay` jika sumber siaran banyak memakai UDP multicast atau stream yang hanya bisa dibaca server relay.
+  - Pakai `api` jika STB bisa mengakses stream asli secara langsung tanpa relay.
+  - Pakai `custom` jika tiap perangkat atau grup perangkat memakai URL M3U berbeda.
+
+### E. Default Status Koneksi Server API (Enabled / Disabled)
 Menentukan apakah saat pertama kali aplikasi diinstal, koneksi ke backend server langsung aktif atau tidak (offline).
 - **Lokasi File**: `android-client/app/src/main/java/com/example/rsdkiptvplayer/data/datastore/DataStoreManager.kt`
 - **Kode**:
@@ -60,7 +117,7 @@ Menentukan apakah saat pertama kali aplikasi diinstal, koneksi ke backend server
   private val _serverApiEnabled = MutableStateFlow(true) // Ubah ke false
   ```
 
-### E. Default Lock Settings & PIN Teknisi
+### F. Default Lock Settings & PIN Teknisi
 Menu Settings Android terkunci secara default untuk deployment STB.
 - **Default lock**: `true`
 - **Default PIN**: `2468`
@@ -81,6 +138,8 @@ SESSION_SECRET="isi-random-panjang-minimal-32-karakter"
 ```
 
 `SESSION_SECRET` wajib ada. Build akan gagal jika env ini kosong.
+
+Untuk default device config yang lebih lengkap, bisa mulai dari [`.env.example`](/e:/Project/xampp/htdocs/iptv-rsdk/.env.example).
 
 ### B. Deploy otomatis
 Setelah pull repo di server, jalankan:
@@ -115,29 +174,62 @@ KEYSTORE_KEY_PASSWORD=...
 
 `KEYSTORE_FILE` relatif terhadap folder `android-client`.
 
-### B. Build debug dan release
+Contoh lengkap env root ada di [`.env.example`](/e:/Project/xampp/htdocs/iptv-rsdk/.env.example), sedangkan contoh env signing release ada di [android-client/.env.example](/e:/Project/xampp/htdocs/iptv-rsdk/android-client/.env.example).
+
+### B. BuildConfig Android yang tertanam
+Saat ini APK Android membaca dua default penting dari `.env` root proyek atau environment variable:
+
+```env
+DEFAULT_API_BASE_URL=https://iptv.teknisirsdk.my.id
+HOME_LOW_EFFECT_MODE=true
+```
+
+Lalu nilainya ditanam ke `BuildConfig` lewat `android-client/app/build.gradle.kts`:
+
+```kotlin
+buildConfigField("String", "DEFAULT_API_BASE_URL", "\"$defaultApiBaseUrl\"")
+buildConfigField("boolean", "HOME_LOW_EFFECT_MODE", homeLowEffectMode.toString())
+```
+
+Arti masing-masing:
+- `DEFAULT_API_BASE_URL`: URL backend bawaan jika teknisi belum mengisi override server URL di STB.
+- `HOME_LOW_EFFECT_MODE`: `true` untuk animasi home yang lebih ringan, `false` untuk efek visual home yang lebih penuh.
+
+### C. Build debug dan release
 Jalankan perintah berikut dari direktori utama proyek:
 
 1. Masuk ke direktori client:
    ```powershell
    cd android-client
    ```
-2. Jalankan build debug untuk testing:
+2. Isi env root proyek untuk BuildConfig Android bila perlu:
+   ```env
+   DEFAULT_API_BASE_URL=http://10.55.1.5:9000
+   HOME_LOW_EFFECT_MODE=true
+   ```
+3. Isi `android-client/.env` untuk signing release:
+   ```env
+   KEYSTORE_FILE=app/keystore/rsdk-release.jks
+   KEYSTORE_STORE_PASSWORD=...
+   KEYSTORE_KEY_ALIAS=...
+   KEYSTORE_KEY_PASSWORD=...
+   ```
+4. Jalankan build debug untuk testing:
    ```powershell
    ./gradlew assembleDebug
    ```
-3. Jalankan build release untuk production:
+5. Jalankan build release untuk production:
    ```powershell
    ./gradlew assembleRelease
    ```
-4. File APK yang dihasilkan akan berada di:
+6. File APK yang dihasilkan akan berada di:
    `android-client/app/build/outputs/apk/debug/app-debug.apk`
    atau
    `android-client/app/build/outputs/apk/release/app-release.apk`
 
 Build release sudah mengaktifkan minify/resource shrink dan signing dari `android-client/.env`.
 
-### C. Upload OTA dari Web Admin
+### D. Upload OTA dari Web Admin
 Dashboard **Updates** membaca `versionCode` dan `versionName` langsung dari manifest APK di browser sebelum upload. APK yang di-upload disimpan sebagai **Draft** lebih dulu. Klik **Deploy Version** untuk menjadikannya versi OTA aktif.
 
 Hanya satu record `app_updates.isDeployed=true` yang dipakai endpoint update check. Update yang di-upload saat ini otomatis diset `isMandatory=true`.
@@ -165,11 +257,13 @@ Setelah APK berhasil di-build, Anda dapat menginstalnya ke STB atau Android TV m
 
 ## 📝 Ringkasan Lokasi Cepat
 - **Default API URL**: `android-client/app/build.gradle.kts`
+- **Env BuildConfig Android**: `.env` root proyek / `.env.example`
 - **Default M3U URL**: `DataStoreManager.kt`
 - **Default Playlist Source**: `DataStoreManager.kt`
+- **Default device env fallback**: `.env` root proyek / `.env.example`
 - **Default Server API Connection (Enabled/Disabled)**: `DataStoreManager.kt` & `SettingsViewModel.kt`
 - **Android versionCode/versionName**: otomatis dari Git di `android-client/app/build.gradle.kts`
-- **Release signing env**: `android-client/.env`
+- **Release signing env**: `android-client/.env` / `android-client/.env.example`
 - **PM2 Config**: `ecosystem.config.cjs`
 - **Deploy Script**: `deploy.sh`
 

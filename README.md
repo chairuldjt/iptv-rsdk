@@ -120,17 +120,17 @@ SESSION_SECRET="isi-random-panjang-minimal-32-karakter"
 Default konfigurasi untuk STB baru bisa diset lewat dashboard `Setup Defaults`. Jika belum ada nilai yang disimpan dari dashboard, backend akan memakai fallback dari `.env` berikut:
 
 ```env
-IPTV_DEFAULT_SYNC_MODE="custom"
+IPTV_DEFAULT_SYNC_MODE="api_relay"
 IPTV_DEFAULT_CUSTOM_M3U_URL="http://10.0.0.1/iptv/iptv_rsdk.m3u"
 IPTV_DEFAULT_ASPECT_RATIO="fit"
 IPTV_DEFAULT_SYNC_INTERVAL="1800"
-IPTV_DEFAULT_START_SCREEN="live_tv"
-IPTV_DEFAULT_CATEGORY="National TV"
+IPTV_DEFAULT_START_SCREEN="home_screen"
+IPTV_DEFAULT_CATEGORY="Semua"
 IPTV_DEFAULT_CHANNEL_ID=""
 IPTV_DEFAULT_LOCK_SETTINGS="true"
-IPTV_DEFAULT_AUTO_START_ON_BOOT="false"
+IPTV_DEFAULT_AUTO_START_ON_BOOT="true"
 IPTV_DEFAULT_TECHNICIAN_PIN="2468"
-IPTV_DEFAULT_EDUCATION_VIDEO_PATH="\\\\10.45.128.129\\edukasi"
+IPTV_DEFAULT_EDUCATION_VIDEO_PATH=""
 IPTV_DEFAULT_EDUCATION_SMB_USERNAME=""
 IPTV_DEFAULT_EDUCATION_SMB_PASSWORD=""
 IPTV_DEFAULT_EDUCATION_SMB_DOMAIN=""
@@ -138,7 +138,22 @@ IPTV_DEFAULT_EDUCATION_REPEAT_MODE="all"
 IPTV_DEFAULT_EDUCATION_PLAY_ORDER="alphabetical"
 IPTV_DEFAULT_EDUCATION_SOURCE="smb"
 IPTV_DEFAULT_EDUCATION_PLAYBACK_MODE="copy"
+IPTV_HLS_RELAY_BASE_URL="http://10.55.1.5/relay"
 ```
+
+Value penting yang valid:
+- `IPTV_DEFAULT_SYNC_MODE`: `api`, `api_relay`, `custom`
+- `IPTV_DEFAULT_ASPECT_RATIO`: `fit`, `stretch`, `zoom`, `16_9`, `4_3`
+- `IPTV_DEFAULT_START_SCREEN`: `live_tv`, `category_list`, `home_screen`
+- `IPTV_DEFAULT_EDUCATION_REPEAT_MODE`: `all`, `one`, `none`
+- `IPTV_DEFAULT_EDUCATION_PLAY_ORDER`: `alphabetical`, `random`, `shuffle`
+- `IPTV_DEFAULT_EDUCATION_SOURCE`: `smb`, `web`
+- `IPTV_DEFAULT_EDUCATION_PLAYBACK_MODE`: `copy`, `stream`
+
+Praktiknya:
+- `api` dipakai kalau STB bisa mengakses URL stream asli langsung.
+- `api_relay` dipakai kalau stream perlu diproxy/diubah dulu oleh relay server, terutama untuk UDP multicast.
+- `custom` dipakai kalau device harus memakai playlist M3U khusus.
 
 ### Relay IPTV UDP Multicast ke HLS (Mode Relay)
 
@@ -171,6 +186,23 @@ Jika menggunakan metode legacy ini, arahkan **HLS Relay Base URL** di dashboard 
 ## 📦 Build & OTA APK Ringkas
 
 Android client sekarang memakai satu package utama tanpa flavor update channel. `versionCode` diambil otomatis dari jumlah commit Git, sedangkan `versionName` dari `git describe --tags --always`. Build release membutuhkan signing env di `android-client/.env`.
+
+Contoh env release signing:
+
+```env
+DEFAULT_API_BASE_URL=http://10.55.1.5:9000
+HOME_LOW_EFFECT_MODE=true
+KEYSTORE_FILE=app/keystore/rsdk-release.jks
+KEYSTORE_STORE_PASSWORD=...
+KEYSTORE_KEY_ALIAS=rsdk-release
+KEYSTORE_KEY_PASSWORD=...
+```
+
+Keterangan:
+- `DEFAULT_API_BASE_URL` = base URL API bawaan yang ditanam ke APK saat build, disimpan di `.env` root proyek.
+- `HOME_LOW_EFFECT_MODE` = `true` untuk efek home lebih ringan, `false` untuk efek lebih penuh, juga disimpan di `.env` root proyek.
+- `KEYSTORE_*` = tetap disimpan di `android-client/.env` untuk kebutuhan signing release.
+- Untuk jaringan lokal, jangan pakai `localhost`; gunakan IP/hostname server yang benar-benar bisa diakses STB.
 
 ```powershell
 cd android-client

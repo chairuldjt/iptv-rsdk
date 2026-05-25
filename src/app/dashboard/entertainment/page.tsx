@@ -17,10 +17,11 @@ export default async function EntertainmentPage({
   const editId = resolvedSearchParams.edit ? parseInt(resolvedSearchParams.edit, 10) : null
   const showSaved = resolvedSearchParams.saved === '1'
 
-  const [items, videos, channels, appPublicOrigin, hlsRelayBaseUrl] = await Promise.all([
+  const [items, videos, channels, playlists, appPublicOrigin, hlsRelayBaseUrl] = await Promise.all([
     prisma.entertainmentItem.findMany({ orderBy: [{ sortOrder: 'asc' }, { title: 'asc' }] }),
     prisma.educationVideo.findMany({ orderBy: [{ folder: { name: 'asc' } }, { title: 'asc' }], include: { folder: true } }),
     prisma.channel.findMany({ where: { isActive: true }, orderBy: [{ playlistId: 'asc' }, { sortOrder: 'asc' }], include: { playlist: { select: { name: true, isGlobal: true } }, category: { select: { name: true } } } }),
+    prisma.playlist.findMany({ orderBy: { name: 'asc' } }),
     getAppPublicOrigin(),
     getHlsRelayBaseUrl(),
   ])
@@ -31,6 +32,11 @@ export default async function EntertainmentPage({
     id: channel.id, name: channel.name, playlistName: channel.playlist.name,
     categoryName: channel.category?.name || 'Uncategorized', streamUrl: channel.streamUrl, apiUrl: channel.streamUrl,
     relayUrl: createChannelRelayUrl({ channelId: channel.id, origin: publicOrigin, name: channel.name, streamUrl: channel.streamUrl, hlsRelayBaseUrl }),
+  }))
+  const playlistOptions = playlists.map((playlist) => ({
+    id: playlist.id,
+    name: playlist.name,
+    totalChannels: playlist.totalChannels,
   }))
 
   return (
@@ -98,7 +104,7 @@ export default async function EntertainmentPage({
             })
           )}
         </section>
-        <EntertainmentItemForm key={editingItem?.id ?? 'new'} editingItem={editingItem} videoOptions={videoOptions} channelOptions={channelOptions} />
+        <EntertainmentItemForm key={editingItem?.id ?? 'new'} editingItem={editingItem} videoOptions={videoOptions} channelOptions={channelOptions} playlistOptions={playlistOptions} publicOrigin={publicOrigin} />
       </div>
     </div>
   )
@@ -106,7 +112,8 @@ export default async function EntertainmentPage({
 
 function contentTypeLabel(type: string): string {
   if (type === 'media_player') return 'Media'
-  if (type === 'm3u_player') return 'M3U'
+  if (type === 'm3u_player') return 'M3U Channel'
+  if (type === 'm3u_playlist') return 'M3U Playlist'
   return 'WebView'
 }
 
