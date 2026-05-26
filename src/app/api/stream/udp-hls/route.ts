@@ -51,9 +51,11 @@ export async function GET(request: Request) {
     })
   } catch (error) {
     console.error('UDP HLS relay error:', error)
+    const message = error instanceof Error ? error.message : 'Unable to start UDP HLS relay.'
+    const status = message.includes('disabled for this playlist') ? 403 : 502
     return NextResponse.json(
-      { status: false, message: error instanceof Error ? error.message : 'Unable to start UDP HLS relay.' },
-      { status: 502 }
+      { status: false, message },
+      { status }
     )
   }
 }

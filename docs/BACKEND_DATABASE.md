@@ -37,7 +37,9 @@ Menyimpan sumber playlist M3U.
 | `filePath` | String/null | Path file upload lokal bila ada. |
 | `sourceUrl` | Text/null | URL M3U eksternal bila playlist berasal dari URL. |
 | `totalChannels` | Int | Jumlah channel hasil parse. |
-| `isGlobal` | Boolean/null | Playlist global aktif untuk mode `api` dan `api_relay`. |
+| `isGlobal` | Boolean/null | Playlist global aktif untuk mode `api`. |
+| `relayEnabled` | Boolean | Mengaktifkan on-demand relay untuk playlist ini. |
+| `relayConfig` | Text/null | Override JSON untuk runtime relay playlist; field kosong mengikuti setting global. |
 | `createdAt` / `updatedAt` | DateTime | Timestamp Prisma. |
 
 Index penting: `isGlobal`, `updatedAt`.
@@ -114,7 +116,7 @@ Konfigurasi per device. Setiap device baru dibuatkan config dari default global 
 | `defaultChannelId` | Int/null | Channel awal opsional. |
 | `aspectRatio` | String | `fit`, `stretch`, `zoom`, `16_9`, `4_3`. |
 | `syncInterval` | Int | Detik, default 1800. |
-| `syncMode` | String/null | `custom`, `api`, atau `api_relay`; default `custom`. |
+| `syncMode` | String/null | `custom` atau `api`; default `custom`. Nilai lama `api_relay` diperlakukan sebagai alias `api`. |
 | `customM3uUrl` | Text/null | URL M3U untuk mode custom. |
 | `startScreen` | String | `live_tv`, `category_list`, `home_screen`. |
 | `lockSettings` | Boolean | Mengunci Settings Android. |
@@ -210,7 +212,6 @@ Key yang dipakai kode saat ini:
 | --- | --- |
 | `device.defaultConfig` | JSON default config untuk device baru. |
 | `dashboard.offlineAutoDeleteDays` | Threshold auto-delete device offline. |
-| `stream.hlsRelayBaseUrl` | Base URL segment HLS relay. |
 | `app.publicOrigin` | Origin publik untuk URL absolut yang dikirim ke client. |
 | `stream.onDemandHlsRelayConfig` | JSON runtime ffmpeg/on-demand relay. |
 

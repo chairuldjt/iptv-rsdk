@@ -1,6 +1,6 @@
 import type { Prisma } from '@prisma/client'
 import prisma from '@/lib/db'
-import { DEFAULT_CUSTOM_M3U_URL, DEFAULT_SYNC_MODE } from '@/lib/defaults'
+import { DEFAULT_CUSTOM_M3U_URL, DEFAULT_SYNC_MODE, normalizeSyncMode } from '@/lib/defaults'
 
 const DEFAULT_DEVICE_CONFIG_KEY = 'device.defaultConfig'
 
@@ -30,7 +30,7 @@ export const FALLBACK_DEFAULT_DEVICE_CONFIG: DefaultDeviceConfig = {
   defaultChannelId: envNullableInt('IPTV_DEFAULT_CHANNEL_ID'),
   aspectRatio: process.env.IPTV_DEFAULT_ASPECT_RATIO || 'fit',
   syncInterval: envInt('IPTV_DEFAULT_SYNC_INTERVAL', 1800),
-  syncMode: process.env.IPTV_DEFAULT_SYNC_MODE || DEFAULT_SYNC_MODE,
+  syncMode: normalizeSyncMode(process.env.IPTV_DEFAULT_SYNC_MODE || DEFAULT_SYNC_MODE),
   customM3uUrl: process.env.IPTV_DEFAULT_CUSTOM_M3U_URL || DEFAULT_CUSTOM_M3U_URL,
   startScreen: process.env.IPTV_DEFAULT_START_SCREEN || 'live_tv',
   lockSettings: envBoolean('IPTV_DEFAULT_LOCK_SETTINGS', true),
@@ -127,7 +127,7 @@ function normalizeDefaultDeviceConfig(value: unknown): DefaultDeviceConfig {
     defaultChannelId: safeNullableInt(source.defaultChannelId),
     aspectRatio: oneOf(source.aspectRatio, ['fit', 'stretch', 'zoom', '16_9', '4_3'], FALLBACK_DEFAULT_DEVICE_CONFIG.aspectRatio),
     syncInterval: clampInt(source.syncInterval, 60, 86_400, FALLBACK_DEFAULT_DEVICE_CONFIG.syncInterval),
-    syncMode: oneOf(source.syncMode, ['api', 'api_relay', 'custom'], FALLBACK_DEFAULT_DEVICE_CONFIG.syncMode),
+    syncMode: normalizeSyncMode(safeString(source.syncMode, FALLBACK_DEFAULT_DEVICE_CONFIG.syncMode)),
     customM3uUrl: safeString(source.customM3uUrl, FALLBACK_DEFAULT_DEVICE_CONFIG.customM3uUrl),
     startScreen: oneOf(source.startScreen, ['live_tv', 'category_list', 'home_screen'], FALLBACK_DEFAULT_DEVICE_CONFIG.startScreen),
     lockSettings: safeBoolean(source.lockSettings, FALLBACK_DEFAULT_DEVICE_CONFIG.lockSettings),

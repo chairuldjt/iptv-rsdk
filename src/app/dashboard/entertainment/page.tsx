@@ -1,10 +1,11 @@
 import prisma from '@/lib/db'
+import Image from 'next/image'
 import ConfirmForm from '@/components/ConfirmForm'
 import EntertainmentItemForm from '@/components/EntertainmentItemForm'
 import PageHeader from '@/components/PageHeader'
 import { deleteEntertainmentItemAction } from './actions'
 import { createPlayableStreamUrl, createUdpOnDemandHlsPath, isUdpStreamUrl } from '@/lib/playableStreams'
-import { getAppPublicOrigin, getHlsRelayBaseUrl } from '@/lib/settings'
+import { getAppPublicOrigin } from '@/lib/settings'
 
 export const revalidate = 0
 
@@ -17,13 +18,12 @@ export default async function EntertainmentPage({
   const editId = resolvedSearchParams.edit ? parseInt(resolvedSearchParams.edit, 10) : null
   const showSaved = resolvedSearchParams.saved === '1'
 
-  const [items, videos, channels, playlists, appPublicOrigin, hlsRelayBaseUrl] = await Promise.all([
+  const [items, videos, channels, playlists, appPublicOrigin] = await Promise.all([
     prisma.entertainmentItem.findMany({ orderBy: [{ sortOrder: 'asc' }, { title: 'asc' }] }),
     prisma.educationVideo.findMany({ orderBy: [{ folder: { name: 'asc' } }, { title: 'asc' }], include: { folder: true } }),
-    prisma.channel.findMany({ where: { isActive: true }, orderBy: [{ playlistId: 'asc' }, { sortOrder: 'asc' }], include: { playlist: { select: { name: true, isGlobal: true } }, category: { select: { name: true } } } }),
+    prisma.channel.findMany({ where: { isActive: true }, orderBy: [{ playlistId: 'asc' }, { sortOrder: 'asc' }], include: { playlist: { select: { name: true, isGlobal: true, relayEnabled: true } }, category: { select: { name: true } } } }),
     prisma.playlist.findMany({ orderBy: { name: 'asc' } }),
     getAppPublicOrigin(),
-    getHlsRelayBaseUrl(),
   ])
   const editingItem = editId ? items.find((item) => item.id === editId) ?? null : null
   const publicOrigin = appPublicOrigin || ''
@@ -31,7 +31,13 @@ export default async function EntertainmentPage({
   const channelOptions = channels.map((channel) => ({
     id: channel.id, name: channel.name, playlistName: channel.playlist.name,
     categoryName: channel.category?.name || 'Uncategorized', streamUrl: channel.streamUrl, apiUrl: channel.streamUrl,
-    relayUrl: createChannelRelayUrl({ channelId: channel.id, origin: publicOrigin, name: channel.name, streamUrl: channel.streamUrl, hlsRelayBaseUrl }),
+    relayUrl: createChannelRelayUrl({
+      channelId: channel.id,
+      origin: publicOrigin,
+      name: channel.name,
+      streamUrl: channel.streamUrl,
+      relayEnabled: channel.playlist.relayEnabled,
+    }),
   }))
   const playlistOptions = playlists.map((playlist) => ({
     id: playlist.id,
@@ -69,7 +75,13 @@ export default async function EntertainmentPage({
                 <article key={item.id} className="rounded-xl overflow-hidden bg-card border border-border hover:border-amber-500/30 transition-all duration-200">
                   <div className="relative aspect-video bg-background">
                     {item.thumbnailUrl ? (
-                      <img src={item.thumbnailUrl} alt="" className="h-full w-full object-cover" />
+                      <Image
+                        src={item.thumbnailUrl}
+                        alt=""
+                        fill
+                        sizes="(max-width: 768px) 100vw, (max-width: 1536px) 50vw, 33vw"
+                        className="object-cover"
+                      />
                     ) : (
                       <div className="h-full w-full bg-gradient-to-br from-amber-500/5 to-transparent flex items-center justify-center">
                         <span className="text-foreground/60 text-lg">▶</span>
@@ -117,11 +129,13 @@ function contentTypeLabel(type: string): string {
   return 'WebView'
 }
 
-function createChannelRelayUrl({ channelId, origin, name, streamUrl, hlsRelayBaseUrl }: {
-  channelId: number; origin: string; name: string; streamUrl: string; hlsRelayBaseUrl: string
+function createChannelRelayUrl({ channelId, origin, streamUrl, relayEnabled }: {
+  channelId: number; origin: string; name: string; streamUrl: string; relayEnabled: boolean
 }) {
   if (isUdpStreamUrl(streamUrl)) {
-    return origin ? new URL(createUdpOnDemandHlsPath(channelId), origin).toString() : createUdpOnDemandHlsPath(channelId)
+    return relayEnabled
+      ? (origin ? new URL(createUdpOnDemandHlsPath(channelId), origin).toString() : createUdpOnDemandHlsPath(channelId))
+      : streamUrl
   }
-  return createPlayableStreamUrl({ origin, name, streamUrl, hlsRelayBaseUrl })
+  return createPlayableStreamUrl({ origin, streamUrl })
 }

@@ -7,7 +7,6 @@ import ChannelPreviewButton from '@/components/ChannelPreviewButton'
 import PageHeader from '@/components/PageHeader'
 import EmptyState from '@/components/FeedbackState'
 import { createPlayableStreamUrl, createUdpOnDemandHlsPath, isUdpStreamUrl } from '@/lib/playableStreams'
-import { getHlsRelayBaseUrl } from '@/lib/settings'
 
 export const revalidate = 0
 const PAGE_SIZE = 200
@@ -120,10 +119,10 @@ export default async function ChannelsPage({
   const filterPlaylistId = resolvedSearchParams.playlistId ? parseInt(resolvedSearchParams.playlistId) : undefined
   const searchQuery = resolvedSearchParams.search || ''
   const currentPage = Math.max(1, parseInt(resolvedSearchParams.page || '1', 10) || 1)
-  const hlsRelayBaseUrl = await getHlsRelayBaseUrl()
 
   const playlists = await prisma.playlist.findMany({ orderBy: { name: 'asc' } })
-  const selectedPlaylistId = filterPlaylistId || playlists[0]?.id
+  const globalPlaylist = playlists.find((playlist) => playlist.isGlobal)
+  const selectedPlaylistId = filterPlaylistId || globalPlaylist?.id || playlists[0]?.id
 
   const channelWhere = selectedPlaylistId ? {
     playlistId: selectedPlaylistId,
@@ -237,12 +236,11 @@ export default async function ChannelsPage({
                       <div className="shrink-0 flex items-center gap-1.5">
                         <ChannelPreviewButton
                           name={c.name}
-                          directUrl={c.streamUrl}
-                          relayUrl={createPlayableStreamUrl({
-                            origin: '', name: c.name,
-                            streamUrl: isUdpStreamUrl(c.streamUrl) ? createUdpOnDemandHlsPath(c.id) : c.streamUrl,
-                            hlsRelayBaseUrl,
+                          streamUrl={createPlayableStreamUrl({
+                            origin: '',
+                            streamUrl: c.playlist?.relayEnabled && isUdpStreamUrl(c.streamUrl) ? createUdpOnDemandHlsPath(c.id) : c.streamUrl,
                           })}
+                          sourceLabel={c.playlist?.relayEnabled && isUdpStreamUrl(c.streamUrl) ? 'Relay Aktif' : 'Sumber Asli Playlist'}
                         />
                         <form action={toggleChannelAction}>
                           <input type="hidden" name="channelId" value={c.id} />

@@ -15,6 +15,7 @@ import {
 } from '@/lib/settings'
 import EducationSettingsFields from '@/components/EducationSettingsFields'
 import PageHeader from '@/components/PageHeader'
+import { normalizeSyncMode } from '@/lib/defaults'
 
 export const revalidate = 0
 
@@ -160,9 +161,8 @@ export default async function SetupPage({
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
               <Field label="Sync Mode">
-                <select name="syncMode" defaultValue={config.syncMode} className="field-input py-2">
+                <select name="syncMode" defaultValue={normalizeSyncMode(config.syncMode)} className="field-input py-2">
                   <option value="api">API Server (Centralized / Global)</option>
-                  <option value="api_relay">API Server Relay (Server Proxy Stream)</option>
                   <option value="custom">Custom M3U URL (Device Specific)</option>
                 </select>
               </Field>

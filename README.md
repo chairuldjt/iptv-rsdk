@@ -120,7 +120,7 @@ SESSION_SECRET="isi-random-panjang-minimal-32-karakter"
 Default konfigurasi untuk STB baru bisa diset lewat dashboard `Setup Defaults`. Jika belum ada nilai yang disimpan dari dashboard, backend akan memakai fallback dari `.env` berikut:
 
 ```env
-IPTV_DEFAULT_SYNC_MODE="api_relay"
+IPTV_DEFAULT_SYNC_MODE="api"
 IPTV_DEFAULT_CUSTOM_M3U_URL="http://10.0.0.1/iptv/iptv_rsdk.m3u"
 IPTV_DEFAULT_ASPECT_RATIO="fit"
 IPTV_DEFAULT_SYNC_INTERVAL="1800"
@@ -138,11 +138,10 @@ IPTV_DEFAULT_EDUCATION_REPEAT_MODE="all"
 IPTV_DEFAULT_EDUCATION_PLAY_ORDER="alphabetical"
 IPTV_DEFAULT_EDUCATION_SOURCE="smb"
 IPTV_DEFAULT_EDUCATION_PLAYBACK_MODE="copy"
-IPTV_HLS_RELAY_BASE_URL="http://10.55.1.5/relay"
 ```
 
 Value penting yang valid:
-- `IPTV_DEFAULT_SYNC_MODE`: `api`, `api_relay`, `custom`
+- `IPTV_DEFAULT_SYNC_MODE`: `api`, `custom`
 - `IPTV_DEFAULT_ASPECT_RATIO`: `fit`, `stretch`, `zoom`, `16_9`, `4_3`
 - `IPTV_DEFAULT_START_SCREEN`: `live_tv`, `category_list`, `home_screen`
 - `IPTV_DEFAULT_EDUCATION_REPEAT_MODE`: `all`, `one`, `none`
@@ -151,8 +150,7 @@ Value penting yang valid:
 - `IPTV_DEFAULT_EDUCATION_PLAYBACK_MODE`: `copy`, `stream`
 
 Praktiknya:
-- `api` dipakai kalau STB bisa mengakses URL stream asli langsung.
-- `api_relay` dipakai kalau stream perlu diproxy/diubah dulu oleh relay server, terutama untuk UDP multicast.
+- `api` dipakai untuk channel terpusat dari backend. Jika playlist mengaktifkan relay, stream UDP akan otomatis diarahkan ke relay on-demand.
 - `custom` dipakai kalau device harus memakai playlist M3U khusus.
 
 ### Relay IPTV UDP Multicast ke HLS (Mode Relay)
@@ -162,7 +160,7 @@ Jika playlist siaran TV Anda berisi URL UDP Multicast (seperti `udp://@238.x.x.x
 #### 1. On-Demand HLS Relay (Sangat Direkomendasikan & Bawaan Aplikasi)
 Sistem Next.js akan mendeteksi request client secara otomatis ke endpoint `/api/stream/udp-hls/{channelId}/index.m3u8` dan menjalankan subprocess `ffmpeg` untuk melakukan transcoding HLS secara dinamis **hanya ketika siaran ditonton**. Subprocess akan mati otomatis setelah beberapa menit jika tidak ada client yang aktif (idle).
 
-*   **Setup**: Cukup sesuaikan konfigurasi default di dashboard **Setup Defaults** pada bagian **On-Demand HLS Relay Runtime** (menentukan path biner `ffmpeg`, port, directory penyimpanan segment sementara `/public/relay`, dan timeout idle).
+*   **Setup**: Cukup sesuaikan konfigurasi default di dashboard **Setup Defaults** pada bagian **On-Demand HLS Relay Runtime** (menentukan path biner `ffmpeg`, directory penyimpanan segment sementara `/public/relay`, dan timeout idle).
 *   Tidak membutuhkan konfigurasi service tambahan di sistem Linux.
 
 #### 2. Background Continuous Relay (Legacy / Pre-run Service)
@@ -179,7 +177,7 @@ sudo systemctl start iptv-relay-all
 journalctl -u iptv-relay-all -f
 ```
 
-Jika menggunakan metode legacy ini, arahkan **HLS Relay Base URL** di dashboard Setup ke folder root output tersebut, misalnya: `http://10.55.1.5/relay`.
+Metode legacy ini tetap bisa dijalankan manual untuk kebutuhan khusus, tetapi tidak lagi dipakai oleh flow utama aplikasi.
 
 ---
 

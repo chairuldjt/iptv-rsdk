@@ -52,15 +52,15 @@ Menentukan apakah APK bawaan langsung mencari playlist dari Server API atau dari
   ```
 - **Pilihan value yang valid di sistem**:
   - `api` = channel diambil dari global playlist backend apa adanya.
-  - `api_relay` = channel diambil dari global playlist backend, tetapi URL stream diarahkan ke HLS relay server. Ini cocok untuk UDP multicast, browser dashboard, atau client yang tidak satu VLAN dengan sumber IPTV.
+- `api` = channel diambil dari global playlist backend. Jika playlist asal channel mengaktifkan relay, URL stream UDP akan diarahkan ke HLS relay server secara otomatis.
   - `custom` = device mengabaikan global playlist dan memakai `customM3uUrl` miliknya sendiri.
-- **Catatan penting**: APK Android bawaan saat ini tetap fallback ke `custom` di sisi client lokal (`DEFAULT_SYNC_MODE` di `src/lib/defaults.ts` untuk web/backend juga `custom`), tetapi perangkat baru yang register ke backend akan mengikuti `IPTV_DEFAULT_SYNC_MODE` atau nilai yang disimpan di dashboard **Setup Defaults**. Jadi bila `.env` backend Anda diisi `api_relay`, device baru akan menerima mode itu saat sync config pertama.
+- **Catatan penting**: APK Android bawaan saat ini tetap fallback ke `custom` di sisi client lokal (`DEFAULT_SYNC_MODE` di `src/lib/defaults.ts` untuk web/backend juga `custom`), tetapi perangkat baru yang register ke backend akan mengikuti `IPTV_DEFAULT_SYNC_MODE` atau nilai yang disimpan di dashboard **Setup Defaults**. Jika masih ada nilai lama `api_relay` di `.env` atau database, backend akan memperlakukannya sebagai alias `api`.
 
 ### D. Nilai Env Device Default yang Valid
 Nilai di bawah ini dibaca backend dari `.env` root proyek saat belum ada override dari dashboard **Setup Defaults**.
 
 ```env
-IPTV_DEFAULT_SYNC_MODE="api_relay"
+IPTV_DEFAULT_SYNC_MODE="api"
 IPTV_DEFAULT_CUSTOM_M3U_URL="http://10.0.0.1/iptv/iptv_rsdk.m3u"
 IPTV_DEFAULT_ASPECT_RATIO="fit"
 IPTV_DEFAULT_SYNC_INTERVAL="1800"
@@ -78,11 +78,10 @@ IPTV_DEFAULT_EDUCATION_REPEAT_MODE="all"
 IPTV_DEFAULT_EDUCATION_PLAY_ORDER="alphabetical"
 IPTV_DEFAULT_EDUCATION_SOURCE="smb"
 IPTV_DEFAULT_EDUCATION_PLAYBACK_MODE="copy"
-IPTV_HLS_RELAY_BASE_URL="http://10.55.1.5/relay"
 ```
 
 Keterangan pilihan value:
-- `IPTV_DEFAULT_SYNC_MODE`: `api`, `api_relay`, `custom`
+- `IPTV_DEFAULT_SYNC_MODE`: `api`, `custom`
 - `IPTV_DEFAULT_ASPECT_RATIO`: `fit`, `stretch`, `zoom`, `16_9`, `4_3`
 - `IPTV_DEFAULT_START_SCREEN`: `live_tv`, `category_list`, `home_screen`
 - `IPTV_DEFAULT_LOCK_SETTINGS`: `true` / `false`
@@ -94,7 +93,7 @@ Keterangan pilihan value:
 - `IPTV_DEFAULT_CHANNEL_ID`: kosongkan untuk `null`, atau isi ID channel numerik yang sudah ada di database
 
 - **Rekomendasi operasional**:
-  - Pakai `api_relay` jika sumber siaran banyak memakai UDP multicast atau stream yang hanya bisa dibaca server relay.
+  - Pakai `api` lalu aktifkan relay di playlist jika sumber siaran banyak memakai UDP multicast atau stream yang hanya bisa dibaca server relay.
   - Pakai `api` jika STB bisa mengakses stream asli secara langsung tanpa relay.
   - Pakai `custom` jika tiap perangkat atau grup perangkat memakai URL M3U berbeda.
 

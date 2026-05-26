@@ -2,7 +2,8 @@ import { NextResponse } from 'next/server'
 import prisma from '@/lib/db'
 import { getErrorMessage } from '@/lib/errors'
 import { createPlayableStreamUrl, createUdpOnDemandHlsPath, isUdpStreamUrl } from '@/lib/playableStreams'
-import { getAppPublicOrigin, getHlsRelayBaseUrl } from '@/lib/settings'
+import { getAppPublicOrigin } from '@/lib/settings'
+import { normalizeSyncMode } from '@/lib/defaults'
 
 export async function GET(
   request: Request,
@@ -35,7 +36,7 @@ export async function GET(
       where: { deviceId }
     })
 
-    if (config?.syncMode === 'custom') {
+    if (normalizeSyncMode(config?.syncMode) === 'custom') {
         return NextResponse.json({
             status: true,
             message: 'Device is in Custom M3U mode. Use the custom URL provided in config.',
@@ -46,12 +47,20 @@ export async function GET(
     // Use the globally active playlist
     let globalPlaylist = await prisma.playlist.findFirst({
       where: { isGlobal: true },
+      select: {
+        id: true,
+        relayEnabled: true,
+      },
     })
     
     // Fallback: If no playlist is marked as global, use the most recently updated one
     if (!globalPlaylist) {
         globalPlaylist = await prisma.playlist.findFirst({
-            orderBy: { updatedAt: 'desc' }
+            orderBy: { updatedAt: 'desc' },
+            select: {
+              id: true,
+              relayEnabled: true,
+            },
         })
     }
 
@@ -89,9 +98,9 @@ export async function GET(
       },
     })
 
-    const shouldRelayStreams = config?.syncMode === 'api_relay'
+    const shouldProxyStreams = normalizeSyncMode(config?.syncMode) === 'api'
+    const allowUdpOnDemandRelay = shouldProxyStreams && Boolean(globalPlaylist?.relayEnabled)
     const requestOrigin = await getPublicOrigin(request)
-    const hlsRelayBaseUrl = shouldRelayStreams ? await getHlsRelayBaseUrl() : ''
 
     // Map channels to expected client schema
     const mappedChannels = channels.map((c) => ({
@@ -99,13 +108,12 @@ export async function GET(
       name: c.name,
       logo: c.logoUrl ? (c.logoUrl.startsWith('/') ? `${requestOrigin}${c.logoUrl}` : c.logoUrl) : null,
       group: c.category?.name || 'Uncategorized',
-      stream_url: shouldRelayStreams
+      stream_url: shouldProxyStreams
         ? createRelayedClientStreamUrl({
             channelId: c.id,
             origin: requestOrigin,
-            name: c.name,
             streamUrl: c.streamUrl,
-            hlsRelayBaseUrl,
+            allowUdpOnDemandRelay,
           })
         : c.streamUrl,
       sort_order: c.sortOrder,
@@ -144,24 +152,22 @@ async function getPublicOrigin(request: Request): Promise<string> {
 function createRelayedClientStreamUrl({
   channelId,
   origin,
-  name,
   streamUrl,
-  hlsRelayBaseUrl,
+  allowUdpOnDemandRelay,
 }: {
   channelId: number
   origin: string
-  name: string
   streamUrl: string
-  hlsRelayBaseUrl: string
+  allowUdpOnDemandRelay: boolean
 }): string {
   if (isUdpStreamUrl(streamUrl)) {
-    return new URL(createUdpOnDemandHlsPath(channelId), origin).toString()
+    return allowUdpOnDemandRelay
+      ? new URL(createUdpOnDemandHlsPath(channelId), origin).toString()
+      : streamUrl
   }
 
   return createPlayableStreamUrl({
     origin,
-    name,
     streamUrl,
-    hlsRelayBaseUrl,
   })
 }

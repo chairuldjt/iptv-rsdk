@@ -87,7 +87,7 @@ Device tidak ditemukan mengembalikan HTTP `404` dengan message `Device not found
 ### Keterangan Field Penting
 | Key | Tipe | Deskripsi |
 | --- | --- | --- |
-| `sync_mode` | String | `custom`, `api`, atau `api_relay`. |
+| `sync_mode` | String | `custom` atau `api`. |
 | `custom_m3u_url` | String | URL M3U yang dipakai saat `sync_mode = custom`. |
 | `playlist_id` | Integer/null | ID global playlist saat mode API, atau `null` untuk custom. |
 | `force_sync` | Boolean | Trigger sekali pakai untuk sync channel. Di-reset server setelah dikirim. |
@@ -104,7 +104,7 @@ Device tidak ditemukan mengembalikan HTTP `404` dengan message `Device not found
 
 Jika `sync_mode = custom`, server mengembalikan `data: []`; client mengambil playlist dari `custom_m3u_url` pada config.
 
-Jika `sync_mode = api`, server mengirim URL stream asli dari global playlist. Jika `sync_mode = api_relay`, URL stream UDP/remote dipetakan menjadi URL HLS relay on-demand.
+Jika `sync_mode = api`, server mengambil channel dari global playlist lalu mengirim URL stream efektif berdasarkan setting playlist. Playlist yang mengaktifkan relay akan memetakan stream UDP ke URL HLS relay on-demand, sedangkan playlist tanpa relay akan mengirim URL asli.
 
 ### Response
 ```json

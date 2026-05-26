@@ -77,7 +77,7 @@ Keterbatasan:
 - Tidak bisa dipakai dari rumah jika jaringan rumah tidak punya akses ke VLAN IPTV.
 - Browser web umumnya tidak bisa memutar `udp://` langsung.
 
-### 2. API Server Relay / On-Demand HLS
+### 2. API Server / On-Demand HLS Relay
 
 Digunakan untuk development, preview web, emulator/HP dari luar VLAN, atau client yang tidak bisa akses UDP langsung.
 
@@ -162,7 +162,7 @@ Cocok untuk:
 - STB di jaringan kantor/VLAN IPTV.
 - Perangkat yang memang bisa mengakses `udp://` atau sumber IPTV langsung.
 
-### Mode `api_relay`
+### Mode `api` dengan playlist relay aktif
 
 ```text
 Android
@@ -226,7 +226,7 @@ sudo rm -rf /var/www/html/landingpage/relay/*
 
 ### Web preview jalan, Android gagal
 
-1. Pastikan device memakai mode `API Server Relay`.
+1. Pastikan device memakai mode `API Server`.
 2. Pastikan Android sudah sync ulang channel dan menerima URL:
 
    ```text
@@ -278,7 +278,7 @@ Biasanya normal saat ffmpeg baru join stream H264 di tengah GOP. Jika setelah be
 ## Rekomendasi Operasional
 
 - Untuk STB kantor yang bisa akses VLAN IPTV: gunakan mode `api` direct.
-- Untuk emulator/HP/development dari rumah: gunakan mode `api_relay` on-demand.
+- Untuk emulator/HP/development dari rumah: gunakan mode `api`, lalu aktifkan relay pada playlist yang sumbernya perlu on-demand relay.
 - Jangan jalankan `iptv-relay-all.service` kecuali memang ingin prewarm banyak channel.
 - Pastikan `IPTV_ON_DEMAND_LOCALADDR` selalu mengarah ke interface server yang bisa join stream IPTV.
 - Pastikan HLS Relay Base URL bisa diakses dari jaringan client yang memutar stream.

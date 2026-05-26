@@ -2,31 +2,18 @@ import { createRelayPath, createRelayUrl } from '@/lib/streamRelay'
 
 type PlayableStreamOptions = {
   origin: string
-  name: string
   streamUrl: string
-  hlsRelayBaseUrl: string
 }
 
 export function createPlayableStreamUrl({
   origin,
-  name,
   streamUrl,
-  hlsRelayBaseUrl,
 }: PlayableStreamOptions): string {
-  if (isUdpStreamUrl(streamUrl)) {
-    return createUdpHlsRelayUrl(name, hlsRelayBaseUrl)
-  }
-
   if (isHttpStreamUrl(streamUrl)) {
     return origin ? createRelayUrl(origin, streamUrl) : createRelayPath(streamUrl)
   }
 
   return streamUrl
-}
-
-export function createUdpHlsRelayUrl(channelName: string, hlsRelayBaseUrl: string): string {
-  const baseUrl = hlsRelayBaseUrl.replace(/\/$/, '')
-  return `${baseUrl}/${slugifyChannelName(channelName)}/index.m3u8`
 }
 
 export function createUdpOnDemandHlsPath(channelId: number): string {

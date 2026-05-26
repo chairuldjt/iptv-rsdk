@@ -1,7 +1,7 @@
 import prisma from '@/lib/db'
 import { revalidatePath } from 'next/cache'
 import ConfirmForm from '@/components/ConfirmForm'
-import DeviceConfigForm from '@/components/DeviceConfigForm'
+import DeviceConfigModal from '@/components/DeviceConfigModal'
 import RemoteControlModal from '@/components/RemoteControlModal'
 import DeviceSearchAndLimit from '@/components/DeviceSearchAndLimit'
 import DevicePagination from '@/components/DevicePagination'
@@ -11,25 +11,21 @@ import { redirect } from 'next/navigation'
 import { getOnlineThreshold } from '@/lib/time'
 import {
   cleanupOfflineDevices,
-  getHlsRelayBaseUrl,
   getOfflineAutoDeleteDays,
-  setHlsRelayBaseUrl,
   setOfflineAutoDeleteDays,
 } from '@/lib/settings'
-import { DEFAULT_CUSTOM_M3U_URL, DEFAULT_SYNC_MODE } from '@/lib/defaults'
+import { DEFAULT_CUSTOM_M3U_URL, DEFAULT_SYNC_MODE, normalizeSyncMode } from '@/lib/defaults'
 
 export const revalidate = 0
 type DeviceStatusFilter = 'all' | 'online' | 'offline' | 'disabled'
 
 function getSyncModeLabel(syncMode: string) {
   if (syncMode === 'custom') return 'Custom M3U'
-  if (syncMode === 'api_relay') return 'API Relay'
   return 'API Server'
 }
 
 function getSyncModeBadgeClass(syncMode: string) {
   if (syncMode === 'custom') return 'badge badge-warning'
-  if (syncMode === 'api_relay') return 'badge badge-success'
   return 'badge badge-primary'
 }
 
@@ -80,19 +76,6 @@ async function saveOfflineCleanupSettingAction(formData: FormData) {
   redirect('/dashboard/devices?cleanupSaved=1')
 }
 
-async function saveStreamRelaySettingAction(formData: FormData) {
-  'use server'
-  const hlsRelayBaseUrl = formData.get('hlsRelayBaseUrl') as string
-  try {
-    await setHlsRelayBaseUrl(hlsRelayBaseUrl)
-    revalidatePath('/dashboard/devices')
-    revalidatePath('/dashboard/channels')
-  } catch (error) {
-    console.error('Save stream relay setting error:', error)
-  }
-  redirect('/dashboard/devices?relaySaved=1')
-}
-
 async function clearDeviceCacheAction(formData: FormData) {
   'use server'
   const deviceId = formData.get('deviceId') as string
@@ -113,7 +96,7 @@ async function saveDeviceConfigAction(formData: FormData) {
   const deviceName = formData.get('deviceName') as string
   const aspectRatio = formData.get('aspectRatio') as string
   const syncInterval = parseInt(formData.get('syncInterval') as string)
-  const syncMode = formData.get('syncMode') as string
+  const syncMode = normalizeSyncMode(formData.get('syncMode') as string)
   const customM3uUrl = formData.get('customM3uUrl') as string
   const technicianPin = formData.get('technicianPin') as string
   const educationVideoPath = formData.get('educationVideoPath') as string
@@ -137,7 +120,7 @@ async function saveDeviceConfigAction(formData: FormData) {
         aspectRatio,
         syncInterval: syncInterval || 1800,
         syncMode: syncMode || DEFAULT_SYNC_MODE,
-        customM3uUrl: (syncMode || DEFAULT_SYNC_MODE) === 'custom' ? (customM3uUrl || DEFAULT_CUSTOM_M3U_URL) : '',
+        customM3uUrl: syncMode === 'custom' ? (customM3uUrl || DEFAULT_CUSTOM_M3U_URL) : '',
         technicianPin: technicianPin || '2468',
         lockSettings,
         forceSync,
@@ -166,7 +149,7 @@ export default async function DevicesPage({
 }: {
   searchParams: Promise<{
     edit?: string; success?: string; status?: string; cleanupSaved?: string
-    relaySaved?: string; remote?: string; q?: string; page?: string; limit?: string
+    remote?: string; q?: string; page?: string; limit?: string
   }>
 }) {
   const resolvedSearchParams = await searchParams
@@ -174,7 +157,6 @@ export default async function DevicesPage({
   const remoteDeviceId = resolvedSearchParams.remote
   const showSuccess = resolvedSearchParams.success === '1'
   const showCleanupSaved = resolvedSearchParams.cleanupSaved === '1'
-  const showRelaySaved = resolvedSearchParams.relaySaved === '1'
   const statusFilter = (['all', 'online', 'offline', 'disabled'].includes(resolvedSearchParams.status || '')
     ? resolvedSearchParams.status : 'all') as DeviceStatusFilter
 
@@ -186,7 +168,6 @@ export default async function DevicesPage({
   const currentPage = pageParam > 0 ? pageParam : 1
 
   const offlineAutoDeleteDays = await getOfflineAutoDeleteDays()
-  const hlsRelayBaseUrl = await getHlsRelayBaseUrl()
   const cleanedDeviceCount = await cleanupOfflineDevices(offlineAutoDeleteDays)
 
   const devices = await prisma.device.findMany({
@@ -254,12 +235,6 @@ export default async function DevicesPage({
           Offline cleanup setting saved. {cleanedDeviceCount > 0 ? `${cleanedDeviceCount} old offline device(s) were deleted.` : 'No old offline devices matched the threshold.'}
         </div>
       )}
-      {showRelaySaved && (
-        <div className="p-3.5 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs font-semibold">
-          Stream relay base URL saved. API Relay devices will receive the updated HLS URLs on the next sync.
-        </div>
-      )}
-
       {/* Settings Panels */}
       <div className="card p-4 rounded-2xl flex flex-col lg:flex-row gap-4 lg:items-end lg:justify-between">
         <div>
@@ -296,19 +271,6 @@ export default async function DevicesPage({
           <button type="submit" className="btn btn-primary btn-sm py-2">Save Cleanup</button>
         </form>
       </div>
-
-      <form action={saveStreamRelaySettingAction} className="card p-4 rounded-2xl flex flex-col lg:flex-row gap-4 lg:items-end lg:justify-between">
-        <div className="flex-1 min-w-0">
-          <label className="block text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-1.5">HLS Relay Base URL</label>
-          <input
-            type="url" name="hlsRelayBaseUrl" defaultValue={hlsRelayBaseUrl} required
-            placeholder="http://10.55.1.5/relay"
-            className="w-full px-3 py-1.5 bg-background border border-border rounded-lg text-foreground text-xs focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary/20 font-mono"
-          />
-          <p className="text-[9px] text-muted-foreground/60 mt-1">UDP playlist entries are exposed as /channel-slug/index.m3u8 under this base URL.</p>
-        </div>
-        <button type="submit" className="btn btn-primary btn-sm py-2">Save Relay URL</button>
-      </form>
 
       {/* Device Table */}
       <div className="card rounded-2xl overflow-hidden">
@@ -373,10 +335,10 @@ export default async function DevicesPage({
                       </td>
                       <td className="p-4">
                         <div className="flex flex-col gap-1">
-                          <span className={getSyncModeBadgeClass(d.config?.syncMode || DEFAULT_SYNC_MODE)}>
-                            {getSyncModeLabel(d.config?.syncMode || DEFAULT_SYNC_MODE)}
+                          <span className={getSyncModeBadgeClass(normalizeSyncMode(d.config?.syncMode || DEFAULT_SYNC_MODE))}>
+                            {getSyncModeLabel(normalizeSyncMode(d.config?.syncMode || DEFAULT_SYNC_MODE))}
                           </span>
-                          {(d.config?.syncMode || DEFAULT_SYNC_MODE) === 'custom' ? (
+                          {normalizeSyncMode(d.config?.syncMode || DEFAULT_SYNC_MODE) === 'custom' ? (
                             <div className="text-[9px] text-muted-foreground truncate max-w-[130px] font-mono" title={d.config?.customM3uUrl || DEFAULT_CUSTOM_M3U_URL}>
                               {d.config?.customM3uUrl || DEFAULT_CUSTOM_M3U_URL}
                             </div>
@@ -454,42 +416,12 @@ export default async function DevicesPage({
 
       {/* Config Modal */}
       {editingDevice && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-background/80 backdrop-blur-sm animate-fade-in">
-          <div className="w-full max-w-3xl card p-6 rounded-2xl border border-border shadow-2xl overflow-y-auto max-h-[90vh] animate-slide-up space-y-6">
-            <div className="flex items-center justify-between border-b border-border pb-4">
-              <div className="flex items-center gap-2.5">
-                <div className="p-1.5 rounded-lg bg-primary/10 border border-primary/20">
-                  <svg className="w-5 h-5 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M9.594 3.94c.09-.542.56-.94 1.11-.94h2.593c.55 0 1.02.398 1.11.94l.213 1.281c.063.374.313.686.645.87.074.04.147.083.22.127.325.196.72.257 1.075.124l1.217-.456a1.125 1.125 0 011.37.49l1.296 2.247a1.125 1.125 0 01-.26 1.431l-1.003.827c-.293.241-.438.613-.43.992a7.723 7.723 0 010 .255c-.008.378.137.75.43.991l1.004.827c.424.35.534.955.26 1.43l-1.298 2.247a1.125 1.125 0 01-1.369.491l-1.217-.456c-.355-.133-.75-.072-1.076.124a6.47 6.47 0 01-.22.128c-.331.183-.581.495-.644.869l-.213 1.281c-.09.543-.56.94-1.11.94h-2.594c-.55 0-1.019-.398-1.11-.94l-.213-1.281c-.062-.374-.312-.686-.644-.87a6.52 6.52 0 01-.22-.127c-.325-.196-.72-.257-1.076-.124l-1.217.456a1.125 1.125 0 01-1.369-.49l-1.297-2.247a1.125 1.125 0 01.26-1.431l1.004-.827c.292-.24.437-.613.43-.991a6.932 6.932 0 010-.255c.007-.38-.138-.751-.43-.992l-1.004-.827a1.125 1.125 0 01-.26-1.43l1.297-2.247a1.125 1.125 0 011.37-.491l1.216.456c.356.133.751.072 1.076-.124.072-.044.146-.086.22-.128.332-.183.582-.495.644-.869l.214-1.28z" />
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                  </svg>
-                </div>
-                <h3 className="font-semibold text-foreground text-sm">Remote Config: {editingDevice.deviceName}</h3>
-              </div>
-              <a href="/dashboard/devices" className="p-1 text-muted-foreground hover:text-foreground hover:bg-accent rounded-lg transition-all">
-                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </a>
-            </div>
-
-            {showSuccess && (
-              <div className="p-3.5 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs font-semibold flex items-center gap-2">
-                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-                </svg>
-                Configuration successfully saved & synced!
-              </div>
-            )}
-
-            <DeviceConfigForm
-              key={editingDevice.deviceId}
-              editingDevice={editingDevice}
-              saveDeviceConfigAction={saveDeviceConfigAction}
-              clearDeviceCacheAction={clearDeviceCacheAction}
-            />
-          </div>
-        </div>
+        <DeviceConfigModal
+          editingDevice={editingDevice}
+          showSuccess={showSuccess}
+          saveDeviceConfigAction={saveDeviceConfigAction}
+          clearDeviceCacheAction={clearDeviceCacheAction}
+        />
       )}
 
       {remoteDevice && (

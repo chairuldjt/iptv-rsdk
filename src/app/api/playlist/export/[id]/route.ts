@@ -1,7 +1,6 @@
-import { NextResponse } from 'next/server'
 import prisma from '@/lib/db'
 import { createPlayableStreamUrl, createUdpOnDemandHlsPath, isUdpStreamUrl } from '@/lib/playableStreams'
-import { getAppPublicOrigin, getHlsRelayBaseUrl } from '@/lib/settings'
+import { getAppPublicOrigin } from '@/lib/settings'
 
 export const revalidate = 0
 
@@ -37,10 +36,8 @@ export async function GET(
     }
 
     const appPublicOrigin = await getAppPublicOrigin()
-    const hlsRelayBaseUrl = await getHlsRelayBaseUrl()
     
     const origin = appPublicOrigin || new URL(request.url).origin
-    const relayBase = hlsRelayBaseUrl || ''
 
     let m3uContent = '#EXTM3U\n'
 
@@ -51,13 +48,13 @@ export async function GET(
       // Determine the stream URL (relay if UDP, otherwise direct stream url)
       let finalStreamUrl = channel.streamUrl
       if (isUdpStreamUrl(channel.streamUrl)) {
-        finalStreamUrl = origin ? new URL(createUdpOnDemandHlsPath(channel.id), origin).toString() : createUdpOnDemandHlsPath(channel.id)
+        finalStreamUrl = playlist.relayEnabled
+          ? (origin ? new URL(createUdpOnDemandHlsPath(channel.id), origin).toString() : createUdpOnDemandHlsPath(channel.id))
+          : channel.streamUrl
       } else {
         finalStreamUrl = createPlayableStreamUrl({
           origin,
-          name: channel.name,
           streamUrl: channel.streamUrl,
-          hlsRelayBaseUrl: relayBase,
         })
       }
 

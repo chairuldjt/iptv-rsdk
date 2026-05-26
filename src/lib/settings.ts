@@ -1,10 +1,8 @@
 import prisma from '@/lib/db'
 
 const OFFLINE_AUTO_DELETE_DAYS_KEY = 'device.offlineAutoDeleteDays'
-const HLS_RELAY_BASE_URL_KEY = 'stream.hlsRelayBaseUrl'
 const APP_PUBLIC_ORIGIN_KEY = 'app.publicOrigin'
 const ON_DEMAND_HLS_RELAY_CONFIG_KEY = 'stream.onDemandHlsRelayConfig'
-const DEFAULT_HLS_RELAY_BASE_URL = process.env.IPTV_HLS_RELAY_BASE_URL || 'http://10.55.1.5/relay'
 const DEFAULT_APP_PUBLIC_ORIGIN = ''
 
 export type OnDemandHlsRelayConfig = {
@@ -47,27 +45,6 @@ export async function setOfflineAutoDeleteDays(days: number): Promise<void> {
     create: {
       key: OFFLINE_AUTO_DELETE_DAYS_KEY,
       value: safeDays.toString(),
-    },
-  })
-}
-
-export async function getHlsRelayBaseUrl(): Promise<string> {
-  const setting = await prisma.appSetting.findUnique({
-    where: { key: HLS_RELAY_BASE_URL_KEY },
-  })
-
-  return normalizeHlsRelayBaseUrl(setting?.value || DEFAULT_HLS_RELAY_BASE_URL)
-}
-
-export async function setHlsRelayBaseUrl(baseUrl: string): Promise<void> {
-  const safeUrl = normalizeHlsRelayBaseUrl(baseUrl || DEFAULT_HLS_RELAY_BASE_URL)
-
-  await prisma.appSetting.upsert({
-    where: { key: HLS_RELAY_BASE_URL_KEY },
-    update: { value: safeUrl },
-    create: {
-      key: HLS_RELAY_BASE_URL_KEY,
-      value: safeUrl,
     },
   })
 }
@@ -146,21 +123,6 @@ export async function cleanupOfflineDevices(days: number): Promise<number> {
   })
 
   return result.count
-}
-
-function normalizeHlsRelayBaseUrl(baseUrl: string): string {
-  const trimmed = baseUrl.trim()
-  if (!trimmed) return DEFAULT_HLS_RELAY_BASE_URL
-
-  try {
-    const url = new URL(trimmed)
-    if (url.protocol !== 'http:' && url.protocol !== 'https:') {
-      return DEFAULT_HLS_RELAY_BASE_URL
-    }
-    return url.toString().replace(/\/$/, '')
-  } catch {
-    return DEFAULT_HLS_RELAY_BASE_URL
-  }
 }
 
 function normalizePublicOrigin(origin: string): string {

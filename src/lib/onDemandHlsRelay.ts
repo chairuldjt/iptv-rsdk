@@ -1,7 +1,8 @@
 import { access, mkdir, readFile, rm } from 'fs/promises'
 import { spawn, type ChildProcessWithoutNullStreams } from 'child_process'
 import { slugifyChannelName } from '@/lib/playableStreams'
-import { getOnDemandHlsRelayConfig, type OnDemandHlsRelayConfig } from '@/lib/settings'
+import { type OnDemandHlsRelayConfig } from '@/lib/settings'
+import { getEffectiveOnDemandHlsRelayConfigForChannel } from '@/lib/playlistRelay'
 
 type RelayProcess = {
   process: ChildProcessWithoutNullStreams
@@ -57,7 +58,12 @@ async function ensureRelay(options: StartRelayOptions): Promise<RelayProcess> {
     relayProcesses.delete(options.channelId)
   }
 
-  const config = await getOnDemandHlsRelayConfig()
+  const relaySettings = await getEffectiveOnDemandHlsRelayConfigForChannel(options.channelId)
+  if (!relaySettings.enabled) {
+    throw new Error('On-demand HLS relay is disabled for this playlist.')
+  }
+
+  const config = relaySettings.config
   const outputSlug = getOutputSlug(options.channelId, options.name)
   const outputRoot = config.outputRoot.replace(/\/$/, '')
   const outputDir = `${outputRoot}/${outputSlug}`

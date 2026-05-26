@@ -3,7 +3,7 @@
 import React, { useState } from 'react'
 import type { Device, DeviceConfig } from '@prisma/client'
 import ConfirmForm from './ConfirmForm'
-import { DEFAULT_CUSTOM_M3U_URL, DEFAULT_SYNC_MODE } from '@/lib/defaults'
+import { DEFAULT_CUSTOM_M3U_URL, DEFAULT_SYNC_MODE, normalizeSyncMode } from '@/lib/defaults'
 import EducationSettingsFields from './EducationSettingsFields'
 
 interface DeviceConfigFormProps {
@@ -13,7 +13,7 @@ interface DeviceConfigFormProps {
 }
 
 export default function DeviceConfigForm({ editingDevice, saveDeviceConfigAction, clearDeviceCacheAction }: DeviceConfigFormProps) {
-  const [syncMode, setSyncMode] = useState(editingDevice.config?.syncMode || DEFAULT_SYNC_MODE)
+  const [syncMode, setSyncMode] = useState(normalizeSyncMode(editingDevice.config?.syncMode || DEFAULT_SYNC_MODE))
   const [lockSettings, setLockSettings] = useState(editingDevice.config?.lockSettings ?? true)
   const [autoStart, setAutoStart] = useState(editingDevice.config?.autoStartOnBoot ?? false)
 
@@ -29,9 +29,8 @@ export default function DeviceConfigForm({ editingDevice, saveDeviceConfigAction
           </div>
           <div>
             <label className="block text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-1.5">Sync Mode (Playlist Source)</label>
-            <select name="syncMode" value={syncMode} onChange={(e) => setSyncMode(e.target.value)} className="field-input py-2">
+            <select name="syncMode" value={syncMode} onChange={(e) => setSyncMode(normalizeSyncMode(e.target.value))} className="field-input py-2">
               <option value="api">API Server (Centralized / Global)</option>
-              <option value="api_relay">API Server Relay (Server Proxy Stream)</option>
               <option value="custom">Custom M3U URL (Device Specific)</option>
             </select>
           </div>
