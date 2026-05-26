@@ -1,8 +1,25 @@
 import prisma from '@/lib/db'
+import { redirect } from 'next/navigation'
 import ConfirmForm from '@/components/ConfirmForm'
 import VideoRepoForm from '@/components/VideoRepoForm'
 import VideoLibraryCard from '@/components/VideoLibraryCard'
 import VideoRepositoryToastBridge from '@/components/VideoRepositoryToastBridge'
+import VideoBroadcastManager from '@/components/VideoBroadcastManager'
+import {
+  FALLBACK_VIDEO_BROADCAST_CONFIG,
+  clearScopedVideoBroadcast,
+  getDeviceVideoBroadcast,
+  getGlobalVideoBroadcast,
+  getGroupVideoBroadcast,
+  setDeviceVideoBroadcast,
+  setGlobalVideoBroadcast,
+  setGroupVideoBroadcast,
+  type ResolvedVideoBroadcastConfig,
+  type VideoBroadcastConfig,
+  type VideoBroadcastScope,
+  videoBroadcastFromFormData,
+} from '@/lib/videoBroadcast'
+import { getDeviceGroupAssignments, getDeviceGroups } from '@/lib/deviceGroups'
 import {
   createFolderAction,
   deleteFolderAction,
@@ -17,18 +34,66 @@ export const revalidate = 0
 type FolderFilter = number | 'unfiled' | null
 type SourceFilter = 'all' | 'upload' | 'url'
 
+async function saveVideoBroadcastAction(formData: FormData) {
+  'use server'
+  const scope = normalizeVideoBroadcastScope((formData.get('scope') as string) || 'global')
+  const targetId = ((formData.get('targetId') as string) || '').trim()
+  const returnQuery = ((formData.get('returnQuery') as string) || '').trim()
+  const config = videoBroadcastFromFormData(formData)
+
+  if (scope === 'group' && targetId) {
+    await setGroupVideoBroadcast(targetId, config)
+  } else if (scope === 'device' && targetId) {
+    await setDeviceVideoBroadcast(targetId, config)
+  } else if (scope === 'global') {
+    await setGlobalVideoBroadcast(config)
+  } else {
+    redirect(buildBroadcastRedirect(returnQuery, scope, targetId, 'broadcast-reset'))
+  }
+
+  redirect(buildBroadcastRedirect(returnQuery, scope, targetId, 'broadcast-saved'))
+}
+
+async function resetVideoBroadcastAction(formData: FormData) {
+  'use server'
+  const scope = normalizeVideoBroadcastScope((formData.get('scope') as string) || 'global')
+  const targetId = ((formData.get('targetId') as string) || '').trim()
+  const returnQuery = ((formData.get('returnQuery') as string) || '').trim()
+
+  if (scope === 'global') {
+    await setGlobalVideoBroadcast(FALLBACK_VIDEO_BROADCAST_CONFIG)
+  } else if (targetId) {
+    await clearScopedVideoBroadcast(scope, targetId)
+  } else {
+    redirect(buildBroadcastRedirect(returnQuery, scope, targetId, 'broadcast-reset'))
+  }
+
+  redirect(buildBroadcastRedirect(returnQuery, scope, targetId, 'broadcast-reset'))
+}
+
 export default async function VideosPage({
   searchParams,
 }: {
-  searchParams: Promise<{ edit?: string; notice?: string; folder?: string; q?: string; source?: string; manageFolder?: string }>
+  searchParams: Promise<{
+    edit?: string
+    notice?: string
+    folder?: string
+    q?: string
+    source?: string
+    manageFolder?: string
+    broadcastScope?: string
+    broadcastId?: string
+  }>
 }) {
   const resolvedSearchParams = await searchParams
   const editId = resolvedSearchParams.edit ? parseInt(resolvedSearchParams.edit, 10) : null
   const selectedFolder = parseFolderFilter(resolvedSearchParams.folder)
   const sourceFilter = parseSourceFilter(resolvedSearchParams.source)
   const searchQuery = (resolvedSearchParams.q || '').trim()
+  const broadcastScope = normalizeVideoBroadcastScope(resolvedSearchParams.broadcastScope)
+  const broadcastTargetId = (resolvedSearchParams.broadcastId || '').trim()
 
-  const [folders, videos, allVideoCount, unfiledCount, allPublishedCount, unfiledPublishedCount] = await Promise.all([
+  const [folders, videos, allVideoCount, unfiledCount, allPublishedCount, unfiledPublishedCount, broadcastVideos, groups, assignments, devices, broadcastConfig] = await Promise.all([
     prisma.educationFolder.findMany({
       orderBy: { name: 'asc' },
       include: {
@@ -57,6 +122,34 @@ export default async function VideosPage({
       },
     }),
     prisma.educationVideo.count({ where: { folderId: null, isPublished: true } }),
+    prisma.educationVideo.findMany({
+      where: {
+        isPublished: true,
+        OR: [
+          { folderId: null },
+          { folder: { isPublished: true } },
+        ],
+      },
+      orderBy: [{ folder: { name: 'asc' } }, { title: 'asc' }],
+      select: {
+        id: true,
+        title: true,
+        videoUrl: true,
+        isPublished: true,
+        folder: { select: { name: true } },
+      },
+    }),
+    getDeviceGroups(),
+    getDeviceGroupAssignments(),
+    prisma.device.findMany({
+      orderBy: [{ deviceName: 'asc' }, { deviceId: 'asc' }],
+      select: {
+        deviceId: true,
+        deviceName: true,
+        isActive: true,
+      },
+    }),
+    loadVideoBroadcastConfig(broadcastScope, broadcastTargetId),
   ])
 
   const selectedFolderEntity = typeof selectedFolder === 'number'
@@ -89,6 +182,20 @@ export default async function VideosPage({
   const folderParam = getFolderParam(selectedFolder)
   const hasFilters = Boolean(searchQuery) || sourceFilter !== 'all'
   const hasFolderData = folders.length > 0
+  const broadcastGroup = broadcastScope === 'group' ? groups.find((group) => group.id === broadcastTargetId) ?? null : null
+  const broadcastDevice = broadcastScope === 'device' ? devices.find((device) => device.deviceId === broadcastTargetId) ?? null : null
+  const currentBroadcastScopeLabel =
+    broadcastScope === 'global'
+      ? 'Global Broadcast'
+      : broadcastScope === 'group'
+        ? `Group Broadcast: ${broadcastGroup?.name || broadcastTargetId || 'Pilih Group'}`
+        : `Device Broadcast: ${broadcastDevice?.deviceName || broadcastTargetId || 'Pilih Device'}`
+  const deviceOptions = devices.map((device) => ({
+    deviceId: device.deviceId,
+    deviceName: device.deviceName,
+    isActive: device.isActive,
+    groupName: groups.find((group) => group.id === (assignments[device.deviceId] || ''))?.name || null,
+  }))
 
   return (
     <div className="video-repository-page mx-auto flex w-full max-w-[1660px] flex-col gap-6 animate-fade-in xl:h-full xl:overflow-hidden">
@@ -149,7 +256,7 @@ export default async function VideosPage({
 
               <div className="space-y-2 overflow-y-auto max-h-[320px] xl:max-h-[none] pr-0.5">
                 <FolderLink
-                  href={buildVideosHref({ folder: null, q: searchQuery, source: sourceFilter })}
+                  href={buildVideosHref({ folder: null, q: searchQuery, source: sourceFilter, broadcastScope, broadcastId: broadcastTargetId })}
                   active={selectedFolder === null}
                   label="Semua Video"
                   count={allVideoCount}
@@ -157,7 +264,7 @@ export default async function VideosPage({
                   published
                 />
                 <FolderLink
-                  href={buildVideosHref({ folder: 'unfiled', q: searchQuery, source: sourceFilter })}
+                  href={buildVideosHref({ folder: 'unfiled', q: searchQuery, source: sourceFilter, broadcastScope, broadcastId: broadcastTargetId })}
                   active={selectedFolder === 'unfiled'}
                   label="Tanpa Folder"
                   count={unfiledCount}
@@ -167,7 +274,7 @@ export default async function VideosPage({
                 {folders.map((folder) => (
                   <FolderLink
                     key={folder.id}
-                    href={buildVideosHref({ folder: folder.id, q: searchQuery, source: sourceFilter })}
+                    href={buildVideosHref({ folder: folder.id, q: searchQuery, source: sourceFilter, broadcastScope, broadcastId: broadcastTargetId })}
                     active={selectedFolder === folder.id}
                     label={folder.name}
                     count={folder._count.videos}
@@ -181,7 +288,7 @@ export default async function VideosPage({
             {/* Gear Button: Kelola Folder */}
             <div className="mt-4 pt-3 border-t border-white/6 shrink-0">
               <a
-                href={buildVideosHref({ folder: selectedFolder, q: searchQuery, source: sourceFilter }) + (selectedFolder ? '&manageFolder=true' : '')}
+                href={buildVideosHref({ folder: selectedFolder, q: searchQuery, source: sourceFilter, broadcastScope, broadcastId: broadcastTargetId }) + (selectedFolder ? '&manageFolder=true' : '')}
                 className={`w-full flex items-center justify-center gap-2 rounded-xl border px-3 py-2.5 text-xs font-bold transition-all select-none cursor-pointer ${
                   selectedFolder && selectedFolder !== 'unfiled'
                     ? 'border-white/8 bg-white/[0.02] text-slate-300 hover:border-white/12 hover:bg-white/[0.04] hover:text-white'
@@ -220,6 +327,8 @@ export default async function VideosPage({
                 <form action="/dashboard/videos" className="relative w-full sm:w-auto sm:min-w-[200px]">
                   {folderParam && <input type="hidden" name="folder" value={folderParam} />}
                   {sourceFilter !== 'all' && <input type="hidden" name="source" value={sourceFilter} />}
+                  <input type="hidden" name="broadcastScope" value={broadcastScope} />
+                  {broadcastScope !== 'global' && broadcastTargetId && <input type="hidden" name="broadcastId" value={broadcastTargetId} />}
                   <div className="relative">
                     <input
                       type="search"
@@ -246,7 +355,7 @@ export default async function VideosPage({
                   </summary>
                   <div className="absolute right-0 top-full z-40 mt-2 w-40 rounded-xl border border-white/8 bg-slate-950/95 p-1.5 shadow-2xl space-y-1">
                     <a
-                      href={buildVideosHref({ folder: selectedFolder, q: searchQuery, source: 'all' })}
+                      href={buildVideosHref({ folder: selectedFolder, q: searchQuery, source: 'all', broadcastScope, broadcastId: broadcastTargetId })}
                       className={`block rounded-lg px-2.5 py-2 text-xs font-semibold hover:bg-white/5 transition-colors ${
                         sourceFilter === 'all' ? 'text-indigo-400 bg-white/5' : 'text-slate-300'
                       }`}
@@ -254,7 +363,7 @@ export default async function VideosPage({
                       Semua Media
                     </a>
                     <a
-                      href={buildVideosHref({ folder: selectedFolder, q: searchQuery, source: 'upload' })}
+                      href={buildVideosHref({ folder: selectedFolder, q: searchQuery, source: 'upload', broadcastScope, broadcastId: broadcastTargetId })}
                       className={`block rounded-lg px-2.5 py-2 text-xs font-semibold hover:bg-white/5 transition-colors ${
                         sourceFilter === 'upload' ? 'text-indigo-400 bg-white/5' : 'text-slate-300'
                       }`}
@@ -262,7 +371,7 @@ export default async function VideosPage({
                       Upload Lokal
                     </a>
                     <a
-                      href={buildVideosHref({ folder: selectedFolder, q: searchQuery, source: 'url' })}
+                      href={buildVideosHref({ folder: selectedFolder, q: searchQuery, source: 'url', broadcastScope, broadcastId: broadcastTargetId })}
                       className={`block rounded-lg px-2.5 py-2 text-xs font-semibold hover:bg-white/5 transition-colors ${
                         sourceFilter === 'url' ? 'text-indigo-400 bg-white/5' : 'text-slate-300'
                       }`}
@@ -290,7 +399,7 @@ export default async function VideosPage({
                 {/* Reset Filters */}
                 {hasFilters && (
                   <a
-                    href={buildVideosHref({ folder: selectedFolder, q: '', source: 'all' })}
+                    href={buildVideosHref({ folder: selectedFolder, q: '', source: 'all', broadcastScope, broadcastId: broadcastTargetId })}
                     className="btn btn-ghost px-2.5 py-2 text-xs hover:text-white"
                   >
                     Reset
@@ -355,6 +464,22 @@ export default async function VideosPage({
 
         {/* Right Column: Forms (Scrolls independently in desktop) */}
         <aside className="desktop-scroll-column w-full xl:w-[360px] shrink-0 pr-1 flex flex-col gap-4 xl:min-h-0 min-h-0">
+          <VideoBroadcastManager
+            scope={broadcastScope}
+            targetId={broadcastTargetId}
+            currentScopeLabel={currentBroadcastScopeLabel}
+            config={broadcastConfig}
+            videos={broadcastVideos.map((video) => ({
+              id: video.id,
+              title: video.title,
+              folderName: video.folder?.name || null,
+              isPublished: video.isPublished,
+            }))}
+            groups={groups}
+            devices={deviceOptions}
+            onSaveAction={saveVideoBroadcastAction}
+            onResetAction={resetVideoBroadcastAction}
+          />
           
           {/* Card 1: Tambah Folder Form */}
           <section className="overflow-hidden rounded-[24px] border border-white/8 bg-slate-900/40 backdrop-blur-xl p-5 shadow-2xl shrink-0">
@@ -401,7 +526,7 @@ export default async function VideosPage({
                 <h3 className="text-lg font-bold text-white mt-0.5">Kelola Folder</h3>
               </div>
               <a
-                href={buildVideosHref({ folder: selectedFolder, q: searchQuery, source: sourceFilter })}
+                href={buildVideosHref({ folder: selectedFolder, q: searchQuery, source: sourceFilter, broadcastScope, broadcastId: broadcastTargetId })}
                 className="text-slate-450 hover:text-white text-xs font-bold transition-colors cursor-pointer"
               >
                 Tutup
@@ -641,12 +766,26 @@ function getFolderParam(folder: FolderFilter): string {
   return ''
 }
 
-function buildVideosHref({ folder, q, source }: { folder: FolderFilter; q: string; source: SourceFilter }) {
+function buildVideosHref({
+  folder,
+  q,
+  source,
+  broadcastScope,
+  broadcastId,
+}: {
+  folder: FolderFilter
+  q: string
+  source: SourceFilter
+  broadcastScope: VideoBroadcastScope
+  broadcastId: string
+}) {
   const params = new URLSearchParams()
   const folderParam = getFolderParam(folder)
   if (folderParam) params.set('folder', folderParam)
   if (q) params.set('q', q)
   if (source !== 'all') params.set('source', source)
+  params.set('broadcastScope', broadcastScope)
+  if (broadcastScope !== 'global' && broadcastId) params.set('broadcastId', broadcastId)
 
   const query = params.toString()
   return query ? `/dashboard/videos?${query}` : '/dashboard/videos'
@@ -654,4 +793,70 @@ function buildVideosHref({ folder, q, source }: { folder: FolderFilter; q: strin
 
 function isVideoLinkedToEducation(video: { isPublished: boolean; folder: { isPublished: boolean } | null }) {
   return video.isPublished && (!video.folder || video.folder.isPublished)
+}
+
+async function loadVideoBroadcastConfig(
+  scope: VideoBroadcastScope,
+  targetId: string
+): Promise<ResolvedVideoBroadcastConfig> {
+  const config =
+    scope === 'group' && targetId
+      ? await getGroupVideoBroadcast(targetId)
+      : scope === 'device' && targetId
+        ? await getDeviceVideoBroadcast(targetId)
+        : scope === 'global'
+          ? await getGlobalVideoBroadcast()
+          : null
+
+  const safeConfig: VideoBroadcastConfig = config ?? FALLBACK_VIDEO_BROADCAST_CONFIG
+  if (!safeConfig.videoId) {
+    return {
+      ...safeConfig,
+      videoTitle: '',
+      videoUrl: '',
+      thumbnailUrl: '',
+      scopeApplied: scope === 'global' ? 'global' : 'fallback',
+    }
+  }
+
+  const video = await prisma.educationVideo.findUnique({
+    where: { id: safeConfig.videoId },
+    include: { folder: true },
+  })
+
+  const isPlayable = Boolean(
+    video &&
+      video.isPublished &&
+      (!video.folder || video.folder.isPublished)
+  )
+
+  return {
+    ...safeConfig,
+    enabled: safeConfig.enabled && isPlayable,
+    videoTitle: video?.title || '',
+    videoUrl: video?.videoUrl || '',
+    thumbnailUrl: video?.thumbnailUrl || '',
+    scopeApplied: config ? scope : 'fallback',
+  }
+}
+
+function normalizeVideoBroadcastScope(value?: string): VideoBroadcastScope {
+  return value === 'group' || value === 'device' ? value : 'global'
+}
+
+function buildBroadcastRedirect(
+  returnQuery: string,
+  scope: VideoBroadcastScope,
+  targetId: string,
+  notice: string
+) {
+  const params = new URLSearchParams(returnQuery)
+  params.set('broadcastScope', scope)
+  if (scope === 'global') {
+    params.delete('broadcastId')
+  } else if (targetId) {
+    params.set('broadcastId', targetId)
+  }
+  params.set('notice', notice)
+  return `/dashboard/videos?${params.toString()}`
 }

@@ -40,6 +40,7 @@ class DataStoreManager(private val context: Context) {
         val TECHNICIAN_PIN = stringPreferencesKey("technician_pin")
         val NTP_SERVER = stringPreferencesKey("ntp_server")
         val HOME_EXPERIENCE_JSON = stringPreferencesKey("home_experience_json")
+        val VIDEO_BROADCAST_JSON = stringPreferencesKey("video_broadcast_json")
     }
 
     // Generate or get existing Device ID
@@ -373,6 +374,26 @@ class DataStoreManager(private val context: Context) {
                 prefs[HOME_EXPERIENCE_JSON] = normalized
             }
             addLog("Home experience profile updated from server.")
+        }
+    }
+
+    val videoBroadcastJsonFlow: Flow<String> = context.dataStore.data.map { prefs ->
+        prefs[VIDEO_BROADCAST_JSON] ?: ""
+    }
+
+    suspend fun getVideoBroadcastJson(): String {
+        val prefs = context.dataStore.data.first()
+        return prefs[VIDEO_BROADCAST_JSON] ?: ""
+    }
+
+    suspend fun setVideoBroadcastJson(json: String) {
+        val normalized = json.trim()
+        val current = getVideoBroadcastJson()
+        if (current != normalized) {
+            context.dataStore.edit { prefs ->
+                prefs[VIDEO_BROADCAST_JSON] = normalized
+            }
+            addLog("Video broadcast profile updated from server.")
         }
     }
 

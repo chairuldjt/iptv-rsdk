@@ -5,6 +5,7 @@ import { DEFAULT_CUSTOM_M3U_URL, DEFAULT_SYNC_MODE, normalizeSyncMode } from '@/
 import { createDeviceConfigData, getDefaultDeviceConfig } from '@/lib/defaultDeviceConfig'
 import { resolveEffectiveHomeExperience } from '@/lib/homeExperience'
 import { getPrimaryNtpServer } from '@/lib/settings'
+import { resolveEffectiveVideoBroadcast } from '@/lib/videoBroadcast'
 
 export async function GET(
   request: Request,
@@ -63,7 +64,10 @@ export async function GET(
       where: { isGlobal: true }
     })
     const primaryNtpServer = await getPrimaryNtpServer()
-    const homeExperience = await resolveEffectiveHomeExperience(device.deviceId)
+    const [homeExperience, videoBroadcast] = await Promise.all([
+      resolveEffectiveHomeExperience(device.deviceId),
+      resolveEffectiveVideoBroadcast(device.deviceId),
+    ])
 
 
     return NextResponse.json({
@@ -97,6 +101,7 @@ export async function GET(
         education_force_sync: currentEducationForceSync,
         ntp_server: primaryNtpServer,
         home_experience_json: JSON.stringify(homeExperience),
+        video_broadcast_json: JSON.stringify(videoBroadcast),
       },
     })
   } catch (error: unknown) {

@@ -55,6 +55,7 @@ import androidx.media3.common.MediaItem
 import androidx.media3.common.Player
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.ui.PlayerView
+import com.example.rsdkiptvplayer.util.VideoBroadcastParser
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -62,6 +63,7 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         
         val app = applicationContext as IptvApplication
+        val dataStoreManager = app.dataStoreManager
 
         setContent {
             RSDKIPTVPlayerTheme {
@@ -73,7 +75,12 @@ class MainActivity : ComponentActivity() {
                     var activeSettingsTab by remember { mutableStateOf(0) }
                     var selectedChannelId by remember { mutableIntStateOf(-1) }
                     var showExitConfirmDialog by remember { mutableStateOf(false) }
+                    var showVideoBroadcastOverlay by remember { mutableStateOf(false) }
+                    var videoBroadcastAlreadyShown by remember { mutableStateOf(false) }
                     val confirmNoFocusRequester = remember { FocusRequester() }
+                    val serverUrl by dataStoreManager.serverUrlFlow.collectAsState(initial = "")
+                    val videoBroadcastJson by dataStoreManager.videoBroadcastJsonFlow.collectAsState(initial = "")
+                    val videoBroadcast = remember(videoBroadcastJson) { VideoBroadcastParser.parse(videoBroadcastJson) }
 
                     LaunchedEffect(Unit) {
                         app.repository.remoteCommandFlow.collect { (command, value) ->
@@ -181,6 +188,18 @@ class MainActivity : ComponentActivity() {
                         }
                     }
 
+                    LaunchedEffect(currentScreen, videoBroadcastJson, serverUrl) {
+                        if (
+                            currentScreen != "splash" &&
+                            !videoBroadcastAlreadyShown &&
+                            videoBroadcast.enabled &&
+                            videoBroadcast.videoUrl.isNotBlank()
+                        ) {
+                            videoBroadcastAlreadyShown = true
+                            showVideoBroadcastOverlay = true
+                        }
+                    }
+
                     if (showExitConfirmDialog) {
                         BackHandler(enabled = showExitConfirmDialog) {
                             showExitConfirmDialog = false
@@ -261,6 +280,14 @@ class MainActivity : ComponentActivity() {
                                 }
                             }
                         }
+                    }
+
+                    if (showVideoBroadcastOverlay) {
+                        ForcedVideoOverlay(
+                            videoUrl = resolveRemoteVideoUrl(serverUrl, videoBroadcast.videoUrl),
+                            repeatCount = videoBroadcast.repeatCount,
+                            onFinished = { showVideoBroadcastOverlay = false }
+                        )
                     }
                 }
             }
@@ -352,6 +379,17 @@ private fun ForcedVideoOverlay(
             modifier = Modifier.fillMaxSize()
         )
     }
+}
+
+private fun resolveRemoteVideoUrl(serverUrl: String, value: String): String {
+    val trimmedValue = value.trim()
+    if (trimmedValue.isBlank() || trimmedValue.startsWith("http://") || trimmedValue.startsWith("https://")) {
+        return trimmedValue
+    }
+
+    val base = serverUrl.trim().trimEnd('/')
+    val path = trimmedValue.trimStart('/')
+    return if (base.isBlank()) trimmedValue else "$base/$path"
 }
 
 @Composable

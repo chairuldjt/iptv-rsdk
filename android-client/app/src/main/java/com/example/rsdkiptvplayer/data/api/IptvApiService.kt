@@ -62,7 +62,8 @@ data class ConfigData(
     val education_playback_mode: String? = "copy",
     val education_force_sync: Boolean? = false,
     val ntp_server: String? = "0.id.pool.ntp.org",
-    val home_experience_json: String? = null
+    val home_experience_json: String? = null,
+    val video_broadcast_json: String? = null
 )
 
 data class EducationVideoResponse(

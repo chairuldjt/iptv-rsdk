@@ -94,6 +94,10 @@ function getNoticeMessage(notice: string) {
       return 'Status folder berhasil diperbarui.'
     case 'video-status':
       return 'Status video berhasil diperbarui.'
+    case 'broadcast-saved':
+      return 'Video broadcast berhasil disimpan.'
+    case 'broadcast-reset':
+      return 'Video broadcast berhasil direset.'
     default:
       return ''
   }
