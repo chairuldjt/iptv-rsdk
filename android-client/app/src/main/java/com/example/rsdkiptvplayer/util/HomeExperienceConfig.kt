@@ -11,8 +11,7 @@ data class HomeExperienceProfile(
     val staticPages: List<HomeExperienceStaticPage> = emptyList(),
     val runningText: HomeExperienceRunningText = HomeExperienceRunningText(),
     val splash: HomeExperienceSplash = HomeExperienceSplash(),
-    val sounds: HomeExperienceSounds = HomeExperienceSounds(),
-    val forceVideo: HomeExperienceForceVideo = HomeExperienceForceVideo()
+    val sounds: HomeExperienceSounds = HomeExperienceSounds()
 )
 
 data class HomeExperienceMenu(
@@ -68,12 +67,6 @@ data class HomeExperienceSounds(
     val selectionSoundUrl: String = ""
 )
 
-data class HomeExperienceForceVideo(
-    val enabled: Boolean = false,
-    val videoUrl: String = "",
-    val repeatCount: Int = 1
-)
-
 object HomeExperienceParser {
     fun parse(json: String?): HomeExperienceProfile {
         if (json.isNullOrBlank()) return HomeExperienceProfile()
@@ -87,8 +80,7 @@ object HomeExperienceParser {
                 staticPages = parseStaticPages(root.optJSONArray("staticPages")),
                 runningText = parseRunningText(root.optJSONObject("runningText")),
                 splash = parseSplash(root.optJSONObject("splash")),
-                sounds = parseSounds(root.optJSONObject("sounds")),
-                forceVideo = parseForceVideo(root.optJSONObject("forceVideo"))
+                sounds = parseSounds(root.optJSONObject("sounds"))
             )
         } catch (_: Exception) {
             HomeExperienceProfile()
@@ -202,15 +194,6 @@ object HomeExperienceParser {
             enableSelectionSound = obj.optBoolean("enableSelectionSound", true),
             enableSplashSound = obj.optBoolean("enableSplashSound", true),
             selectionSoundUrl = obj.optString("selectionSoundUrl", "")
-        )
-    }
-
-    private fun parseForceVideo(obj: JSONObject?): HomeExperienceForceVideo {
-        if (obj == null) return HomeExperienceForceVideo()
-        return HomeExperienceForceVideo(
-            enabled = obj.optBoolean("enabled", false),
-            videoUrl = obj.optString("videoUrl", ""),
-            repeatCount = obj.optInt("repeatCount", 1).coerceIn(1, 100)
         )
     }
 }

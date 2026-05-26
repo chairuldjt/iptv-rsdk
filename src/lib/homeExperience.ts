@@ -69,11 +69,6 @@ export type HomeExperienceConfig = {
     enableSplashSound: boolean
     selectionSoundUrl: string
   }
-  forceVideo: {
-    enabled: boolean
-    videoUrl: string
-    repeatCount: number
-  }
 }
 
 export const FALLBACK_HOME_EXPERIENCE_CONFIG: HomeExperienceConfig = {
@@ -188,11 +183,6 @@ export const FALLBACK_HOME_EXPERIENCE_CONFIG: HomeExperienceConfig = {
     enableSplashSound: true,
     selectionSoundUrl: '',
   },
-  forceVideo: {
-    enabled: false,
-    videoUrl: '',
-    repeatCount: 1,
-  },
 }
 
 export async function getGlobalHomeExperience(): Promise<HomeExperienceConfig> {
@@ -268,11 +258,6 @@ export function homeExperienceFromFormData(formData: FormData): HomeExperienceCo
       enableSplashSound: formData.get('enableSplashSound') === 'on',
       selectionSoundUrl: formData.get('selectionSoundUrl'),
     },
-    forceVideo: {
-      enabled: formData.get('forceVideoEnabled') === 'on',
-      videoUrl: formData.get('forceVideoUrl'),
-      repeatCount: Number.parseInt(String(formData.get('forceVideoRepeatCount') || 1), 10),
-    },
   })
 }
 
@@ -288,7 +273,6 @@ export function normalizeHomeExperienceConfig(value: unknown): HomeExperienceCon
     runningText: normalizeRunningText(source.runningText),
     splash: normalizeSplash(source.splash),
     sounds: normalizeSounds(source.sounds),
-    forceVideo: normalizeForceVideo(source.forceVideo),
   }
 }
 
@@ -313,10 +297,6 @@ export function deepMergeHomeExperience(
     sounds: {
       ...base.sounds,
       ...overrideConfig.sounds,
-    },
-    forceVideo: {
-      ...base.forceVideo,
-      ...overrideConfig.forceVideo,
     },
     menus: overrideConfig.menus,
     staticPages: overrideConfig.staticPages,
@@ -446,15 +426,6 @@ function normalizeSounds(value: unknown): HomeExperienceConfig['sounds'] {
     enableSelectionSound: safeBoolean(source.enableSelectionSound, FALLBACK_HOME_EXPERIENCE_CONFIG.sounds.enableSelectionSound),
     enableSplashSound: safeBoolean(source.enableSplashSound, FALLBACK_HOME_EXPERIENCE_CONFIG.sounds.enableSplashSound),
     selectionSoundUrl: safeString(source.selectionSoundUrl, ''),
-  }
-}
-
-function normalizeForceVideo(value: unknown): HomeExperienceConfig['forceVideo'] {
-  const source = isRecord(value) ? value : {}
-  return {
-    enabled: safeBoolean(source.enabled, false),
-    videoUrl: safeString(source.videoUrl, ''),
-    repeatCount: clampInt(source.repeatCount, 1, 100, 1),
   }
 }
 

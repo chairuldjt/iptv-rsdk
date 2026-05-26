@@ -55,7 +55,6 @@ import androidx.media3.common.MediaItem
 import androidx.media3.common.Player
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.ui.PlayerView
-import com.example.rsdkiptvplayer.util.HomeExperienceParser
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -63,7 +62,6 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         
         val app = applicationContext as IptvApplication
-        val dataStoreManager = app.dataStoreManager
 
         setContent {
             RSDKIPTVPlayerTheme {
@@ -75,11 +73,7 @@ class MainActivity : ComponentActivity() {
                     var activeSettingsTab by remember { mutableStateOf(0) }
                     var selectedChannelId by remember { mutableIntStateOf(-1) }
                     var showExitConfirmDialog by remember { mutableStateOf(false) }
-                    var showForcedVideoOverlay by remember { mutableStateOf(false) }
-                    var forceVideoAlreadyShown by remember { mutableStateOf(false) }
                     val confirmNoFocusRequester = remember { FocusRequester() }
-                    val homeExperienceJson by dataStoreManager.homeExperienceJsonFlow.collectAsState(initial = "")
-                    val homeExperience = remember(homeExperienceJson) { HomeExperienceParser.parse(homeExperienceJson) }
 
                     LaunchedEffect(Unit) {
                         app.repository.remoteCommandFlow.collect { (command, value) ->
@@ -185,26 +179,6 @@ class MainActivity : ComponentActivity() {
                                 onBack = { currentScreen = "home" }
                             )
                         }
-                    }
-
-                    LaunchedEffect(currentScreen, homeExperienceJson) {
-                        if (
-                            currentScreen != "splash" &&
-                            !forceVideoAlreadyShown &&
-                            homeExperience.forceVideo.enabled &&
-                            homeExperience.forceVideo.videoUrl.isNotBlank()
-                        ) {
-                            forceVideoAlreadyShown = true
-                            showForcedVideoOverlay = true
-                        }
-                    }
-
-                    if (showForcedVideoOverlay) {
-                        ForcedVideoOverlay(
-                            videoUrl = homeExperience.forceVideo.videoUrl,
-                            repeatCount = homeExperience.forceVideo.repeatCount,
-                            onFinished = { showForcedVideoOverlay = false }
-                        )
                     }
 
                     if (showExitConfirmDialog) {

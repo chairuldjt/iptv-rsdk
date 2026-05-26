@@ -15,9 +15,8 @@ Target fitur:
 - [x] 7. Icon, nama menu, sub teks, warna teks, dan border selection per menu
 - [x] 8. Tambah menu baru di homescreen
 - [~] 9. Sound effect
-- [~] 10. Force tampilkan video overlay dari menu mana pun, lalu kembali ke layar sebelumnya
-- [x] 11. Group di device manager
-- [x] 12. Semua poin 1-10 bisa di-apply per device / per group
+- [x] 10. Group di device manager
+- [x] 11. Semua poin 1-9 bisa di-apply per device / per group
 
 ## Aturan Penerapan
 
@@ -52,7 +51,7 @@ Target fitur:
 - [x] Halaman group config
 - [x] Halaman device override config
 - [x] Manajemen device group dari Device Manager
-- [x] Upload field untuk asset image/audio/video terkait home experience
+- [x] Upload field untuk asset image/audio terkait home experience
 - [x] Checklist/preview status config efektif
 
 ### D. Android Client Shell
@@ -67,14 +66,11 @@ Target fitur:
 - [x] Halaman statis aktif
 - [x] Running text global aktif
 - [~] Sound effect configurable
-- [~] Video overlay paksa aktif
-- [x] Kembali ke layar sebelumnya setelah video overlay selesai
 
 ### E. Asset & Delivery
 
 - [x] Asset image disajikan dari backend/public uploads
 - [x] Asset audio disajikan dari backend/public uploads
-- [x] Asset video overlay disajikan dari backend/public uploads
 - [x] Client punya fallback default bila asset kosong / gagal dimuat
 - [x] Asset non-kritis tidak membuat app gagal render
 
@@ -87,7 +83,6 @@ Target fitur:
 - [x] Uji hide/show menu
 - [x] Uji halaman statis
 - [x] Uji running text
-- [~] Uji force video overlay
 - [x] Uji device group assignment
 - [x] Uji langsung via ADB pada device online
 
@@ -95,6 +90,6 @@ Target fitur:
 
 - Device saat ini hanya menerapkan perubahan setelah restart aplikasi.
 - `Sound effect` saat ini sudah mendukung enable/disable dan remote URL untuk splash serta selection sound, tetapi belum ada library soundboard / multi-event audio yang lebih lengkap.
-- `Force video overlay` saat ini sudah bisa dipicu dari profile saat app start dan kembali ke layar sebelumnya setelah selesai. Trigger live penuh tanpa restart dari screen mana pun masih perlu tahap lanjutan.
+- `Force video` sudah dikeluarkan dari ruang lingkup Home Experience dan akan lebih cocok dikelola dari repository / modul video terpisah.
 - Group dan assignment saat ini disimpan di backend melalui `app_settings` JSON, belum menjadi tabel Prisma terpisah.
 - Beberapa poin membutuhkan kemampuan shell Android baru terlebih dahulu. Setelah kemampuan itu ditanam ke APK, perubahan berikutnya dapat dilakukan dari server tanpa update APK lagi.

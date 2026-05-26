@@ -74,7 +74,7 @@ Untuk mempermudah pengembangan backend (Web Admin & API) serta frontend (Android
    Menjelaskan strategi agar perubahan harian semaksimal mungkin dikirim dari server web tanpa reinstall APK, termasuk batasan, kategori asset dinamis, desain manifest sync, dan roadmap implementasi.
 
 9. **[Progress Home Experience](docs/HOME_EXPERIENCE_PROGRESS.md)**  
-   Checklist progress implementasi fitur splash, home background, running text, static page, force video, device group, dan penerapan per global/group/device.
+   Checklist progress implementasi fitur splash, home background, running text, static page, device group, dan penerapan per global/group/device.
 
 ---
 

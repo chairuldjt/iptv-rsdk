@@ -59,9 +59,6 @@ export default function HomeExperienceForm({
   const [enableSelectionSound, setEnableSelectionSound] = useState(config.sounds.enableSelectionSound)
   const [enableSplashSound, setEnableSplashSound] = useState(config.sounds.enableSplashSound)
   const [selectionSoundUrl, setSelectionSoundUrl] = useState(config.sounds.selectionSoundUrl)
-  const [forceVideoEnabled, setForceVideoEnabled] = useState(config.forceVideo.enabled)
-  const [forceVideoRepeatCount, setForceVideoRepeatCount] = useState(config.forceVideo.repeatCount)
-  const [forceVideoUrl, setForceVideoUrl] = useState(config.forceVideo.videoUrl)
 
   const staticPageOptions = useMemo(
     () => staticPages.map((page) => ({ id: page.id, title: page.title || page.id })),
@@ -356,22 +353,6 @@ export default function HomeExperienceForm({
         </section>
 
         <section className="space-y-4 border-t border-border pt-6">
-          <SectionTitle title="Force Video Overlay" description="Memaksa video tampil penuh layar setelah restart aplikasi." />
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-            <Toggle name="forceVideoEnabled" checked={forceVideoEnabled} onChange={setForceVideoEnabled} title="Enable Force Video" description="Aktifkan mode video prioritas dari server." />
-            <Field label="Repeat Count">
-              <input type="number" name="forceVideoRepeatCount" min={1} max={100} value={forceVideoRepeatCount} onChange={(e) => setForceVideoRepeatCount(Number.parseInt(e.target.value || '1', 10) || 1)} className="field-input" />
-            </Field>
-            <Field label="Force Video URL" wide>
-              <input type="url" name="forceVideoUrl" value={forceVideoUrl} onChange={(e) => setForceVideoUrl(e.target.value)} className="field-input font-mono" placeholder="https://.../video.mp4" />
-            </Field>
-            <Field label="Upload Force Video" wide>
-              <input type="file" name="forceVideoFile" accept="video/*" className="field-input py-2" />
-            </Field>
-          </div>
-        </section>
-
-        <section className="space-y-4 border-t border-border pt-6">
           <SectionTitle title="Live Preview" description="Preview cepat untuk splash, menu, dan running text berdasarkan state editor saat ini." />
           <HomeExperiencePreview
             config={{
@@ -405,12 +386,6 @@ export default function HomeExperienceForm({
                 enableSelectionSound,
                 enableSplashSound,
                 selectionSoundUrl,
-              },
-              forceVideo: {
-                ...config.forceVideo,
-                enabled: forceVideoEnabled,
-                repeatCount: forceVideoRepeatCount,
-                videoUrl: forceVideoUrl,
               },
             }}
           />

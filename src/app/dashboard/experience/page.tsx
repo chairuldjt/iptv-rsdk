@@ -39,7 +39,6 @@ async function saveHomeExperienceAction(formData: FormData) {
   config.splash.logoUrl = await resolveUploadedAsset(formData, 'splashLogoFile', 'splash-logo', config.splash.logoUrl)
   config.splash.soundUrl = await resolveUploadedAsset(formData, 'splashSoundFile', 'splash-sound', config.splash.soundUrl)
   config.sounds.selectionSoundUrl = await resolveUploadedAsset(formData, 'selectionSoundFile', 'selection-sound', config.sounds.selectionSoundUrl)
-  config.forceVideo.videoUrl = await resolveUploadedAsset(formData, 'forceVideoFile', 'force-video', config.forceVideo.videoUrl)
   config.menus = await Promise.all(
     config.menus.map(async (menu) => ({
       ...menu,
@@ -150,7 +149,7 @@ export default async function ExperiencePage({
     <div className="space-y-6 animate-fade-in">
       <PageHeader
         title="Home Experience"
-        description="Atur asset-driven splash, home menu, running text, halaman statis, dan force video dengan prioritas Global -> Group -> Device."
+        description="Atur asset-driven splash, home menu, running text, dan halaman statis dengan prioritas Global -> Group -> Device."
         badge="Server-Driven UI"
       />
 
