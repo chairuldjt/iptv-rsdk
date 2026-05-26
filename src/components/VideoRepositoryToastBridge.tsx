@@ -98,6 +98,8 @@ function getNoticeMessage(notice: string) {
       return 'Video broadcast berhasil disimpan.'
     case 'broadcast-reset':
       return 'Video broadcast berhasil direset.'
+    case 'broadcast-live':
+      return 'Perintah video broadcast live berhasil dikirim.'
     default:
       return ''
   }

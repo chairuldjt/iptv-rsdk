@@ -18,6 +18,7 @@ type VideoCardProps = {
     folder: { name: string; isPublished: boolean } | null
   }
   selectedFolder: FolderFilter
+  editHref: string
   onTogglePublished: (formData: FormData) => void | Promise<void>
   onDelete: (formData: FormData) => void | Promise<void>
 }
@@ -25,12 +26,12 @@ type VideoCardProps = {
 export default function VideoLibraryCard({
   video,
   selectedFolder,
+  editHref,
   onTogglePublished,
   onDelete,
 }: VideoCardProps) {
   const [playerOpen, setPlayerOpen] = useState(false)
   const isUpload = video.videoUrl.startsWith('/uploads/videos/')
-  const folderSuffix = selectedFolder ? `&folder=${selectedFolder}` : ''
   const linked = video.isPublished && (!video.folder || video.folder.isPublished)
   const updatedAtLabel = new Date(video.updatedAt).toLocaleDateString('id-ID')
   const statusLabel = linked ? 'Linked' : video.isPublished ? 'Not Linked' : 'Aktif Off'
@@ -147,7 +148,7 @@ export default function VideoLibraryCard({
               Preview
             </button>
             <a
-              href={`/dashboard/videos?edit=${video.id}${folderSuffix}`}
+              href={editHref}
               className="btn bg-white/5 text-slate-300 border border-white/10 hover:bg-white/10 hover:text-white py-1.5 px-3.5 text-xs rounded-xl inline-flex items-center gap-1.5 transition-all"
             >
               <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>

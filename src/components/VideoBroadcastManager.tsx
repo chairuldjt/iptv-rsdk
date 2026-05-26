@@ -29,6 +29,7 @@ type VideoBroadcastManagerProps = {
   devices: DeviceOption[]
   onSaveAction: (formData: FormData) => void | Promise<void>
   onResetAction: (formData: FormData) => void | Promise<void>
+  onPlayNowAction: (formData: FormData) => void | Promise<void>
 }
 
 export default function VideoBroadcastManager({
@@ -41,6 +42,7 @@ export default function VideoBroadcastManager({
   devices,
   onSaveAction,
   onResetAction,
+  onPlayNowAction,
 }: VideoBroadcastManagerProps) {
   const pathname = usePathname()
   const router = useRouter()
@@ -196,9 +198,18 @@ export default function VideoBroadcastManager({
           <div><span className="text-slate-500">Status:</span> {config.enabled && config.videoUrl ? 'Siap diputar setelah restart' : 'Tidak aktif'}</div>
         </div>
 
-        <button type="submit" className="w-full btn bg-indigo-600 hover:bg-indigo-500 text-white font-bold py-2.5 text-xs rounded-xl shadow-[0_4px_12px_rgba(99,102,241,0.2)] cursor-pointer transition-all">
-          Simpan Video Broadcast
-        </button>
+        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+          <button type="submit" className="w-full btn bg-indigo-600 hover:bg-indigo-500 text-white font-bold py-2.5 text-xs rounded-xl shadow-[0_4px_12px_rgba(99,102,241,0.2)] cursor-pointer transition-all">
+            Simpan Broadcast
+          </button>
+          <button
+            type="submit"
+            formAction={onPlayNowAction}
+            className="w-full rounded-xl border border-emerald-400/20 bg-emerald-500/10 py-2.5 text-xs font-semibold text-emerald-300 hover:bg-emerald-500/15"
+          >
+            Tampilkan Sekarang
+          </button>
+        </div>
       </form>
 
       <form action={onResetAction} className="border-t border-white/6 pt-4">

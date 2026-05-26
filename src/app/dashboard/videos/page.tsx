@@ -20,6 +20,7 @@ import {
   videoBroadcastFromFormData,
 } from '@/lib/videoBroadcast'
 import { getDeviceGroupAssignments, getDeviceGroups } from '@/lib/deviceGroups'
+import { pushCommand } from '@/lib/remoteQueue'
 import {
   createFolderAction,
   deleteFolderAction,
@@ -71,11 +72,32 @@ async function resetVideoBroadcastAction(formData: FormData) {
   redirect(buildBroadcastRedirect(returnQuery, scope, targetId, 'broadcast-reset'))
 }
 
+async function playVideoBroadcastNowAction(formData: FormData) {
+  'use server'
+  const scope = normalizeVideoBroadcastScope((formData.get('scope') as string) || 'global')
+  const targetId = ((formData.get('targetId') as string) || '').trim()
+  const returnQuery = ((formData.get('returnQuery') as string) || '').trim()
+  const config = videoBroadcastFromFormData(formData)
+
+  const payload = await resolveLiveBroadcastPayload(config)
+  if (!payload) {
+    redirect(buildBroadcastRedirect(returnQuery, scope, targetId, 'broadcast-reset'))
+  }
+
+  const recipientIds = await resolveBroadcastRecipientIds(scope, targetId)
+  for (const deviceId of recipientIds) {
+    pushCommand(deviceId, 'PLAY_VIDEO_BROADCAST', JSON.stringify(payload))
+  }
+
+  redirect(buildBroadcastRedirect(returnQuery, scope, targetId, 'broadcast-live'))
+}
+
 export default async function VideosPage({
   searchParams,
 }: {
   searchParams: Promise<{
     edit?: string
+    compose?: string
     notice?: string
     folder?: string
     q?: string
@@ -83,15 +105,19 @@ export default async function VideosPage({
     manageFolder?: string
     broadcastScope?: string
     broadcastId?: string
+    broadcastModal?: string
   }>
 }) {
   const resolvedSearchParams = await searchParams
   const editId = resolvedSearchParams.edit ? parseInt(resolvedSearchParams.edit, 10) : null
+  const composeMode = resolvedSearchParams.compose || ''
   const selectedFolder = parseFolderFilter(resolvedSearchParams.folder)
   const sourceFilter = parseSourceFilter(resolvedSearchParams.source)
   const searchQuery = (resolvedSearchParams.q || '').trim()
   const broadcastScope = normalizeVideoBroadcastScope(resolvedSearchParams.broadcastScope)
   const broadcastTargetId = (resolvedSearchParams.broadcastId || '').trim()
+  const showVideoModal = composeMode === 'video' || Boolean(editId)
+  const showBroadcastModal = resolvedSearchParams.broadcastModal === '1'
 
   const [folders, videos, allVideoCount, unfiledCount, allPublishedCount, unfiledPublishedCount, broadcastVideos, groups, assignments, devices, broadcastConfig] = await Promise.all([
     prisma.educationFolder.findMany({
@@ -196,6 +222,30 @@ export default async function VideosPage({
     isActive: device.isActive,
     groupName: groups.find((group) => group.id === (assignments[device.deviceId] || ''))?.name || null,
   }))
+  const videoModalOpenHref = buildVideosHref({
+    folder: selectedFolder,
+    q: searchQuery,
+    source: sourceFilter,
+    broadcastScope,
+    broadcastId: broadcastTargetId,
+    compose: 'video',
+  })
+  const videoModalCloseHref = buildVideosHref({
+    folder: selectedFolder,
+    q: searchQuery,
+    source: sourceFilter,
+    broadcastScope,
+    broadcastId: broadcastTargetId,
+  })
+  const broadcastModalOpenHref = buildVideosHref({
+    folder: selectedFolder,
+    q: searchQuery,
+    source: sourceFilter,
+    broadcastScope,
+    broadcastId: broadcastTargetId,
+    broadcastModal: true,
+  })
+  const broadcastModalCloseHref = videoModalCloseHref
 
   return (
     <div className="video-repository-page mx-auto flex w-full max-w-[1660px] flex-col gap-6 animate-fade-in xl:h-full xl:overflow-hidden">
@@ -215,10 +265,28 @@ export default async function VideosPage({
       {/* Header section (Locked/Fixed at top in desktop) */}
       <div className="flex flex-col gap-1.5 shrink-0">
         <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-primary">EDUCATION MEDIA LIBRARY</span>
-        <h2 className="text-3xl font-extrabold tracking-tight text-white">Video Repository</h2>
-        <p className="text-xs text-slate-400 max-w-3xl leading-relaxed">
-          Kelola video edukasi untuk STB mode Web Repository. Gunakan folder, pencarian, dan sumber media untuk menjaga galeri tetap rapi.
-        </p>
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
+          <div>
+            <h2 className="text-3xl font-extrabold tracking-tight text-white">Video Repository</h2>
+            <p className="text-xs text-slate-400 max-w-3xl leading-relaxed">
+              Kelola galeri edukasi sekaligus video broadcast live untuk device, group, atau seluruh armada.
+            </p>
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            <a
+              href={broadcastModalOpenHref}
+              className="rounded-xl border border-emerald-400/20 bg-emerald-500/10 px-4 py-2 text-xs font-semibold text-emerald-300 hover:bg-emerald-500/15"
+            >
+              Video Broadcast
+            </a>
+            <a
+              href={videoModalOpenHref}
+              className="btn bg-indigo-600 hover:bg-indigo-500 text-white font-bold py-2 px-4 text-xs rounded-xl shadow-[0_4px_12px_rgba(99,102,241,0.2)] cursor-pointer transition-all"
+            >
+              Tambah Video
+            </a>
+          </div>
+        </div>
       </div>
 
       {/* Stats Cards Section (Locked/Fixed at top in desktop) */}
@@ -428,6 +496,14 @@ export default async function VideosPage({
                     folder: video.folder ? { name: video.folder.name, isPublished: video.folder.isPublished } : null,
                   }}
                   selectedFolder={selectedFolder}
+                  editHref={buildVideosHref({
+                    folder: selectedFolder,
+                    q: searchQuery,
+                    source: sourceFilter,
+                    broadcastScope,
+                    broadcastId: broadcastTargetId,
+                    edit: video.id,
+                  })}
                   onTogglePublished={toggleVideoPublishedAction}
                   onDelete={deleteVideoAction}
                 />
@@ -464,22 +540,48 @@ export default async function VideosPage({
 
         {/* Right Column: Forms (Scrolls independently in desktop) */}
         <aside className="desktop-scroll-column w-full xl:w-[360px] shrink-0 pr-1 flex flex-col gap-4 xl:min-h-0 min-h-0">
-          <VideoBroadcastManager
-            scope={broadcastScope}
-            targetId={broadcastTargetId}
-            currentScopeLabel={currentBroadcastScopeLabel}
-            config={broadcastConfig}
-            videos={broadcastVideos.map((video) => ({
-              id: video.id,
-              title: video.title,
-              folderName: video.folder?.name || null,
-              isPublished: video.isPublished,
-            }))}
-            groups={groups}
-            devices={deviceOptions}
-            onSaveAction={saveVideoBroadcastAction}
-            onResetAction={resetVideoBroadcastAction}
-          />
+          <section className="overflow-hidden rounded-[24px] border border-white/8 bg-slate-900/40 backdrop-blur-xl p-5 shadow-2xl shrink-0 space-y-4">
+            <div>
+              <h3 className="text-sm font-bold uppercase tracking-[0.2em] text-white">QUICK ACTIONS</h3>
+              <p className="mt-1 text-xs text-slate-400">Buka editor video atau panel broadcast tanpa memenuhi workspace utama.</p>
+            </div>
+            <div className="grid grid-cols-1 gap-2">
+              <a
+                href={videoModalOpenHref}
+                className="rounded-xl border border-white/8 bg-white/[0.02] px-4 py-3 text-xs font-semibold text-white hover:bg-white/[0.04]"
+              >
+                Tambah / Edit Video
+              </a>
+              <a
+                href={broadcastModalOpenHref}
+                className="rounded-xl border border-emerald-400/20 bg-emerald-500/10 px-4 py-3 text-xs font-semibold text-emerald-300 hover:bg-emerald-500/15"
+              >
+                Atur Video Broadcast
+              </a>
+            </div>
+          </section>
+
+          <section className="overflow-hidden rounded-[24px] border border-white/8 bg-slate-900/40 backdrop-blur-xl p-5 shadow-2xl shrink-0 space-y-4">
+            <div>
+              <h3 className="text-sm font-bold uppercase tracking-[0.2em] text-white">BROADCAST SUMMARY</h3>
+              <p className="mt-1 text-xs text-slate-400">Ringkasan config aktif untuk scope yang sedang dipilih.</p>
+            </div>
+            <div className="rounded-2xl border border-primary/15 bg-primary/10 px-3.5 py-3">
+              <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-primary">Scope Aktif</div>
+              <div className="mt-1 text-sm font-semibold text-white">{currentBroadcastScopeLabel}</div>
+              <div className="mt-1 text-[11px] text-slate-300">
+                Effective source: <span className="font-semibold text-white">{broadcastConfig.scopeApplied}</span>
+              </div>
+            </div>
+            <div className="rounded-2xl border border-white/8 bg-black/20 p-3.5 text-xs text-slate-300 space-y-1.5">
+              <div><span className="text-slate-500">Status:</span> {broadcastConfig.enabled && broadcastConfig.videoUrl ? 'Aktif' : 'Tidak aktif'}</div>
+              <div><span className="text-slate-500">Video:</span> <span className="font-semibold text-white">{broadcastConfig.videoTitle || 'Belum dipilih'}</span></div>
+              <div><span className="text-slate-500">Repeat:</span> {broadcastConfig.repeatCount}x</div>
+            </div>
+            <p className="text-[11px] leading-relaxed text-slate-400">
+              `Tampilkan Sekarang` akan mendorong command live ke device target. Saat app restart, config ini juga tetap dipakai sebagai fallback startup broadcast.
+            </p>
+          </section>
           
           {/* Card 1: Tambah Folder Form */}
           <section className="overflow-hidden rounded-[24px] border border-white/8 bg-slate-900/40 backdrop-blur-xl p-5 shadow-2xl shrink-0">
@@ -505,14 +607,6 @@ export default async function VideosPage({
               </div>
             </form>
           </section>
-
-          {/* Card 2: Tambah/Edit Video Form */}
-          <VideoRepoForm
-            key={editingVideo?.id ?? `new-${selectedFolder || 'all'}`}
-            folders={folders.map((folder) => ({ id: folder.id, name: folder.name }))}
-            selectedFolderId={typeof selectedFolder === 'number' ? selectedFolder : null}
-            editingVideo={editingVideo}
-          />
         </aside>
       </div>
 
@@ -598,6 +692,79 @@ export default async function VideosPage({
                 Pilih salah satu folder custom terlebih dahulu di menu sebelah kiri sebelum Anda dapat mengelolanya.
               </div>
             )}
+          </div>
+        </div>
+      )}
+
+      {showVideoModal && (
+        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/70 backdrop-blur-md p-4">
+          <div className="w-full max-w-2xl rounded-[28px] border border-white/8 bg-slate-950/95 p-5 shadow-2xl">
+            <div className="mb-4 flex items-start justify-between gap-4">
+              <div>
+                <div className="text-[10px] font-bold uppercase tracking-[0.2em] text-indigo-300">
+                  {editingVideo ? 'EDIT VIDEO' : 'TAMBAH VIDEO'}
+                </div>
+                <h3 className="mt-1 text-xl font-bold text-white">
+                  {editingVideo ? editingVideo.title : 'Video Baru'}
+                </h3>
+                <p className="mt-1 text-xs text-slate-400">
+                  Form dipisah ke modal supaya workspace repository tetap fokus ke pencarian, folder, dan review video.
+                </p>
+              </div>
+              <a
+                href={videoModalCloseHref}
+                className="rounded-xl border border-white/8 bg-white/[0.02] px-3 py-2 text-xs font-semibold text-slate-300 hover:bg-white/[0.05] hover:text-white"
+              >
+                Tutup
+              </a>
+            </div>
+
+            <VideoRepoForm
+              key={editingVideo?.id ?? `modal-new-${selectedFolder || 'all'}`}
+              folders={folders.map((folder) => ({ id: folder.id, name: folder.name }))}
+              selectedFolderId={typeof selectedFolder === 'number' ? selectedFolder : null}
+              editingVideo={editingVideo}
+            />
+          </div>
+        </div>
+      )}
+
+      {showBroadcastModal && (
+        <div className="fixed inset-0 z-[75] flex items-center justify-center bg-black/70 backdrop-blur-md p-4">
+          <div className="w-full max-w-3xl rounded-[28px] border border-white/8 bg-slate-950/95 p-5 shadow-2xl">
+            <div className="mb-4 flex items-start justify-between gap-4">
+              <div>
+                <div className="text-[10px] font-bold uppercase tracking-[0.2em] text-emerald-300">VIDEO BROADCAST</div>
+                <h3 className="mt-1 text-xl font-bold text-white">Kelola Broadcast & Trigger Live</h3>
+                <p className="mt-1 text-xs text-slate-400">
+                  Gunakan modal ini untuk menyimpan config fallback sekaligus mengirim trigger live tanpa restart aplikasi.
+                </p>
+              </div>
+              <a
+                href={broadcastModalCloseHref}
+                className="rounded-xl border border-white/8 bg-white/[0.02] px-3 py-2 text-xs font-semibold text-slate-300 hover:bg-white/[0.05] hover:text-white"
+              >
+                Tutup
+              </a>
+            </div>
+
+            <VideoBroadcastManager
+              scope={broadcastScope}
+              targetId={broadcastTargetId}
+              currentScopeLabel={currentBroadcastScopeLabel}
+              config={broadcastConfig}
+              videos={broadcastVideos.map((video) => ({
+                id: video.id,
+                title: video.title,
+                folderName: video.folder?.name || null,
+                isPublished: video.isPublished,
+              }))}
+              groups={groups}
+              devices={deviceOptions}
+              onSaveAction={saveVideoBroadcastAction}
+              onResetAction={resetVideoBroadcastAction}
+              onPlayNowAction={playVideoBroadcastNowAction}
+            />
           </div>
         </div>
       )}
@@ -772,12 +939,18 @@ function buildVideosHref({
   source,
   broadcastScope,
   broadcastId,
+  edit,
+  compose,
+  broadcastModal,
 }: {
   folder: FolderFilter
   q: string
   source: SourceFilter
   broadcastScope: VideoBroadcastScope
   broadcastId: string
+  edit?: number
+  compose?: string
+  broadcastModal?: boolean
 }) {
   const params = new URLSearchParams()
   const folderParam = getFolderParam(folder)
@@ -786,6 +959,9 @@ function buildVideosHref({
   if (source !== 'all') params.set('source', source)
   params.set('broadcastScope', broadcastScope)
   if (broadcastScope !== 'global' && broadcastId) params.set('broadcastId', broadcastId)
+  if (typeof edit === 'number' && Number.isFinite(edit)) params.set('edit', String(edit))
+  if (compose) params.set('compose', compose)
+  if (broadcastModal) params.set('broadcastModal', '1')
 
   const query = params.toString()
   return query ? `/dashboard/videos?${query}` : '/dashboard/videos'
@@ -859,4 +1035,61 @@ function buildBroadcastRedirect(
   }
   params.set('notice', notice)
   return `/dashboard/videos?${params.toString()}`
+}
+
+async function resolveLiveBroadcastPayload(config: VideoBroadcastConfig) {
+  if (!config.enabled || !config.videoId) return null
+
+  const video = await prisma.educationVideo.findUnique({
+    where: { id: config.videoId },
+    include: { folder: true },
+  })
+
+  const isPlayable = Boolean(
+    video &&
+      video.isPublished &&
+      (!video.folder || video.folder.isPublished)
+  )
+
+  if (!video || !isPlayable) return null
+
+  return {
+    enabled: true,
+    videoTitle: video.title,
+    videoUrl: video.videoUrl,
+    thumbnailUrl: video.thumbnailUrl || '',
+    repeatCount: config.repeatCount,
+    scopeApplied: 'live',
+  }
+}
+
+async function resolveBroadcastRecipientIds(scope: VideoBroadcastScope, targetId: string): Promise<string[]> {
+  if (scope === 'device') {
+    return targetId ? [targetId] : []
+  }
+
+  if (scope === 'group') {
+    if (!targetId) return []
+    const assignments = await getDeviceGroupAssignments()
+    const deviceIds = Object.entries(assignments)
+      .filter(([, groupId]) => groupId === targetId)
+      .map(([deviceId]) => deviceId)
+
+    if (deviceIds.length === 0) return []
+
+    const activeDevices = await prisma.device.findMany({
+      where: {
+        deviceId: { in: deviceIds },
+        isActive: true,
+      },
+      select: { deviceId: true },
+    })
+    return activeDevices.map((device) => device.deviceId)
+  }
+
+  const devices = await prisma.device.findMany({
+    where: { isActive: true },
+    select: { deviceId: true },
+  })
+  return devices.map((device) => device.deviceId)
 }

@@ -55,6 +55,7 @@ import androidx.media3.common.MediaItem
 import androidx.media3.common.Player
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.ui.PlayerView
+import com.example.rsdkiptvplayer.util.VideoBroadcastProfile
 import com.example.rsdkiptvplayer.util.VideoBroadcastParser
 
 class MainActivity : ComponentActivity() {
@@ -77,6 +78,7 @@ class MainActivity : ComponentActivity() {
                     var showExitConfirmDialog by remember { mutableStateOf(false) }
                     var showVideoBroadcastOverlay by remember { mutableStateOf(false) }
                     var videoBroadcastAlreadyShown by remember { mutableStateOf(false) }
+                    var activeVideoBroadcast by remember { mutableStateOf(VideoBroadcastProfile()) }
                     val confirmNoFocusRequester = remember { FocusRequester() }
                     val serverUrl by dataStoreManager.serverUrlFlow.collectAsState(initial = "")
                     val videoBroadcastJson by dataStoreManager.videoBroadcastJsonFlow.collectAsState(initial = "")
@@ -97,6 +99,13 @@ class MainActivity : ComponentActivity() {
                                     if (chId != null) {
                                         selectedChannelId = chId
                                         currentScreen = "player"
+                                    }
+                                }
+                                "PLAY_VIDEO_BROADCAST" -> {
+                                    val liveBroadcast = VideoBroadcastParser.parse(value)
+                                    if (liveBroadcast.enabled && liveBroadcast.videoUrl.isNotBlank()) {
+                                        activeVideoBroadcast = liveBroadcast
+                                        showVideoBroadcastOverlay = true
                                     }
                                 }
                             }
@@ -196,6 +205,7 @@ class MainActivity : ComponentActivity() {
                             videoBroadcast.videoUrl.isNotBlank()
                         ) {
                             videoBroadcastAlreadyShown = true
+                            activeVideoBroadcast = videoBroadcast
                             showVideoBroadcastOverlay = true
                         }
                     }
@@ -284,8 +294,8 @@ class MainActivity : ComponentActivity() {
 
                     if (showVideoBroadcastOverlay) {
                         ForcedVideoOverlay(
-                            videoUrl = resolveRemoteVideoUrl(serverUrl, videoBroadcast.videoUrl),
-                            repeatCount = videoBroadcast.repeatCount,
+                            videoUrl = resolveRemoteVideoUrl(serverUrl, activeVideoBroadcast.videoUrl),
+                            repeatCount = activeVideoBroadcast.repeatCount,
                             onFinished = { showVideoBroadcastOverlay = false }
                         )
                     }
