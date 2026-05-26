@@ -74,14 +74,18 @@ export default function VideoBroadcastManager({
     router.replace(`${pathname}?${params.toString()}`, { scroll: false })
   }
 
+  const isPlainSurface = surface === 'plain'
+
   return (
-    <section className={`${surface === 'card' ? 'overflow-hidden rounded-[24px] border border-white/8 bg-slate-900/40 p-5 shadow-2xl backdrop-blur-xl' : 'rounded-[22px] border border-white/8 bg-white/[0.02] p-5'} shrink-0 space-y-4`}>
-      <div>
-        <h3 className="text-sm font-bold uppercase tracking-[0.2em] text-white">VIDEO BROADCAST</h3>
-        <p className="mt-1 text-xs leading-relaxed text-slate-400">
-          Atur video prioritas dari repository untuk ditampilkan setelah aplikasi restart. Scope mengikuti prioritas Global -&gt; Group -&gt; Device.
-        </p>
-      </div>
+    <section className={`${isPlainSurface ? 'space-y-4' : 'overflow-hidden rounded-[24px] border border-white/8 bg-slate-900/40 p-5 shadow-2xl backdrop-blur-xl space-y-4'} shrink-0`}>
+      {!isPlainSurface && (
+        <div>
+          <h3 className="text-sm font-bold uppercase tracking-[0.2em] text-white">VIDEO BROADCAST</h3>
+          <p className="mt-1 text-xs leading-relaxed text-slate-400">
+            Atur video prioritas dari repository untuk ditampilkan setelah aplikasi restart. Scope mengikuti prioritas Global -&gt; Group -&gt; Device.
+          </p>
+        </div>
+      )}
 
       <div className="grid grid-cols-1 gap-3">
         <label>

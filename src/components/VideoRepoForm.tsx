@@ -57,6 +57,7 @@ export default function VideoRepoForm({
     : isEdit
       ? 'Simpan Perubahan'
       : 'Tambah ke Galeri'
+  const isPlainSurface = surface === 'plain'
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
@@ -108,15 +109,17 @@ export default function VideoRepoForm({
   }
 
   return (
-    <div className={`${surface === 'card' ? 'card rounded-2xl p-5' : 'rounded-[22px] border border-white/8 bg-white/[0.02] p-5'} flex-1 min-h-0`}>
-      <div className="mb-5">
-        <h3 className="text-sm font-bold uppercase tracking-[0.2em] text-white">
-          {isEdit ? 'PERBARUI VIDEO' : 'TAMBAH VIDEO'}
-        </h3>
-        <p className="mt-1 text-xs text-slate-400">
-          Masukkan URL video atau upload file lokal.
-        </p>
-      </div>
+    <div className={`${isPlainSurface ? '' : 'card rounded-2xl p-5'} flex-1 min-h-0`}>
+      {!isPlainSurface && (
+        <div className="mb-5">
+          <h3 className="text-sm font-bold uppercase tracking-[0.2em] text-white">
+            {isEdit ? 'PERBARUI VIDEO' : 'TAMBAH VIDEO'}
+          </h3>
+          <p className="mt-1 text-xs text-slate-400">
+            Masukkan URL video atau upload file lokal.
+          </p>
+        </div>
+      )}
 
       <form onSubmit={handleSubmit} className="space-y-4" encType="multipart/form-data">
         {isEdit && <input type="hidden" name="videoId" value={editingVideo.id} />}
