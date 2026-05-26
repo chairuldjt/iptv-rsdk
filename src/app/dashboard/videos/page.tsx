@@ -199,10 +199,10 @@ export default async function VideosPage({
         </aside>
 
         {/* Middle Column: Videos Workspace */}
-        <section className="desktop-scroll-column-hidden flex-1 min-w-0 flex flex-col gap-4 xl:min-h-0 min-h-0">
+        <section className="desktop-scroll-column-hidden relative flex-1 min-w-0 flex flex-col gap-4 xl:min-h-0 min-h-0">
           
           {/* Header Card (Fixed at top of Workspace column) */}
-          <div className="rounded-[24px] border border-white/8 bg-slate-900/40 backdrop-blur-xl p-4 shadow-2xl shrink-0">
+          <div className="relative z-20 overflow-visible rounded-[24px] border border-white/8 bg-slate-900/40 p-4 shadow-2xl backdrop-blur-xl shrink-0">
             <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
               
               {/* Workspace Title Info */}
@@ -237,14 +237,14 @@ export default async function VideosPage({
                 </form>
 
                 {/* Filter Dropdown */}
-                <details className="group relative select-none">
+                <details className="group relative z-20 select-none">
                   <summary className="btn bg-white/5 text-slate-300 border border-white/10 hover:bg-white/10 hover:text-white px-3.5 py-2 text-xs rounded-xl flex items-center gap-1.5 list-none cursor-pointer focus:outline-none select-none">
                     Filter
                     <svg className="w-3.5 h-3.5 transition-transform group-open:rotate-180 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                       <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5" />
                     </svg>
                   </summary>
-                  <div className="absolute right-0 mt-2 w-40 rounded-xl border border-white/8 bg-slate-950/95 p-1.5 shadow-2xl z-30 space-y-1">
+                  <div className="absolute right-0 top-full z-40 mt-2 w-40 rounded-xl border border-white/8 bg-slate-950/95 p-1.5 shadow-2xl space-y-1">
                     <a
                       href={buildVideosHref({ folder: selectedFolder, q: searchQuery, source: 'all' })}
                       className={`block rounded-lg px-2.5 py-2 text-xs font-semibold hover:bg-white/5 transition-colors ${
@@ -273,14 +273,14 @@ export default async function VideosPage({
                 </details>
 
                 {/* Sort Dropdown */}
-                <details className="group relative select-none">
+                <details className="group relative z-20 select-none">
                   <summary className="btn bg-white/5 text-slate-300 border border-white/10 hover:bg-white/10 hover:text-white px-3.5 py-2 text-xs rounded-xl flex items-center gap-1.5 list-none cursor-pointer focus:outline-none select-none">
                     Terbaru
                     <svg className="w-3.5 h-3.5 transition-transform group-open:rotate-180 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                       <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5" />
                     </svg>
                   </summary>
-                  <div className="absolute right-0 mt-2 w-32 rounded-xl border border-white/8 bg-slate-950/95 p-1.5 shadow-2xl z-30">
+                  <div className="absolute right-0 top-full z-40 mt-2 w-32 rounded-xl border border-white/8 bg-slate-950/95 p-1.5 shadow-2xl">
                     <div className="rounded-lg px-2.5 py-2 text-xs font-bold text-indigo-400 bg-white/5 text-center">
                       Terbaru
                     </div>
@@ -302,7 +302,7 @@ export default async function VideosPage({
           </div>
 
           {/* Scrollable Videos List (Scrolls independently in desktop) */}
-          <div className="xl:flex-1 xl:overflow-y-auto flex flex-col gap-4 min-h-0 pr-1">
+          <div className="relative z-0 xl:flex-1 xl:overflow-y-auto flex flex-col gap-4 min-h-0 pr-1">
             {visibleVideos.length === 0 ? (
               <EmptyVideoState hasFilters={hasFilters} />
             ) : (
@@ -655,4 +655,3 @@ function buildVideosHref({ folder, q, source }: { folder: FolderFilter; q: strin
 function isVideoLinkedToEducation(video: { isPublished: boolean; folder: { isPublished: boolean } | null }) {
   return video.isPublished && (!video.folder || video.folder.isPublished)
 }
-
