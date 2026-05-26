@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import prisma from '@/lib/db'
 import { getErrorMessage } from '@/lib/errors'
+import { resolvePublicOrigin } from '@/lib/publicOrigin'
 
 export async function GET(request: Request) {
   try {
@@ -38,10 +39,8 @@ export async function GET(request: Request) {
 
     const updateAvailable = activeUpdate.versionCode > currentVersionCode
 
-    // Construct download URL dynamically from request host
-    const host = request.headers.get('host') || 'localhost:3000'
-    const protocol = request.headers.get('x-forwarded-proto') || 'http'
-    const apkUrl = `${protocol}://${host}/uploads/apk/${activeUpdate.apkFileName}`
+    const origin = await resolvePublicOrigin(request)
+    const apkUrl = new URL('/iptv.apk', origin).toString()
 
     return NextResponse.json({
       status: true,

@@ -2,13 +2,17 @@ import prisma from '@/lib/db'
 import ConfirmForm from '@/components/ConfirmForm'
 import UploadApkForm from '@/components/UploadApkForm'
 import PageHeader from '@/components/PageHeader'
+import CopyDownloadLinkButton from '@/components/CopyDownloadLinkButton'
 import { deployUpdateAction, deleteUpdateAction } from './actions'
+import { getAppPublicOrigin } from '@/lib/settings'
 
 export const revalidate = 0
 
 export default async function UpdatesPage() {
   const updates = await prisma.appUpdate.findMany({ orderBy: { versionCode: 'desc' } })
   const deployedUpdate = updates.find(u => u.isDeployed)
+  const appPublicOrigin = await getAppPublicOrigin()
+  const latestApkUrl = createLatestApkUrl(appPublicOrigin)
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -22,25 +26,44 @@ export default async function UpdatesPage() {
 
         <div className="lg:col-span-2 space-y-6">
           {deployedUpdate && (
-            <div className="p-5 rounded-2xl bg-primary/10 border border-primary/20 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-              <div>
-                <span className="badge badge-success">Active OTA Version</span>
-                <h4 className="font-bold text-foreground text-lg mt-2">v{deployedUpdate.versionName} <span className="text-primary font-mono text-xs">({deployedUpdate.versionCode})</span></h4>
-                <p className="text-muted-foreground text-[10px] mt-1 font-mono">File: {deployedUpdate.apkFileName}</p>
-                {deployedUpdate.changelog && (
-                  <div className="mt-3 bg-background/60 p-3 rounded-xl border border-border max-w-lg">
-                    <span className="text-[9px] uppercase font-semibold text-muted-foreground">Changelog:</span>
-                    <p className="text-foreground/80 text-xs whitespace-pre-line mt-1 font-medium">{deployedUpdate.changelog}</p>
-                  </div>
-                )}
-              </div>
-              <div className="flex flex-col items-end gap-3 self-end md:self-center shrink-0">
-                <div className="text-[10px] text-right font-semibold text-muted-foreground font-mono">
-                  Deployed: {new Date(deployedUpdate.updatedAt).toLocaleDateString()}
+            <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_340px] gap-4">
+              <div className="p-5 rounded-2xl bg-primary/10 border border-primary/20 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                <div>
+                  <span className="badge badge-success">Active OTA Version</span>
+                  <h4 className="font-bold text-foreground text-lg mt-2">v{deployedUpdate.versionName} <span className="text-primary font-mono text-xs">({deployedUpdate.versionCode})</span></h4>
+                  <p className="text-muted-foreground text-[10px] mt-1 font-mono">File: {deployedUpdate.apkFileName}</p>
+                  {deployedUpdate.changelog && (
+                    <div className="mt-3 bg-background/60 p-3 rounded-xl border border-border max-w-lg">
+                      <span className="text-[9px] uppercase font-semibold text-muted-foreground">Changelog:</span>
+                      <p className="text-foreground/80 text-xs whitespace-pre-line mt-1 font-medium">{deployedUpdate.changelog}</p>
+                    </div>
+                  )}
                 </div>
-                <a href={createApkDownloadUrl(deployedUpdate.apkFileName)} download={deployedUpdate.apkFileName}
-                  className="btn btn-xs text-emerald-400 border border-emerald-500/20 hover:bg-emerald-500/10">
-                  Download APK
+                <div className="flex flex-col items-end gap-3 self-end md:self-center shrink-0">
+                  <div className="text-[10px] text-right font-semibold text-muted-foreground font-mono">
+                    Deployed: {new Date(deployedUpdate.updatedAt).toLocaleDateString()}
+                  </div>
+                  <a href={createApkDownloadUrl(deployedUpdate.apkFileName)} download={deployedUpdate.apkFileName}
+                    className="btn btn-xs text-emerald-400 border border-emerald-500/20 hover:bg-emerald-500/10">
+                    Download APK
+                  </a>
+                </div>
+              </div>
+
+              <div className="card rounded-2xl p-5 border border-sky-500/20 bg-sky-500/5">
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <span className="badge badge-primary">Short Download Link</span>
+                    <h4 className="font-semibold text-foreground text-sm mt-2">Selalu ke APK terbaru</h4>
+                    <p className="text-[11px] text-muted-foreground mt-1">Link ini otomatis mengunduh versi deployed terbaru.</p>
+                  </div>
+                  <CopyDownloadLinkButton url={latestApkUrl} />
+                </div>
+                <a
+                  href="/iptv.apk"
+                  className="mt-4 block rounded-xl border border-border bg-background/70 px-3 py-3 text-[11px] font-mono text-sky-300 break-all hover:border-sky-500/30 hover:bg-sky-500/5 transition-colors"
+                >
+                  {latestApkUrl}
                 </a>
               </div>
             </div>
@@ -94,4 +117,8 @@ export default async function UpdatesPage() {
 
 function createApkDownloadUrl(fileName: string) {
   return `/uploads/apk/${encodeURIComponent(fileName)}`
+}
+
+function createLatestApkUrl(appPublicOrigin: string) {
+  return appPublicOrigin ? `${appPublicOrigin}/iptv.apk` : '/iptv.apk'
 }

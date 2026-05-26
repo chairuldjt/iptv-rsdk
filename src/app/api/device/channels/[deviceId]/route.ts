@@ -2,8 +2,8 @@ import { NextResponse } from 'next/server'
 import prisma from '@/lib/db'
 import { getErrorMessage } from '@/lib/errors'
 import { createPlayableStreamUrl, createUdpOnDemandHlsPath, isUdpStreamUrl } from '@/lib/playableStreams'
-import { getAppPublicOrigin } from '@/lib/settings'
 import { normalizeSyncMode } from '@/lib/defaults'
+import { resolvePublicOrigin } from '@/lib/publicOrigin'
 
 export async function GET(
   request: Request,
@@ -100,7 +100,7 @@ export async function GET(
 
     const shouldProxyStreams = normalizeSyncMode(config?.syncMode) === 'api'
     const allowUdpOnDemandRelay = shouldProxyStreams && Boolean(globalPlaylist?.relayEnabled)
-    const requestOrigin = await getPublicOrigin(request)
+    const requestOrigin = await resolvePublicOrigin(request)
 
     // Map channels to expected client schema
     const mappedChannels = channels.map((c) => ({
@@ -132,21 +132,6 @@ export async function GET(
       { status: 500 }
     )
   }
-}
-
-async function getPublicOrigin(request: Request): Promise<string> {
-  const configuredOrigin = await getAppPublicOrigin()
-  if (configuredOrigin) {
-    return configuredOrigin.replace(/\/$/, '')
-  }
-
-  const forwardedHost = request.headers.get('x-forwarded-host')
-  const forwardedProto = request.headers.get('x-forwarded-proto') || 'https'
-  if (forwardedHost) {
-    return `${forwardedProto.split(',')[0]}://${forwardedHost.split(',')[0]}`.replace(/\/$/, '')
-  }
-
-  return new URL(request.url).origin
 }
 
 function createRelayedClientStreamUrl({

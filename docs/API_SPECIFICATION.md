@@ -197,7 +197,7 @@ Response saat ada APK deployed yang lebih baru:
   "update_available": true,
   "version_name": "v1.2.3",
   "version_code": 123,
-  "apk_url": "https://iptv.teknisirsdk.my.id/uploads/apk/app-release.apk",
+  "apk_url": "https://iptv.teknisirsdk.my.id/iptv.apk",
   "apk_file_name": "app-release.apk",
   "is_mandatory": false,
   "changelog": "Perbaikan playback"
@@ -231,6 +231,9 @@ File tersimpan di `public/uploads/apk` dengan nama aman berawalan `versionCode`,
 ### Download APK
 **Endpoint:** `GET /uploads/apk/{filename}`  
 Mengirim file APK yang sudah di-upload untuk proses update client.
+
+**Endpoint:** `GET /iptv.apk`  
+Short link publik yang selalu me-redirect ke APK yang sedang aktif/deployed. Cocok untuk dibagikan sebagai link unduhan tetap karena otomatis mengikuti versi terbaru yang sudah di-deploy.
 
 ---
 
