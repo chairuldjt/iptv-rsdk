@@ -4,15 +4,16 @@ import UploadApkForm from '@/components/UploadApkForm'
 import PageHeader from '@/components/PageHeader'
 import CopyDownloadLinkButton from '@/components/CopyDownloadLinkButton'
 import { deployUpdateAction, deleteUpdateAction } from './actions'
-import { getAppPublicOrigin } from '@/lib/settings'
+import { headers } from 'next/headers'
+import { resolvePublicOriginFromHeaders } from '@/lib/publicOrigin'
 
 export const revalidate = 0
 
 export default async function UpdatesPage() {
   const updates = await prisma.appUpdate.findMany({ orderBy: { versionCode: 'desc' } })
   const deployedUpdate = updates.find(u => u.isDeployed)
-  const appPublicOrigin = await getAppPublicOrigin()
-  const latestApkUrl = createLatestApkUrl(appPublicOrigin)
+  const requestHeaders = await headers()
+  const latestApkUrl = createLatestApkUrl(await resolvePublicOriginFromHeaders(requestHeaders))
 
   return (
     <div className="space-y-6 animate-fade-in">
