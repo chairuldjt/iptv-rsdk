@@ -101,7 +101,6 @@ export default async function VideosPage({
           }
           .desktop-scroll-column-hidden {
             height: calc(100vh - 22rem) !important;
-            overflow: hidden !important;
           }
         }
       `}} />
