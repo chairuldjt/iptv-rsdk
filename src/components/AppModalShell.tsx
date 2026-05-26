@@ -1,3 +1,8 @@
+'use client'
+
+import { useSyncExternalStore } from 'react'
+import { createPortal } from 'react-dom'
+
 type AppModalShellProps = {
   title: string
   closeHref: string
@@ -17,7 +22,17 @@ export default function AppModalShell({
   maxWidthClass = 'max-w-3xl',
   zIndexClass = 'z-[70]',
 }: AppModalShellProps) {
-  return (
+  const isMounted = useSyncExternalStore(
+    () => () => {},
+    () => true,
+    () => false
+  )
+
+  if (!isMounted) {
+    return null
+  }
+
+  return createPortal(
     <div className={`fixed inset-0 ${zIndexClass} flex items-center justify-center bg-slate-950/78 p-4 backdrop-blur-md animate-fade-in`}>
       <div className={`w-full ${maxWidthClass} overflow-hidden rounded-[30px] border border-white/10 bg-[linear-gradient(180deg,rgba(16,20,35,0.98),rgba(7,10,19,0.98))] shadow-[0_30px_90px_rgba(0,0,0,0.55)] animate-slide-up`}>
         <div className="flex items-start justify-between gap-4 border-b border-white/8 px-6 py-5">
@@ -46,6 +61,7 @@ export default function AppModalShell({
           {children}
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   )
 }
