@@ -1,6 +1,7 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useSyncExternalStore } from 'react'
+import { createPortal } from 'react-dom'
 import Link from 'next/link'
 
 interface RemoteControlModalProps {
@@ -22,6 +23,11 @@ export default function RemoteControlModal({
   deviceIp,
   closeUrl,
 }: RemoteControlModalProps) {
+  const isMounted = useSyncExternalStore(
+    () => () => {},
+    () => true,
+    () => false
+  )
   const [status, setStatus] = useState<{ type: 'idle' | 'loading' | 'success' | 'error'; message: string }>({
     type: 'idle',
     message: deviceIp ? `Proxy active for: ${deviceIp}` : 'No IP address found for device',
@@ -30,6 +36,8 @@ export default function RemoteControlModal({
   const [screenshot, setScreenshot] = useState<string | null>(null)
 
   useEffect(() => {
+    if (!isMounted) return
+
     // 1. Tell Next.js server to start requesting screenshots for this device
     const setStatusActive = async (active: boolean) => {
       try {
@@ -71,7 +79,11 @@ export default function RemoteControlModal({
       clearInterval(intervalId)
       setStatusActive(false)
     }
-  }, [deviceId])
+  }, [deviceId, isMounted])
+
+  if (!isMounted) {
+    return null
+  }
 
   const sendCommand = async (command: string, value?: string) => {
     setStatus({ type: 'loading', message: `Sending: ${command}...` })
@@ -101,8 +113,8 @@ export default function RemoteControlModal({
     }
   }
 
-  return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-950/85 backdrop-blur-md animate-fade-in">
+  return createPortal(
+    <div className="fixed inset-0 z-[120] flex items-center justify-center p-4 bg-slate-950/85 backdrop-blur-md animate-fade-in">
       <div className="w-full max-w-sm glass-card p-6 rounded-3xl border border-indigo-500/30 shadow-2xl relative flex flex-col items-center bg-slate-900/90 text-white animate-scale-in">
         
         {/* Modal Close Button */}
@@ -321,6 +333,7 @@ export default function RemoteControlModal({
         </div>
 
       </div>
-    </div>
+    </div>,
+    document.body
   )
 }

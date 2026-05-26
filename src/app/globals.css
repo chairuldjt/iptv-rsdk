@@ -319,6 +319,11 @@ input[type="file"]:focus-visible {
   50% { opacity: 0.5; }
 }
 
+@keyframes scaleIn {
+  from { opacity: 0; transform: scale(0.92); }
+  to { opacity: 1; transform: scale(1); }
+}
+
 @keyframes shimmer {
   0% { background-position: -200% 0; }
   100% { background-position: 200% 0; }
@@ -338,6 +343,18 @@ input[type="file"]:focus-visible {
 
 .animate-pulse-glow {
   animation: pulse-glow 2s ease-in-out infinite;
+}
+
+.animate-scale-in {
+  animation: scaleIn 0.25s ease forwards;
+}
+
+/* ===== Glass Card (for remote modal inner) ===== */
+.glass-card {
+  background: rgba(15, 23, 42, 0.9);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border-color: rgba(99, 102, 241, 0.2);
 }
 
 /* ===== Skeleton Loading ===== */
