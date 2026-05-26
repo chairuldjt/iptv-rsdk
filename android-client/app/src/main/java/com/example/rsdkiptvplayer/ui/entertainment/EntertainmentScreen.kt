@@ -356,10 +356,17 @@ private fun EntertainmentOptionCard(
 @Composable
 private fun EntertainmentWebView(option: EntertainmentOption, onBack: () -> Unit) {
     var webView by remember { mutableStateOf<WebView?>(null) }
+    var detailVisible by remember(option.id, option.url) { mutableStateOf(true) }
 
     BackHandler {
         val currentWebView = webView
         if (currentWebView?.canGoBack() == true) currentWebView.goBack() else onBack()
+    }
+
+    LaunchedEffect(option.id, option.url) {
+        detailVisible = true
+        delay(3000)
+        detailVisible = false
     }
 
     Box(Modifier.fillMaxSize().background(Color.Black)) {
@@ -383,7 +390,14 @@ private fun EntertainmentWebView(option: EntertainmentOption, onBack: () -> Unit
             update = {}
         )
 
-        DetailChrome(title = option.title, subtitle = option.subtitle)
+        AnimatedVisibility(
+            visible = detailVisible,
+            enter = fadeIn(),
+            exit = fadeOut(),
+            modifier = Modifier.align(Alignment.TopStart)
+        ) {
+            DetailChrome(title = option.title, subtitle = option.subtitle)
+        }
     }
 
     DisposableEffect(Unit) {
@@ -1219,4 +1233,3 @@ private fun buildMediaItem(streamUrl: String): MediaItem {
 
     return builder.build()
 }
-

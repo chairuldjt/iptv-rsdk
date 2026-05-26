@@ -38,6 +38,7 @@ class DataStoreManager(private val context: Context) {
         val EDUCATION_SOURCE = stringPreferencesKey("education_source")
         val EDUCATION_PLAYBACK_MODE = stringPreferencesKey("education_playback_mode")
         val TECHNICIAN_PIN = stringPreferencesKey("technician_pin")
+        val NTP_SERVER = stringPreferencesKey("ntp_server")
     }
 
     // Generate or get existing Device ID
@@ -331,6 +332,26 @@ class DataStoreManager(private val context: Context) {
                 prefs[TECHNICIAN_PIN] = pin
             }
             addLog("Technician PIN updated.")
+        }
+    }
+
+    val ntpServerFlow: Flow<String> = context.dataStore.data.map { prefs ->
+        prefs[NTP_SERVER] ?: "0.id.pool.ntp.org"
+    }
+
+    suspend fun getNtpServer(): String {
+        val prefs = context.dataStore.data.first()
+        return prefs[NTP_SERVER] ?: "0.id.pool.ntp.org"
+    }
+
+    suspend fun setNtpServer(server: String) {
+        val normalizedServer = server.trim().lowercase().removeSuffix(".").ifBlank { "0.id.pool.ntp.org" }
+        val current = getNtpServer()
+        if (current != normalizedServer) {
+            context.dataStore.edit { prefs ->
+                prefs[NTP_SERVER] = normalizedServer
+            }
+            addLog("Primary NTP server changed to: $normalizedServer")
         }
     }
 

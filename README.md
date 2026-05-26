@@ -70,6 +70,9 @@ Untuk mempermudah pengembangan backend (Web Admin & API) serta frontend (Android
 7. **[Arsitektur Infrastruktur](docs/INFRASTRUCTURE.md)**  
    Menjelaskan topologi jaringan kantor/rumah, server IPTV lokal, mode direct vs relay on-demand, dan checklist troubleshooting playback.
 
+8. **[Server-Driven Updates](docs/SERVER_DRIVEN_UPDATES.md)**  
+   Menjelaskan strategi agar perubahan harian semaksimal mungkin dikirim dari server web tanpa reinstall APK, termasuk batasan, kategori asset dinamis, desain manifest sync, dan roadmap implementasi.
+
 ---
 
 ## 🛠️ Ringkasan Fitur Wajib (MVP Checklist)

@@ -3,7 +3,9 @@ import prisma from '@/lib/db'
 const OFFLINE_AUTO_DELETE_DAYS_KEY = 'device.offlineAutoDeleteDays'
 const APP_PUBLIC_ORIGIN_KEY = 'app.publicOrigin'
 const ON_DEMAND_HLS_RELAY_CONFIG_KEY = 'stream.onDemandHlsRelayConfig'
+const PRIMARY_NTP_SERVER_KEY = 'app.primaryNtpServer'
 const DEFAULT_APP_PUBLIC_ORIGIN = ''
+const DEFAULT_PRIMARY_NTP_SERVER = '0.id.pool.ntp.org'
 
 export type OnDemandHlsRelayConfig = {
   ffmpegBin: string
@@ -70,11 +72,32 @@ export async function setAppPublicOrigin(origin: string): Promise<void> {
   })
 }
 
+export async function getPrimaryNtpServer(): Promise<string> {
+  const setting = await prisma.appSetting.findUnique({
+    where: { key: PRIMARY_NTP_SERVER_KEY },
+  })
+
+  return normalizeNtpServer(setting?.value || DEFAULT_PRIMARY_NTP_SERVER)
+}
+
+export async function setPrimaryNtpServer(server: string): Promise<void> {
+  const safeServer = normalizeNtpServer(server || DEFAULT_PRIMARY_NTP_SERVER)
+
+  await prisma.appSetting.upsert({
+    where: { key: PRIMARY_NTP_SERVER_KEY },
+    update: { value: safeServer },
+    create: {
+      key: PRIMARY_NTP_SERVER_KEY,
+      value: safeServer,
+    },
+  })
+}
+
 export async function resetRelayRuntimeSettings(): Promise<void> {
   await prisma.appSetting.deleteMany({
     where: {
       key: {
-        in: [APP_PUBLIC_ORIGIN_KEY, ON_DEMAND_HLS_RELAY_CONFIG_KEY],
+        in: [APP_PUBLIC_ORIGIN_KEY, ON_DEMAND_HLS_RELAY_CONFIG_KEY, PRIMARY_NTP_SERVER_KEY],
       },
     },
   })
@@ -138,6 +161,14 @@ function normalizePublicOrigin(origin: string): string {
   } catch {
     return ''
   }
+}
+
+function normalizeNtpServer(server: string): string {
+  const trimmed = server.trim().toLowerCase()
+  if (!trimmed) return DEFAULT_PRIMARY_NTP_SERVER
+
+  const normalized = trimmed.replace(/\.$/, '')
+  return /^[a-z0-9.-]+$/.test(normalized) ? normalized : DEFAULT_PRIMARY_NTP_SERVER
 }
 
 function normalizeOnDemandHlsRelayConfig(value: unknown): OnDemandHlsRelayConfig {

@@ -134,6 +134,7 @@ class IptvRepository(
                     )
                     dataStoreManager.setEducationSource(config.education_source ?: "smb")
                     dataStoreManager.setEducationPlaybackMode(config.education_playback_mode ?: "copy")
+                    dataStoreManager.setNtpServer(config.ntp_server ?: "0.id.pool.ntp.org")
                     dataStoreManager.setAutoStartOnBoot(config.auto_start_on_boot ?: false)
 
                     if (config.force_sync == true) {

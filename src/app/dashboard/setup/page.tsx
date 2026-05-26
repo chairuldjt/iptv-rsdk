@@ -9,9 +9,11 @@ import {
 import {
   getAppPublicOrigin,
   getOnDemandHlsRelayConfig,
+  getPrimaryNtpServer,
   resetRelayRuntimeSettings,
   setAppPublicOrigin,
   setOnDemandHlsRelayConfig,
+  setPrimaryNtpServer,
 } from '@/lib/settings'
 import EducationSettingsFields from '@/components/EducationSettingsFields'
 import PageHeader from '@/components/PageHeader'
@@ -36,6 +38,7 @@ async function resetDefaultSetupAction() {
 async function saveRelayRuntimeAction(formData: FormData) {
   'use server'
   await setAppPublicOrigin(formData.get('appPublicOrigin') as string)
+  await setPrimaryNtpServer(formData.get('primaryNtpServer') as string)
   await setOnDemandHlsRelayConfig({
     ffmpegBin: formData.get('ffmpegBin') as string,
     localAddr: formData.get('localAddr') as string,
@@ -66,6 +69,7 @@ export default async function SetupPage({
   const config = await getDefaultDeviceConfig()
   const relayConfig = await getOnDemandHlsRelayConfig()
   const appPublicOrigin = await getAppPublicOrigin()
+  const primaryNtpServer = await getPrimaryNtpServer()
   const showSaved = resolvedSearchParams.saved === '1'
   const showReset = resolvedSearchParams.reset === '1'
   const showRelaySaved = resolvedSearchParams.relaySaved === '1'
@@ -90,12 +94,12 @@ export default async function SetupPage({
       )}
       {showRelaySaved && (
         <div className="p-3.5 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs font-semibold">
-          Runtime relay setting saved. Relay baru akan memakai konfigurasi ini pada request berikutnya.
+          Runtime setting saved. Relay dan sinkron waktu STB akan memakai konfigurasi ini pada sync/request berikutnya.
         </div>
       )}
       {showRelayReset && (
         <div className="p-3.5 rounded-xl bg-primary/10 border border-primary/20 text-primary text-xs font-semibold">
-          Runtime relay setting dikembalikan ke fallback bawaan kode.
+          Runtime setting dikembalikan ke fallback bawaan kode.
         </div>
       )}
 
@@ -106,13 +110,16 @@ export default async function SetupPage({
             <div>
               <h3 className="font-semibold text-foreground text-sm">On-Demand HLS Relay Runtime</h3>
               <p className="text-[10px] text-muted-foreground mt-1">
-                Pengganti env `IPTV_ON_DEMAND_*` dan `APP_PUBLIC_ORIGIN`. Env tetap dipakai sebagai fallback awal.
+                Pengganti env `IPTV_ON_DEMAND_*`, `APP_PUBLIC_ORIGIN`, dan server NTP utama. Env tetap dipakai sebagai fallback awal.
               </p>
             </div>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
             <Field label="APP Public Origin" wide>
               <input type="url" name="appPublicOrigin" defaultValue={appPublicOrigin} placeholder="https://iptv.teknisirsdk.my.id" className="field-input font-mono" />
+            </Field>
+            <Field label="Primary NTP Server">
+              <input type="text" name="primaryNtpServer" defaultValue={primaryNtpServer} placeholder="0.id.pool.ntp.org" className="field-input font-mono" />
             </Field>
             <Field label="FFmpeg Binary">
               <input type="text" name="ffmpegBin" defaultValue={relayConfig.ffmpegBin} required className="field-input font-mono" />
@@ -140,11 +147,11 @@ export default async function SetupPage({
               </select>
             </Field>
           </div>
-          <button type="submit" className="w-full btn btn-primary py-2.5">Save Relay Runtime</button>
+          <button type="submit" className="w-full btn btn-primary py-2.5">Save Runtime Settings</button>
         </form>
         <form action={resetRelayRuntimeAction} className="pt-2">
           <button type="submit" className="w-full py-2.5 rounded-xl border border-amber-500/20 bg-amber-500/5 text-amber-400 hover:bg-amber-500/10 font-semibold text-xs transition-all cursor-pointer">
-            Reset Relay Runtime to Built-in Defaults
+            Reset Runtime Settings to Built-in Defaults
           </button>
         </form>
       </div>

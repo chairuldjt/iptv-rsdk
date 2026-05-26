@@ -76,6 +76,7 @@ import java.util.*
 import android.widget.Toast
 import com.example.rsdkiptvplayer.util.UpdateManager
 import com.example.rsdkiptvplayer.data.api.RetrofitClient
+import com.example.rsdkiptvplayer.util.NtpTimeProvider
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -101,6 +102,7 @@ fun HomeScreen(
     val channelsLoading by playerViewModel.isLoading.collectAsState()
     val serverUrl by dataStoreManager.serverUrlFlow.collectAsState(initial = "")
     val storedStbName by dataStoreManager.stbNameFlow.collectAsState(initial = "")
+    val ntpServer by dataStoreManager.ntpServerFlow.collectAsState(initial = "0.id.pool.ntp.org")
     val educationPath by dataStoreManager.educationVideoPathFlow.collectAsState(initial = null)
     val educationSource by dataStoreManager.educationSourceFlow.collectAsState(initial = null)
     val educationPlaybackMode by dataStoreManager.educationPlaybackModeFlow.collectAsState(initial = null)
@@ -110,6 +112,7 @@ fun HomeScreen(
     var localIpAddress by remember { mutableStateOf("127.0.0.1") }
     var timeString by remember { mutableStateOf("") }
     var dateString by remember { mutableStateOf("") }
+    var ntpOffsetMillis by remember { mutableStateOf<Long?>(null) }
     var versionText by remember { mutableStateOf("") }
     var currentVersionName by remember { mutableStateOf("") }
     var currentVersionCode by remember { mutableIntStateOf(0) }
@@ -117,6 +120,7 @@ fun HomeScreen(
     var showStbNameDialog by remember { mutableStateOf(false) }
     val menuFocusRequester = remember { FocusRequester() }
     val displayedStbName = storedStbName.ifBlank { "${Build.MANUFACTURER} ${Build.MODEL}".trim() }
+    val indonesianLocale = remember { Locale.forLanguageTag("id-ID") }
 
     LaunchedEffect(showInfoDialog, showStbNameDialog) {
         if (!showInfoDialog && !showStbNameDialog) {
@@ -139,11 +143,40 @@ fun HomeScreen(
         versionText = "v$currentVersionName ($currentVersionCode)"
     }
 
-    LaunchedEffect(Unit) {
+    LaunchedEffect(ntpServer) {
         while (true) {
-            val cal = Calendar.getInstance()
-            timeString = SimpleDateFormat("HH:mm", Locale.getDefault()).format(cal.time)
-            dateString = SimpleDateFormat("EEEE, d MMMM yyyy", Locale.getDefault()).format(cal.time)
+            val refreshedOffset = NtpTimeProvider.resolveTimeOffsetMillis(ntpServer)
+            if (refreshedOffset != null) {
+                ntpOffsetMillis = refreshedOffset
+                delay(6 * 60 * 60 * 1000L)
+            } else {
+                delay(5 * 60 * 1000L)
+            }
+        }
+    }
+
+    LaunchedEffect(ntpOffsetMillis) {
+        while (true) {
+            val useNtpClock = ntpOffsetMillis != null
+            val displayDate = Date(System.currentTimeMillis() + (ntpOffsetMillis ?: 0L))
+            val timeFormatter = SimpleDateFormat(
+                "HH:mm",
+                if (useNtpClock) indonesianLocale else Locale.getDefault()
+            ).apply {
+                if (useNtpClock) {
+                    timeZone = TimeZone.getTimeZone("Asia/Jakarta")
+                }
+            }
+            val dateFormatter = SimpleDateFormat(
+                "EEEE, d MMMM yyyy",
+                if (useNtpClock) indonesianLocale else Locale.getDefault()
+            ).apply {
+                if (useNtpClock) {
+                    timeZone = TimeZone.getTimeZone("Asia/Jakarta")
+                }
+            }
+            timeString = timeFormatter.format(displayDate)
+            dateString = dateFormatter.format(displayDate)
             delay(1000)
         }
     }
@@ -654,12 +687,14 @@ private fun HospitalityMenuBar(
                         Key.DirectionLeft -> {
                             okHoldJob?.cancel()
                             okHoldJob = null
+                            okLongPressTriggered = false
                             moveSelection(-1)
                             true
                         }
                         Key.DirectionRight -> {
                             okHoldJob?.cancel()
                             okHoldJob = null
+                            okLongPressTriggered = false
                             moveSelection(1)
                             true
                         }
@@ -678,7 +713,6 @@ private fun HospitalityMenuBar(
                                 okHoldJob = coroutineScope.launch {
                                     delay(3000)
                                     okLongPressTriggered = true
-                                    onOpenStbNameMenu()
                                 }
                             }
                             true
@@ -686,7 +720,9 @@ private fun HospitalityMenuBar(
                         KeyEventType.KeyUp -> {
                             okHoldJob?.cancel()
                             okHoldJob = null
-                            if (!okLongPressTriggered) {
+                            if (okLongPressTriggered) {
+                                onOpenStbNameMenu()
+                            } else {
                                 menuItems[selectedIndex].action()
                             }
                             okLongPressTriggered = false
@@ -795,6 +831,30 @@ private fun HospitalityMenuBar(
             }
         }
         Spacer(modifier = Modifier.height(if (isUltraCompact) 4.dp else 8.dp))
+        if (okLongPressTriggered) {
+            Box(
+                modifier = Modifier
+                    .clip(RoundedCornerShape(if (isUltraCompact) 8.dp else 12.dp))
+                    .background(Color(0xFF2EE6C6).copy(alpha = 0.22f))
+                    .border(
+                        BorderStroke(1.dp, Color(0xFF2EE6C6).copy(alpha = 0.85f)),
+                        RoundedCornerShape(if (isUltraCompact) 8.dp else 12.dp)
+                    )
+                    .padding(
+                        horizontal = if (isUltraCompact) 10.dp else 14.dp,
+                        vertical = if (isUltraCompact) 5.dp else 7.dp
+                    )
+            ) {
+                Text(
+                    text = if (isUltraCompact) "Lepas OK untuk ubah nama STB" else "Trigger aktif. Lepaskan tombol OK untuk membuka ubah nama STB.",
+                    color = Color.White,
+                    fontSize = if (isUltraCompact) 8.sp else if (isSmallScreen) 9.sp else 11.sp,
+                    fontWeight = FontWeight.Bold,
+                    textAlign = TextAlign.Center
+                )
+            }
+            Spacer(modifier = Modifier.height(if (isUltraCompact) 4.dp else 8.dp))
+        }
         Text(
             text = if (isUltraCompact) "Kiri/Kanan: Putar • OK: Pilih • Tahan OK 3s: Nama STB"
                    else "Gunakan kiri/kanan remote untuk memutar menu, OK untuk memilih, tahan OK 3 detik untuk ubah nama STB",

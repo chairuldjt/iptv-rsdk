@@ -3,6 +3,7 @@ import prisma from '@/lib/db'
 import { getErrorMessage } from '@/lib/errors'
 import { DEFAULT_CUSTOM_M3U_URL, DEFAULT_SYNC_MODE, normalizeSyncMode } from '@/lib/defaults'
 import { createDeviceConfigData, getDefaultDeviceConfig } from '@/lib/defaultDeviceConfig'
+import { getPrimaryNtpServer } from '@/lib/settings'
 
 export async function GET(
   request: Request,
@@ -60,6 +61,7 @@ export async function GET(
     const globalPlaylist = await prisma.playlist.findFirst({
       where: { isGlobal: true }
     })
+    const primaryNtpServer = await getPrimaryNtpServer()
 
 
     return NextResponse.json({
@@ -91,6 +93,7 @@ export async function GET(
         education_source: config.educationSource || 'smb',
         education_playback_mode: config.educationPlaybackMode || 'copy',
         education_force_sync: currentEducationForceSync,
+        ntp_server: primaryNtpServer,
       },
     })
   } catch (error: unknown) {
