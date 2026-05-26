@@ -108,6 +108,9 @@ class MainActivity : ComponentActivity() {
                                         showVideoBroadcastOverlay = true
                                     }
                                 }
+                                "STOP_VIDEO_BROADCAST" -> {
+                                    showVideoBroadcastOverlay = false
+                                }
                             }
                         }
                     }

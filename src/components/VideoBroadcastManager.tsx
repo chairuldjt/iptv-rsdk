@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import type { DeviceGroup } from '@/lib/deviceGroups'
 import type { ResolvedVideoBroadcastConfig, VideoBroadcastScope } from '@/lib/videoBroadcast'
@@ -30,6 +30,7 @@ type VideoBroadcastManagerProps = {
   onSaveAction: (formData: FormData) => void | Promise<void>
   onResetAction: (formData: FormData) => void | Promise<void>
   onPlayNowAction: (formData: FormData) => void | Promise<void>
+  onStopNowAction: (formData: FormData) => void | Promise<void>
 }
 
 export default function VideoBroadcastManager({
@@ -43,10 +44,14 @@ export default function VideoBroadcastManager({
   onSaveAction,
   onResetAction,
   onPlayNowAction,
+  onStopNowAction,
 }: VideoBroadcastManagerProps) {
   const pathname = usePathname()
   const router = useRouter()
   const searchParams = useSearchParams()
+  const [liveTargetMode, setLiveTargetMode] = useState<'global' | 'group' | 'device' | 'selected'>(scope)
+  const [liveGroupId, setLiveGroupId] = useState(scope === 'group' ? targetId : groups[0]?.id || '')
+  const [liveDeviceId, setLiveDeviceId] = useState(scope === 'device' ? targetId : devices[0]?.deviceId || '')
 
   const sortedVideos = useMemo(
     () =>
@@ -155,6 +160,9 @@ export default function VideoBroadcastManager({
         <input type="hidden" name="targetId" value={targetId} />
         <input type="hidden" name="revision" value={String(config.revision + 1)} />
         <input type="hidden" name="returnQuery" value={searchParams.toString()} />
+        <input type="hidden" name="liveTargetMode" value={liveTargetMode} />
+        <input type="hidden" name="liveGroupId" value={liveGroupId} />
+        <input type="hidden" name="liveDeviceId" value={liveDeviceId} />
 
         <label className="flex cursor-pointer items-center gap-3 rounded-xl border border-white/8 bg-white/[0.02] p-3 hover:bg-white/[0.04] transition-colors">
           <input type="checkbox" name="enabled" defaultChecked={config.enabled} className="h-4 w-4 rounded accent-primary" />
@@ -198,7 +206,78 @@ export default function VideoBroadcastManager({
           <div><span className="text-slate-500">Status:</span> {config.enabled && config.videoUrl ? 'Siap diputar setelah restart' : 'Tidak aktif'}</div>
         </div>
 
-        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+        <div className="space-y-3 rounded-2xl border border-emerald-400/15 bg-emerald-500/[0.04] p-4">
+          <div>
+            <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-emerald-300">Live Target</div>
+            <p className="mt-1 text-[11px] text-slate-400">Dipakai khusus untuk aksi `Tampilkan Sekarang` dan `Stop Broadcast`.</p>
+          </div>
+
+          <label>
+            <span className="mb-1.5 block text-[10px] font-semibold uppercase tracking-wider text-slate-400">Mode</span>
+            <select
+              value={liveTargetMode}
+              onChange={(e) => setLiveTargetMode(e.target.value as 'global' | 'group' | 'device' | 'selected')}
+              className="w-full rounded-xl border border-white/8 bg-slate-950/45 px-3 py-2 text-xs text-white outline-none transition-all focus:border-emerald-400/50 focus:ring-1 focus:ring-emerald-400/20"
+            >
+              <option value="global">Semua Device Aktif</option>
+              <option value="group">Per Group</option>
+              <option value="device">Satu Device</option>
+              <option value="selected">Selected Devices</option>
+            </select>
+          </label>
+
+          {liveTargetMode === 'group' && (
+            <label>
+              <span className="mb-1.5 block text-[10px] font-semibold uppercase tracking-wider text-slate-400">Pilih Group</span>
+              <select
+                value={liveGroupId}
+                onChange={(e) => setLiveGroupId(e.target.value)}
+                className="w-full rounded-xl border border-white/8 bg-slate-950/45 px-3 py-2 text-xs text-white outline-none transition-all focus:border-emerald-400/50 focus:ring-1 focus:ring-emerald-400/20"
+              >
+                {groups.map((group) => (
+                  <option key={group.id} value={group.id}>{group.name}</option>
+                ))}
+              </select>
+            </label>
+          )}
+
+          {liveTargetMode === 'device' && (
+            <label>
+              <span className="mb-1.5 block text-[10px] font-semibold uppercase tracking-wider text-slate-400">Pilih Device</span>
+              <select
+                value={liveDeviceId}
+                onChange={(e) => setLiveDeviceId(e.target.value)}
+                className="w-full rounded-xl border border-white/8 bg-slate-950/45 px-3 py-2 text-xs text-white outline-none transition-all focus:border-emerald-400/50 focus:ring-1 focus:ring-emerald-400/20"
+              >
+                {devices.map((device) => (
+                  <option key={device.deviceId} value={device.deviceId}>
+                    {device.deviceName}{device.groupName ? ` • ${device.groupName}` : ''}
+                  </option>
+                ))}
+              </select>
+            </label>
+          )}
+
+          {liveTargetMode === 'selected' && (
+            <div>
+              <span className="mb-1.5 block text-[10px] font-semibold uppercase tracking-wider text-slate-400">Selected Devices</span>
+              <div className="max-h-56 space-y-2 overflow-y-auto rounded-xl border border-white/8 bg-black/20 p-3">
+                {devices.map((device) => (
+                  <label key={device.deviceId} className="flex cursor-pointer items-start gap-2 rounded-lg border border-white/6 bg-white/[0.02] p-2.5 hover:bg-white/[0.04]">
+                    <input type="checkbox" name="selectedDeviceIds" value={device.deviceId} className="mt-0.5 h-4 w-4 rounded accent-emerald-400" />
+                    <span className="min-w-0">
+                      <span className="block text-xs font-semibold text-white">{device.deviceName}</span>
+                      <span className="block break-all text-[10px] text-slate-500">{device.deviceId}</span>
+                      <span className="block text-[10px] text-slate-400">{device.groupName || 'Tanpa Group'}</span>
+                    </span>
+                  </label>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+
+        <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
           <button type="submit" className="w-full btn bg-indigo-600 hover:bg-indigo-500 text-white font-bold py-2.5 text-xs rounded-xl shadow-[0_4px_12px_rgba(99,102,241,0.2)] cursor-pointer transition-all">
             Simpan Broadcast
           </button>
@@ -208,6 +287,13 @@ export default function VideoBroadcastManager({
             className="w-full rounded-xl border border-emerald-400/20 bg-emerald-500/10 py-2.5 text-xs font-semibold text-emerald-300 hover:bg-emerald-500/15"
           >
             Tampilkan Sekarang
+          </button>
+          <button
+            type="submit"
+            formAction={onStopNowAction}
+            className="w-full rounded-xl border border-rose-400/20 bg-rose-500/10 py-2.5 text-xs font-semibold text-rose-300 hover:bg-rose-500/15"
+          >
+            Stop Broadcast
           </button>
         </div>
       </form>

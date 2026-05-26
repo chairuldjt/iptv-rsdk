@@ -84,9 +84,23 @@ async function playVideoBroadcastNowAction(formData: FormData) {
     redirect(buildBroadcastRedirect(returnQuery, scope, targetId, 'broadcast-reset'))
   }
 
-  const recipientIds = await resolveBroadcastRecipientIds(scope, targetId)
+  const recipientIds = await resolveLiveBroadcastRecipientIds(formData, scope, targetId)
   for (const deviceId of recipientIds) {
     pushCommand(deviceId, 'PLAY_VIDEO_BROADCAST', JSON.stringify(payload))
+  }
+
+  redirect(buildBroadcastRedirect(returnQuery, scope, targetId, 'broadcast-live'))
+}
+
+async function stopVideoBroadcastNowAction(formData: FormData) {
+  'use server'
+  const scope = normalizeVideoBroadcastScope((formData.get('scope') as string) || 'global')
+  const targetId = ((formData.get('targetId') as string) || '').trim()
+  const returnQuery = ((formData.get('returnQuery') as string) || '').trim()
+
+  const recipientIds = await resolveLiveBroadcastRecipientIds(formData, scope, targetId)
+  for (const deviceId of recipientIds) {
+    pushCommand(deviceId, 'STOP_VIDEO_BROADCAST')
   }
 
   redirect(buildBroadcastRedirect(returnQuery, scope, targetId, 'broadcast-live'))
@@ -764,6 +778,7 @@ export default async function VideosPage({
               onSaveAction={saveVideoBroadcastAction}
               onResetAction={resetVideoBroadcastAction}
               onPlayNowAction={playVideoBroadcastNowAction}
+              onStopNowAction={stopVideoBroadcastNowAction}
             />
           </div>
         </div>
@@ -1092,4 +1107,46 @@ async function resolveBroadcastRecipientIds(scope: VideoBroadcastScope, targetId
     select: { deviceId: true },
   })
   return devices.map((device) => device.deviceId)
+}
+
+async function resolveLiveBroadcastRecipientIds(
+  formData: FormData,
+  fallbackScope: VideoBroadcastScope,
+  fallbackTargetId: string
+): Promise<string[]> {
+  const liveTargetMode = String(formData.get('liveTargetMode') || '').trim()
+  const liveGroupId = String(formData.get('liveGroupId') || '').trim()
+  const liveDeviceId = String(formData.get('liveDeviceId') || '').trim()
+
+  if (liveTargetMode === 'selected') {
+    const selectedDeviceIds = formData
+      .getAll('selectedDeviceIds')
+      .map((value) => String(value).trim())
+      .filter(Boolean)
+
+    if (selectedDeviceIds.length === 0) return []
+
+    const activeDevices = await prisma.device.findMany({
+      where: {
+        deviceId: { in: selectedDeviceIds },
+        isActive: true,
+      },
+      select: { deviceId: true },
+    })
+    return activeDevices.map((device) => device.deviceId)
+  }
+
+  if (liveTargetMode === 'group') {
+    return resolveBroadcastRecipientIds('group', liveGroupId)
+  }
+
+  if (liveTargetMode === 'device') {
+    return resolveBroadcastRecipientIds('device', liveDeviceId)
+  }
+
+  if (liveTargetMode === 'global') {
+    return resolveBroadcastRecipientIds('global', '')
+  }
+
+  return resolveBroadcastRecipientIds(fallbackScope, fallbackTargetId)
 }
