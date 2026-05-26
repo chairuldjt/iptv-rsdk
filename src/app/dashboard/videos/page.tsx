@@ -1,6 +1,7 @@
 import prisma from '@/lib/db'
 import { redirect } from 'next/navigation'
 import ConfirmForm from '@/components/ConfirmForm'
+import AppModalShell from '@/components/AppModalShell'
 import VideoRepoForm from '@/components/VideoRepoForm'
 import VideoLibraryCard from '@/components/VideoLibraryCard'
 import VideoRepositoryToastBridge from '@/components/VideoRepositoryToastBridge'
@@ -626,21 +627,15 @@ export default async function VideosPage({
 
       {/* Kelola Folder Modal */}
       {resolvedSearchParams.manageFolder === 'true' && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
-          <div className="w-full max-w-md rounded-[24px] border border-white/8 bg-slate-900 p-6 shadow-2xl space-y-5 animate-slide-up">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-slate-400">Settings</p>
-                <h3 className="text-lg font-bold text-white mt-0.5">Kelola Folder</h3>
-              </div>
-              <a
-                href={buildVideosHref({ folder: selectedFolder, q: searchQuery, source: sourceFilter, broadcastScope, broadcastId: broadcastTargetId })}
-                className="text-slate-450 hover:text-white text-xs font-bold transition-colors cursor-pointer"
-              >
-                Tutup
-              </a>
-            </div>
-
+        <AppModalShell
+          title="Kelola Folder"
+          eyebrow="Settings"
+          description="Atur visibilitas folder, ubah nama, atau hapus folder tanpa meninggalkan workspace video."
+          closeHref={buildVideosHref({ folder: selectedFolder, q: searchQuery, source: sourceFilter, broadcastScope, broadcastId: broadcastTargetId })}
+          maxWidthClass="max-w-md"
+          zIndexClass="z-[60]"
+        >
+          <div className="space-y-5">
             {selectedFolderEntity ? (
               <div className="space-y-4">
                 <div className="text-xs font-semibold text-slate-400">
@@ -707,66 +702,44 @@ export default async function VideosPage({
               </div>
             )}
           </div>
-        </div>
+        </AppModalShell>
       )}
 
       {showVideoModal && (
-        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/70 backdrop-blur-md p-4">
-          <div className="w-full max-w-2xl rounded-[28px] border border-white/8 bg-slate-950/95 p-5 shadow-2xl">
-            <div className="mb-4 flex items-start justify-between gap-4">
-              <div>
-                <div className="text-[10px] font-bold uppercase tracking-[0.2em] text-indigo-300">
-                  {editingVideo ? 'EDIT VIDEO' : 'TAMBAH VIDEO'}
-                </div>
-                <h3 className="mt-1 text-xl font-bold text-white">
-                  {editingVideo ? editingVideo.title : 'Video Baru'}
-                </h3>
-                <p className="mt-1 text-xs text-slate-400">
-                  Form dipisah ke modal supaya workspace repository tetap fokus ke pencarian, folder, dan review video.
-                </p>
-              </div>
-              <a
-                href={videoModalCloseHref}
-                className="rounded-xl border border-white/8 bg-white/[0.02] px-3 py-2 text-xs font-semibold text-slate-300 hover:bg-white/[0.05] hover:text-white"
-              >
-                Tutup
-              </a>
-            </div>
-
+        <AppModalShell
+          title={editingVideo ? editingVideo.title : 'Video Baru'}
+          eyebrow={editingVideo ? 'Edit Video' : 'Tambah Video'}
+          description="Form dipisah ke modal supaya workspace repository tetap fokus ke pencarian, folder, dan review video."
+          closeHref={videoModalCloseHref}
+          maxWidthClass="max-w-2xl"
+          zIndexClass="z-[70]"
+        >
             <VideoRepoForm
               key={editingVideo?.id ?? `modal-new-${selectedFolder || 'all'}`}
               folders={folders.map((folder) => ({ id: folder.id, name: folder.name }))}
               selectedFolderId={typeof selectedFolder === 'number' ? selectedFolder : null}
               editingVideo={editingVideo}
+              surface="plain"
+              cancelHref={videoModalCloseHref}
             />
-          </div>
-        </div>
+        </AppModalShell>
       )}
 
       {showBroadcastModal && (
-        <div className="fixed inset-0 z-[75] flex items-center justify-center bg-black/70 backdrop-blur-md p-4">
-          <div className="w-full max-w-3xl rounded-[28px] border border-white/8 bg-slate-950/95 p-5 shadow-2xl">
-            <div className="mb-4 flex items-start justify-between gap-4">
-              <div>
-                <div className="text-[10px] font-bold uppercase tracking-[0.2em] text-emerald-300">VIDEO BROADCAST</div>
-                <h3 className="mt-1 text-xl font-bold text-white">Kelola Broadcast & Trigger Live</h3>
-                <p className="mt-1 text-xs text-slate-400">
-                  Gunakan modal ini untuk menyimpan config fallback sekaligus mengirim trigger live tanpa restart aplikasi.
-                </p>
-              </div>
-              <a
-                href={broadcastModalCloseHref}
-                className="rounded-xl border border-white/8 bg-white/[0.02] px-3 py-2 text-xs font-semibold text-slate-300 hover:bg-white/[0.05] hover:text-white"
-              >
-                Tutup
-              </a>
-            </div>
-
+        <AppModalShell
+          title="Kelola Broadcast & Trigger Live"
+          eyebrow="Video Broadcast"
+          description="Simpan config fallback startup sekaligus kirim trigger live ke device target tanpa restart aplikasi."
+          closeHref={broadcastModalCloseHref}
+          maxWidthClass="max-w-3xl"
+          zIndexClass="z-[75]"
+        >
             <VideoBroadcastManager
               scope={broadcastScope}
               targetId={broadcastTargetId}
               currentScopeLabel={currentBroadcastScopeLabel}
               config={broadcastConfig}
+              surface="plain"
               videos={broadcastVideos.map((video) => ({
                 id: video.id,
                 title: video.title,
@@ -780,8 +753,7 @@ export default async function VideosPage({
               onPlayNowAction={playVideoBroadcastNowAction}
               onStopNowAction={stopVideoBroadcastNowAction}
             />
-          </div>
-        </div>
+        </AppModalShell>
       )}
 
     </div>

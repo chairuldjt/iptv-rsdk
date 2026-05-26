@@ -24,6 +24,7 @@ type VideoBroadcastManagerProps = {
   targetId: string
   currentScopeLabel: string
   config: ResolvedVideoBroadcastConfig
+  surface?: 'card' | 'plain'
   videos: VideoOption[]
   groups: DeviceGroup[]
   devices: DeviceOption[]
@@ -38,6 +39,7 @@ export default function VideoBroadcastManager({
   targetId,
   currentScopeLabel,
   config,
+  surface = 'card',
   videos,
   groups,
   devices,
@@ -73,7 +75,7 @@ export default function VideoBroadcastManager({
   }
 
   return (
-    <section className="overflow-hidden rounded-[24px] border border-white/8 bg-slate-900/40 backdrop-blur-xl p-5 shadow-2xl shrink-0 space-y-4">
+    <section className={`${surface === 'card' ? 'overflow-hidden rounded-[24px] border border-white/8 bg-slate-900/40 p-5 shadow-2xl backdrop-blur-xl' : 'rounded-[22px] border border-white/8 bg-white/[0.02] p-5'} shrink-0 space-y-4`}>
       <div>
         <h3 className="text-sm font-bold uppercase tracking-[0.2em] text-white">VIDEO BROADCAST</h3>
         <p className="mt-1 text-xs leading-relaxed text-slate-400">

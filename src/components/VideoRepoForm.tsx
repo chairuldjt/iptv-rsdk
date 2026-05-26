@@ -13,6 +13,7 @@ interface VideoRepoFormProps {
   folders: FolderOption[]
   selectedFolderId: number | null
   surface?: 'card' | 'plain'
+  cancelHref?: string
   editingVideo?: {
     id: number
     title: string
@@ -28,7 +29,13 @@ type FormErrors = {
   folderName?: string
 }
 
-export default function VideoRepoForm({ folders, selectedFolderId, editingVideo, surface = 'card' }: VideoRepoFormProps) {
+export default function VideoRepoForm({
+  folders,
+  selectedFolderId,
+  editingVideo,
+  surface = 'card',
+  cancelHref = '/dashboard/videos',
+}: VideoRepoFormProps) {
   const [sourceType, setSourceType] = useState<'url' | 'file'>(
     editingVideo?.videoUrl?.startsWith('/uploads/videos/') ? 'file' : 'url'
   )
@@ -101,7 +108,7 @@ export default function VideoRepoForm({ folders, selectedFolderId, editingVideo,
   }
 
   return (
-    <div className={`${surface === 'card' ? 'card p-5 rounded-2xl' : 'rounded-[22px] border border-white/8 bg-white/[0.02] p-5'} flex-1 min-h-0 overflow-y-auto`}>
+    <div className={`${surface === 'card' ? 'card rounded-2xl p-5' : 'rounded-[22px] border border-white/8 bg-white/[0.02] p-5'} flex-1 min-h-0`}>
       <div className="mb-5">
         <h3 className="text-sm font-bold uppercase tracking-[0.2em] text-white">
           {isEdit ? 'PERBARUI VIDEO' : 'TAMBAH VIDEO'}
@@ -364,7 +371,7 @@ export default function VideoRepoForm({ folders, selectedFolderId, editingVideo,
 
           {isEdit && (
             <a
-              href="/dashboard/videos"
+              href={cancelHref}
               className="mt-3 block text-center text-xs font-semibold text-slate-500 hover:text-white transition-colors"
             >
               Batal edit
