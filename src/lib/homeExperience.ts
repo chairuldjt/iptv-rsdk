@@ -1,9 +1,10 @@
 import prisma from '@/lib/db'
 import { getDeviceGroupForDevice } from '@/lib/deviceGroups'
+import { resolveEffectiveRunningText } from '@/lib/runningText'
 
 const GLOBAL_HOME_EXPERIENCE_KEY = 'homeExperience.global'
 
-export type HomeExperienceScope = 'global' | 'group' | 'device'
+export type HomeExperienceScope = 'global' | 'group' | 'device' | 'profile'
 
 export type HomeExperienceMenuType =
   | 'tv'
@@ -68,6 +69,11 @@ export type HomeExperienceConfig = {
     enableSelectionSound: boolean
     enableSplashSound: boolean
     selectionSoundUrl: string
+  }
+  videoBroadcast?: {
+    enabled: boolean
+    videoId: number | null
+    repeatCount: number
   }
 }
 
@@ -183,6 +189,11 @@ export const FALLBACK_HOME_EXPERIENCE_CONFIG: HomeExperienceConfig = {
     enableSplashSound: true,
     selectionSoundUrl: '',
   },
+  videoBroadcast: {
+    enabled: false,
+    videoId: null,
+    repeatCount: 1,
+  },
 }
 
 export async function getGlobalHomeExperience(): Promise<HomeExperienceConfig> {
@@ -209,6 +220,14 @@ export async function setDeviceHomeExperience(deviceId: string, config: HomeExpe
   await saveStoredHomeExperience(deviceKey(deviceId), config)
 }
 
+export async function getDeviceIdsWithOverride(): Promise<string[]> {
+  const settings = await prisma.appSetting.findMany({
+    where: { key: { startsWith: 'homeExperience.device.' } },
+    select: { key: true },
+  })
+  return settings.map((s) => s.key.replace('homeExperience.device.', ''))
+}
+
 export async function clearScopedHomeExperience(scope: HomeExperienceScope, id?: string): Promise<void> {
   const key = resolveScopeKey(scope, id)
   await prisma.appSetting.deleteMany({
@@ -217,15 +236,46 @@ export async function clearScopedHomeExperience(scope: HomeExperienceScope, id?:
 }
 
 export async function resolveEffectiveHomeExperience(deviceId: string): Promise<HomeExperienceConfig> {
-  const globalConfig = await getGlobalHomeExperience()
-  const groupId = await getDeviceGroupForDevice(deviceId)
-  const groupConfig = groupId ? await getGroupHomeExperience(groupId) : null
-  const deviceConfig = await getDeviceHomeExperience(deviceId)
+  // 1. Global: prefer profile-based global, fallback to legacy
+  const globalProfileId = await getGlobalProfileId()
+  const globalConfig = globalProfileId
+    ? ((await getHomeExperienceProfileConfig(globalProfileId)) ?? await getGlobalHomeExperience())
+    : await getGlobalHomeExperience()
 
-  return deepMergeHomeExperience(
+  // 2. Group: prefer profile-based group config, fallback to legacy per-group config
+  const groupId = await getDeviceGroupForDevice(deviceId)
+  let groupConfig: HomeExperienceConfig | null = null
+  if (groupId) {
+    const groupProfileMap = await getGroupProfileMap()
+    const groupProfileId = groupProfileMap[groupId]
+    groupConfig = groupProfileId
+      ? await getHomeExperienceProfileConfig(groupProfileId)
+      : await getGroupHomeExperience(groupId)
+  }
+
+  // 3. Device: prefer profile-based device config, fallback to legacy per-device override
+  const deviceProfileMap = await getDeviceProfileMap()
+  const deviceProfileId = deviceProfileMap[deviceId]
+  const deviceConfig = deviceProfileId
+    ? await getHomeExperienceProfileConfig(deviceProfileId)
+    : await getDeviceHomeExperience(deviceId)
+
+  const merged = deepMergeHomeExperience(
     deepMergeHomeExperience(globalConfig, groupConfig),
     deviceConfig
   )
+
+  // Override runningText with the resolved Running Text profile settings
+  const effectiveRunningText = await resolveEffectiveRunningText(deviceId)
+  merged.runningText = {
+    enabled: effectiveRunningText.enabled,
+    visibleCount: effectiveRunningText.visibleCount,
+    rotationSeconds: effectiveRunningText.rotationSeconds,
+    displaySeconds: effectiveRunningText.displaySeconds,
+    items: effectiveRunningText.items,
+  }
+
+  return merged
 }
 
 export function homeExperienceFromFormData(formData: FormData): HomeExperienceConfig {
@@ -258,6 +308,11 @@ export function homeExperienceFromFormData(formData: FormData): HomeExperienceCo
       enableSplashSound: formData.get('enableSplashSound') === 'on',
       selectionSoundUrl: formData.get('selectionSoundUrl'),
     },
+    videoBroadcast: {
+      enabled: formData.get('videoBroadcastEnabled') === 'on',
+      videoId: formData.get('videoBroadcastVideoId') ? Number.parseInt(String(formData.get('videoBroadcastVideoId')), 10) : null,
+      repeatCount: Number.parseInt(String(formData.get('videoBroadcastRepeatCount') || 1), 10),
+    },
   })
 }
 
@@ -273,6 +328,7 @@ export function normalizeHomeExperienceConfig(value: unknown): HomeExperienceCon
     runningText: normalizeRunningText(source.runningText),
     splash: normalizeSplash(source.splash),
     sounds: normalizeSounds(source.sounds),
+    videoBroadcast: normalizeVideoBroadcast(source.videoBroadcast),
   }
 }
 
@@ -298,10 +354,188 @@ export function deepMergeHomeExperience(
       ...base.sounds,
       ...overrideConfig.sounds,
     },
+    videoBroadcast: {
+      ...base.videoBroadcast,
+      ...overrideConfig.videoBroadcast,
+    },
     menus: overrideConfig.menus,
     staticPages: overrideConfig.staticPages,
   })
 }
+
+// ===== Profile System =====
+// Profiles are named, reusable config objects (like GPOs in GPMC).
+// One profile can be assigned to multiple groups and/or multiple devices.
+
+export type HomeExperienceProfile = {
+  id: string
+  name: string
+  description: string
+  createdAt: string
+}
+
+const PROFILES_META_KEY = 'homeExperience.profiles'
+const GLOBAL_PROFILE_ID_KEY = 'homeExperience.globalProfileId'
+const GROUP_PROFILE_MAP_KEY = 'homeExperience.groupProfileMap'
+const DEVICE_PROFILE_MAP_KEY = 'homeExperience.deviceProfileMap'
+
+function profileDataKey(profileId: string): string {
+  return `homeExperience.profile.${profileId}`
+}
+
+export async function getHomeExperienceProfiles(): Promise<HomeExperienceProfile[]> {
+  const setting = await prisma.appSetting.findUnique({ where: { key: PROFILES_META_KEY } })
+  if (!setting?.value) return []
+  try {
+    const arr = JSON.parse(setting.value)
+    return Array.isArray(arr) ? arr : []
+  } catch {
+    return []
+  }
+}
+
+async function saveHomeExperienceProfiles(profiles: HomeExperienceProfile[]): Promise<void> {
+  await prisma.appSetting.upsert({
+    where: { key: PROFILES_META_KEY },
+    update: { value: JSON.stringify(profiles) },
+    create: { key: PROFILES_META_KEY, value: JSON.stringify(profiles) },
+  })
+}
+
+export async function getHomeExperienceProfileConfig(profileId: string): Promise<HomeExperienceConfig | null> {
+  return getStoredHomeExperienceOptional(profileDataKey(profileId))
+}
+
+export async function createHomeExperienceProfile(input: {
+  name: string
+  description?: string
+}): Promise<HomeExperienceProfile> {
+  const profiles = await getHomeExperienceProfiles()
+  const profile: HomeExperienceProfile = {
+    id: `hep_${Date.now()}`,
+    name: input.name.trim() || 'Untitled Profile',
+    description: (input.description || '').trim(),
+    createdAt: new Date().toISOString(),
+  }
+  profiles.push(profile)
+  await saveHomeExperienceProfiles(profiles)
+  await saveStoredHomeExperience(profileDataKey(profile.id), FALLBACK_HOME_EXPERIENCE_CONFIG)
+  return profile
+}
+
+export async function updateHomeExperienceProfileMeta(
+  profileId: string,
+  input: { name: string; description: string }
+): Promise<void> {
+  const profiles = await getHomeExperienceProfiles()
+  await saveHomeExperienceProfiles(
+    profiles.map((p) =>
+      p.id === profileId
+        ? { ...p, name: input.name.trim() || p.name, description: input.description.trim() }
+        : p
+    )
+  )
+}
+
+export async function saveHomeExperienceProfileConfig(
+  profileId: string,
+  config: HomeExperienceConfig
+): Promise<void> {
+  await saveStoredHomeExperience(profileDataKey(profileId), config)
+}
+
+export async function deleteHomeExperienceProfile(profileId: string): Promise<void> {
+  // Remove from metadata list
+  const profiles = await getHomeExperienceProfiles()
+  await saveHomeExperienceProfiles(profiles.filter((p) => p.id !== profileId))
+
+  // Remove config data
+  await prisma.appSetting.deleteMany({ where: { key: profileDataKey(profileId) } })
+
+  // Clear global if it was this profile
+  const globalId = await getGlobalProfileId()
+  if (globalId === profileId) await setGlobalProfileId(null)
+
+  // Clear group assignments pointing to this profile
+  const groupMap = await getGroupProfileMap()
+  await saveProfileMap(
+    GROUP_PROFILE_MAP_KEY,
+    Object.fromEntries(Object.entries(groupMap).filter(([, pid]) => pid !== profileId))
+  )
+
+  // Clear device assignments pointing to this profile
+  const deviceMap = await getDeviceProfileMap()
+  await saveProfileMap(
+    DEVICE_PROFILE_MAP_KEY,
+    Object.fromEntries(Object.entries(deviceMap).filter(([, pid]) => pid !== profileId))
+  )
+}
+
+export async function getGlobalProfileId(): Promise<string | null> {
+  const setting = await prisma.appSetting.findUnique({ where: { key: GLOBAL_PROFILE_ID_KEY } })
+  return setting?.value?.trim() || null
+}
+
+export async function setGlobalProfileId(profileId: string | null): Promise<void> {
+  if (!profileId) {
+    await prisma.appSetting.deleteMany({ where: { key: GLOBAL_PROFILE_ID_KEY } })
+    return
+  }
+  await prisma.appSetting.upsert({
+    where: { key: GLOBAL_PROFILE_ID_KEY },
+    update: { value: profileId },
+    create: { key: GLOBAL_PROFILE_ID_KEY, value: profileId },
+  })
+}
+
+export async function getGroupProfileMap(): Promise<Record<string, string>> {
+  return loadProfileMap(GROUP_PROFILE_MAP_KEY)
+}
+
+export async function getDeviceProfileMap(): Promise<Record<string, string>> {
+  return loadProfileMap(DEVICE_PROFILE_MAP_KEY)
+}
+
+async function loadProfileMap(key: string): Promise<Record<string, string>> {
+  const setting = await prisma.appSetting.findUnique({ where: { key } })
+  if (!setting?.value) return {}
+  try {
+    const obj = JSON.parse(setting.value)
+    return typeof obj === 'object' && obj !== null && !Array.isArray(obj) ? obj : {}
+  } catch {
+    return {}
+  }
+}
+
+async function saveProfileMap(key: string, map: Record<string, string>): Promise<void> {
+  await prisma.appSetting.upsert({
+    where: { key },
+    update: { value: JSON.stringify(map) },
+    create: { key, value: JSON.stringify(map) },
+  })
+}
+
+export async function assignProfileToGroup(groupId: string, profileId: string | null): Promise<void> {
+  const map = await getGroupProfileMap()
+  if (!profileId) {
+    delete map[groupId]
+  } else {
+    map[groupId] = profileId
+  }
+  await saveProfileMap(GROUP_PROFILE_MAP_KEY, map)
+}
+
+export async function assignProfileToDevice(deviceId: string, profileId: string | null): Promise<void> {
+  const map = await getDeviceProfileMap()
+  if (!profileId) {
+    delete map[deviceId]
+  } else {
+    map[deviceId] = profileId
+  }
+  await saveProfileMap(DEVICE_PROFILE_MAP_KEY, map)
+}
+
+// ===== END Profile System =====
 
 async function getStoredHomeExperience(key: string): Promise<HomeExperienceConfig> {
   const config = await getStoredHomeExperienceOptional(key)
@@ -309,6 +543,7 @@ async function getStoredHomeExperience(key: string): Promise<HomeExperienceConfi
 }
 
 async function getStoredHomeExperienceOptional(key: string): Promise<HomeExperienceConfig | null> {
+
   const setting = await prisma.appSetting.findUnique({
     where: { key },
   })
@@ -427,6 +662,22 @@ function normalizeSounds(value: unknown): HomeExperienceConfig['sounds'] {
     enableSplashSound: safeBoolean(source.enableSplashSound, FALLBACK_HOME_EXPERIENCE_CONFIG.sounds.enableSplashSound),
     selectionSoundUrl: safeString(source.selectionSoundUrl, ''),
   }
+}
+
+function normalizeVideoBroadcast(value: unknown): HomeExperienceConfig['videoBroadcast'] {
+  const source = isRecord(value) ? value : {}
+  const fallback = FALLBACK_HOME_EXPERIENCE_CONFIG.videoBroadcast || { enabled: false, videoId: null, repeatCount: 1 }
+  return {
+    enabled: safeBoolean(source.enabled, fallback.enabled),
+    videoId: nullableNumber(source.videoId),
+    repeatCount: clampInt(source.repeatCount, 1, 100, fallback.repeatCount),
+  }
+}
+
+function nullableNumber(value: unknown): number | null {
+  if (typeof value === 'number' && Number.isFinite(value) && value > 0) return Math.floor(value)
+  const parsed = Number.parseInt(String(value ?? ''), 10)
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : null
 }
 
 function parseJsonArray<T>(value: FormDataEntryValue | null, fallback: T[]): T[] {

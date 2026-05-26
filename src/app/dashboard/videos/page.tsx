@@ -288,12 +288,7 @@ export default async function VideosPage({
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
-            <a
-              href={broadcastModalOpenHref}
-              className="rounded-xl border border-emerald-400/20 bg-emerald-500/10 px-4 py-2 text-xs font-semibold text-emerald-300 hover:bg-emerald-500/15"
-            >
-              Video Broadcast
-            </a>
+
             <a
               href={videoModalOpenHref}
               className="btn bg-indigo-600 hover:bg-indigo-500 text-white font-bold py-2 px-4 text-xs rounded-xl shadow-[0_4px_12px_rgba(99,102,241,0.2)] cursor-pointer transition-all"
@@ -558,7 +553,7 @@ export default async function VideosPage({
           <section className="overflow-hidden rounded-[24px] border border-white/8 bg-slate-900/40 backdrop-blur-xl p-5 shadow-2xl shrink-0 space-y-4">
             <div>
               <h3 className="text-sm font-bold uppercase tracking-[0.2em] text-white">QUICK ACTIONS</h3>
-              <p className="mt-1 text-xs text-slate-400">Buka editor video atau panel broadcast tanpa memenuhi workspace utama.</p>
+              <p className="mt-1 text-xs text-slate-400">Buka editor video tanpa memenuhi workspace utama.</p>
             </div>
             <div className="grid grid-cols-1 gap-2">
               <a
@@ -567,35 +562,7 @@ export default async function VideosPage({
               >
                 Tambah / Edit Video
               </a>
-              <a
-                href={broadcastModalOpenHref}
-                className="rounded-xl border border-emerald-400/20 bg-emerald-500/10 px-4 py-3 text-xs font-semibold text-emerald-300 hover:bg-emerald-500/15"
-              >
-                Atur Video Broadcast
-              </a>
             </div>
-          </section>
-
-          <section className="overflow-hidden rounded-[24px] border border-white/8 bg-slate-900/40 backdrop-blur-xl p-5 shadow-2xl shrink-0 space-y-4">
-            <div>
-              <h3 className="text-sm font-bold uppercase tracking-[0.2em] text-white">BROADCAST SUMMARY</h3>
-              <p className="mt-1 text-xs text-slate-400">Ringkasan config aktif untuk scope yang sedang dipilih.</p>
-            </div>
-            <div className="rounded-2xl border border-primary/15 bg-primary/10 px-3.5 py-3">
-              <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-primary">Scope Aktif</div>
-              <div className="mt-1 text-sm font-semibold text-white">{currentBroadcastScopeLabel}</div>
-              <div className="mt-1 text-[11px] text-slate-300">
-                Effective source: <span className="font-semibold text-white">{broadcastConfig.scopeApplied}</span>
-              </div>
-            </div>
-            <div className="rounded-2xl border border-white/8 bg-black/20 p-3.5 text-xs text-slate-300 space-y-1.5">
-              <div><span className="text-slate-500">Status:</span> {broadcastConfig.enabled && broadcastConfig.videoUrl ? 'Aktif' : 'Tidak aktif'}</div>
-              <div><span className="text-slate-500">Video:</span> <span className="font-semibold text-white">{broadcastConfig.videoTitle || 'Belum dipilih'}</span></div>
-              <div><span className="text-slate-500">Repeat:</span> {broadcastConfig.repeatCount}x</div>
-            </div>
-            <p className="text-[11px] leading-relaxed text-slate-400">
-              `Tampilkan Sekarang` akan mendorong command live ke device target. Saat app restart, config ini juga tetap dipakai sebagai fallback startup broadcast.
-            </p>
           </section>
           
           {/* Card 1: Tambah Folder Form */}
@@ -725,36 +692,7 @@ export default async function VideosPage({
         </AppModalShell>
       )}
 
-      {showBroadcastModal && (
-        <AppModalShell
-          title="Kelola Broadcast & Trigger Live"
-          eyebrow="Video Broadcast"
-          description="Simpan config fallback startup sekaligus kirim trigger live ke device target tanpa restart aplikasi."
-          closeHref={broadcastModalCloseHref}
-          maxWidthClass="max-w-3xl"
-          zIndexClass="z-[75]"
-        >
-            <VideoBroadcastManager
-              scope={broadcastScope}
-              targetId={broadcastTargetId}
-              currentScopeLabel={currentBroadcastScopeLabel}
-              config={broadcastConfig}
-              surface="plain"
-              videos={broadcastVideos.map((video) => ({
-                id: video.id,
-                title: video.title,
-                folderName: video.folder?.name || null,
-                isPublished: video.isPublished,
-              }))}
-              groups={groups}
-              devices={deviceOptions}
-              onSaveAction={saveVideoBroadcastAction}
-              onResetAction={resetVideoBroadcastAction}
-              onPlayNowAction={playVideoBroadcastNowAction}
-              onStopNowAction={stopVideoBroadcastNowAction}
-            />
-        </AppModalShell>
-      )}
+
 
     </div>
   )

@@ -15,7 +15,7 @@ import {
   setOfflineAutoDeleteDays,
 } from '@/lib/settings'
 import { DEFAULT_CUSTOM_M3U_URL, DEFAULT_SYNC_MODE, normalizeSyncMode } from '@/lib/defaults'
-import { assignDeviceToGroup, getDeviceGroupAssignments, getDeviceGroups } from '@/lib/deviceGroups'
+import { getDeviceGroupAssignments, getDeviceGroups } from '@/lib/deviceGroups'
 
 export const revalidate = 0
 type DeviceStatusFilter = 'all' | 'online' | 'offline' | 'disabled'
@@ -91,19 +91,6 @@ async function clearDeviceCacheAction(formData: FormData) {
   }
 }
 
-async function assignDeviceGroupAction(formData: FormData) {
-  'use server'
-  const deviceId = formData.get('deviceId') as string
-  const groupId = ((formData.get('groupId') as string) || '').trim() || null
-
-  try {
-    await assignDeviceToGroup(deviceId, groupId)
-    revalidatePath('/dashboard/devices')
-    revalidatePath('/dashboard/experience')
-  } catch (error) {
-    console.error('Assign device group error:', error)
-  }
-}
 
 async function saveDeviceConfigAction(formData: FormData) {
   'use server'
@@ -164,7 +151,7 @@ export default async function DevicesPage({
 }: {
   searchParams: Promise<{
     edit?: string; success?: string; status?: string; cleanupSaved?: string
-    remote?: string; q?: string; page?: string; limit?: string
+    remote?: string; q?: string; page?: string; limit?: string; group?: string
   }>
 }) {
   const resolvedSearchParams = await searchParams
@@ -181,6 +168,8 @@ export default async function DevicesPage({
   const allowedLimits = [10, 25, 50, 100]
   const pageSize = allowedLimits.includes(limitParam) ? limitParam : 25
   const currentPage = pageParam > 0 ? pageParam : 1
+
+  const groupFilter = resolvedSearchParams.group || ''
 
   const offlineAutoDeleteDays = await getOfflineAutoDeleteDays()
   const cleanedDeviceCount = await cleanupOfflineDevices(offlineAutoDeleteDays)
@@ -209,9 +198,11 @@ export default async function DevicesPage({
 
   const filteredDevices = devices.filter((d) => {
     const isOnline = d.isActive && d.lastOnline && d.lastOnline.getTime() >= tenMinutesAgo.getTime()
-    if (statusFilter === 'online') return Boolean(isOnline)
-    if (statusFilter === 'offline') return d.isActive && !isOnline
-    if (statusFilter === 'disabled') return !d.isActive
+    if (statusFilter === 'online' && !isOnline) return false
+    if (statusFilter === 'offline' && !(d.isActive && !isOnline)) return false
+    if (statusFilter === 'disabled' && d.isActive) return false
+    if (groupFilter === '__none__' && groupAssignments[d.deviceId]) return false
+    if (groupFilter && groupFilter !== '__none__' && groupAssignments[d.deviceId] !== groupFilter) return false
     return true
   })
 
@@ -254,41 +245,86 @@ export default async function DevicesPage({
           Offline cleanup setting saved. {cleanedDeviceCount > 0 ? `${cleanedDeviceCount} old offline device(s) were deleted.` : 'No old offline devices matched the threshold.'}
         </div>
       )}
-      {/* Settings Panels */}
-      <div className="card p-4 rounded-2xl flex flex-col lg:flex-row gap-4 lg:items-end lg:justify-between">
-        <div>
-          <span className="block text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-2">Filter Devices</span>
-          <div className="flex flex-wrap gap-2">
-            {filterItems.map((item) => (
-              <a
-                key={item.value}
-                href={`/dashboard/devices?status=${item.value}`}
-                className={`px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all ${
-                  statusFilter === item.value
-                    ? 'bg-primary/15 text-primary border-primary/30'
-                    : 'text-muted-foreground border-border hover:text-foreground hover:bg-accent/50'
-                }`}
-              >
-                {item.label} ({item.count})
-              </a>
-            ))}
-          </div>
-        </div>
-        <form action={saveOfflineCleanupSettingAction} className="flex flex-col sm:flex-row gap-3 sm:items-end">
-          <div>
-            <label className="block text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-1.5">Auto-delete Offline After</label>
-            <div className="flex items-center gap-2">
-              <input
-                type="number" name="offlineAutoDeleteDays" defaultValue={offlineAutoDeleteDays}
-                min={0} max={3650}
-                className="w-24 px-3 py-1.5 bg-background border border-border rounded-lg text-foreground text-xs font-medium focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary/20"
-              />
-              <span className="text-xs text-muted-foreground">days</span>
+      {/* Filter & Settings Panel */}
+      <div className="card p-4 rounded-2xl space-y-4">
+        <div className="flex flex-col lg:flex-row gap-4 lg:items-end lg:justify-between">
+          <div className="space-y-3">
+            {/* Status Filter */}
+            <div>
+              <span className="block text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-2">Status</span>
+              <div className="flex flex-wrap gap-2">
+                {filterItems.map((item) => (
+                  <a
+                    key={item.value}
+                    href={`/dashboard/devices?status=${item.value}${groupFilter ? `&group=${encodeURIComponent(groupFilter)}` : ''}`}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all ${
+                      statusFilter === item.value
+                        ? 'bg-primary/15 text-primary border-primary/30'
+                        : 'text-muted-foreground border-border hover:text-foreground hover:bg-accent/50'
+                    }`}
+                  >
+                    {item.label} ({item.count})
+                  </a>
+                ))}
+              </div>
             </div>
-            <p className="text-[9px] text-muted-foreground/60 mt-1">0 disables auto-delete</p>
+            {/* Group Filter */}
+            <div>
+              <span className="block text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-2">Group</span>
+              <div className="flex flex-wrap gap-2">
+                <a
+                  href={`/dashboard/devices?status=${statusFilter}`}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all ${
+                    !groupFilter
+                      ? 'bg-primary/15 text-primary border-primary/30'
+                      : 'text-muted-foreground border-border hover:text-foreground hover:bg-accent/50'
+                  }`}
+                >
+                  Semua Group
+                </a>
+                <a
+                  href={`/dashboard/devices?status=${statusFilter}&group=__none__`}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all ${
+                    groupFilter === '__none__'
+                      ? 'bg-primary/15 text-primary border-primary/30'
+                      : 'text-muted-foreground border-border hover:text-foreground hover:bg-accent/50'
+                  }`}
+                >
+                  Tanpa Grup
+                </a>
+                {deviceGroups.map((g) => (
+                  <a
+                    key={g.id}
+                    href={`/dashboard/devices?status=${statusFilter}&group=${encodeURIComponent(g.id)}`}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all flex items-center gap-1.5 ${
+                      groupFilter === g.id
+                        ? 'bg-primary/15 text-primary border-primary/30'
+                        : 'text-muted-foreground border-border hover:text-foreground hover:bg-accent/50'
+                    }`}
+                  >
+                    <span className="w-2 h-2 rounded-full" style={{ backgroundColor: g.color }} />
+                    {g.name}
+                  </a>
+                ))}
+              </div>
+            </div>
           </div>
-          <button type="submit" className="btn btn-primary btn-sm py-2">Save Cleanup</button>
-        </form>
+          <form action={saveOfflineCleanupSettingAction} className="flex flex-col sm:flex-row gap-3 sm:items-end shrink-0">
+            <div>
+              <label className="block text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-1.5">Auto-delete Offline After</label>
+              <div className="flex items-center gap-2">
+                <input
+                  type="number" name="offlineAutoDeleteDays" defaultValue={offlineAutoDeleteDays}
+                  min={0} max={3650}
+                  className="w-24 px-3 py-1.5 bg-background border border-border rounded-lg text-foreground text-xs font-medium focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary/20"
+                />
+                <span className="text-xs text-muted-foreground">days</span>
+              </div>
+              <p className="text-[9px] text-muted-foreground/60 mt-1">0 disables auto-delete</p>
+            </div>
+            <button type="submit" className="btn btn-primary btn-sm py-2">Save Cleanup</button>
+          </form>
+        </div>
       </div>
 
       {/* Device Table */}
@@ -355,31 +391,24 @@ export default async function DevicesPage({
                           <span className="text-muted-foreground/60">ID:</span> {d.deviceId}
                         </div>
                       </td>
-                      <td className="p-4 min-w-[220px]">
-                        <form action={assignDeviceGroupAction} className="space-y-2">
-                          <input type="hidden" name="deviceId" value={d.deviceId} />
-                          <select
-                            name="groupId"
-                            defaultValue={assignedGroupId}
-                            className="field-input py-2 text-[11px]"
-                          >
-                            <option value="">Tanpa Group</option>
-                            {deviceGroups.map((group) => (
-                              <option key={group.id} value={group.id}>{group.name}</option>
-                            ))}
-                          </select>
-                          <div className="flex items-center justify-between gap-2">
-                            <span className="text-[9px] text-muted-foreground">
-                              {assignedGroup ? assignedGroup.name : 'Global only'}
-                            </span>
-                            <button
-                              type="submit"
-                              className="rounded-lg border border-primary/20 px-2 py-1 text-[10px] font-semibold text-primary hover:bg-primary/10"
-                            >
-                              Save
-                            </button>
+                      <td className="p-4">
+                        {assignedGroup ? (
+                          <div className="flex items-center gap-2">
+                            <span
+                              className="w-2 h-2 rounded-full shrink-0"
+                              style={{ backgroundColor: assignedGroup.color }}
+                            />
+                            <span className="text-xs font-medium text-foreground">{assignedGroup.name}</span>
                           </div>
-                        </form>
+                        ) : (
+                          <span className="text-[11px] text-muted-foreground/60 italic">Tanpa grup</span>
+                        )}
+                        <a
+                          href="/dashboard/groups"
+                          className="mt-1 block text-[9px] text-primary/60 hover:text-primary transition-colors"
+                        >
+                          Kelola grup →
+                        </a>
                       </td>
                       <td className="p-4">
                         <div className="flex flex-col gap-1">

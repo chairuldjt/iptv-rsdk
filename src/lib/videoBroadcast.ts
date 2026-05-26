@@ -1,7 +1,12 @@
 import prisma from '@/lib/db'
 import { getDeviceGroupForDevice } from '@/lib/deviceGroups'
 
-const GLOBAL_VIDEO_BROADCAST_KEY = 'videoBroadcast.global'
+export type VideoBroadcastProfile = {
+  id: string
+  name: string
+  description: string
+  createdAt: string
+}
 
 export type VideoBroadcastScope = 'global' | 'group' | 'device'
 
@@ -16,7 +21,7 @@ export type ResolvedVideoBroadcastConfig = VideoBroadcastConfig & {
   videoTitle: string
   videoUrl: string
   thumbnailUrl: string
-  scopeApplied: VideoBroadcastScope | 'fallback'
+  scopeApplied: 'global' | 'group' | 'device' | 'fallback'
 }
 
 export const FALLBACK_VIDEO_BROADCAST_CONFIG: VideoBroadcastConfig = {
@@ -26,35 +31,171 @@ export const FALLBACK_VIDEO_BROADCAST_CONFIG: VideoBroadcastConfig = {
   repeatCount: 1,
 }
 
-export async function getGlobalVideoBroadcast(): Promise<VideoBroadcastConfig> {
-  return getStoredVideoBroadcast(GLOBAL_VIDEO_BROADCAST_KEY)
+const VIDEO_PROFILES_META_KEY = 'videoBroadcast.profiles'
+const VIDEO_GLOBAL_PROFILE_ID_KEY = 'videoBroadcast.globalProfileId'
+const VIDEO_GROUP_PROFILE_MAP_KEY = 'videoBroadcast.groupProfileMap'
+const VIDEO_DEVICE_PROFILE_MAP_KEY = 'videoBroadcast.deviceProfileMap'
+
+function videoProfileDataKey(profileId: string): string {
+  return `videoBroadcast.profile.${profileId}`
 }
 
-export async function setGlobalVideoBroadcast(config: VideoBroadcastConfig): Promise<void> {
-  await saveStoredVideoBroadcast(GLOBAL_VIDEO_BROADCAST_KEY, config)
+export async function getVideoBroadcastProfiles(): Promise<VideoBroadcastProfile[]> {
+  const setting = await prisma.appSetting.findUnique({ where: { key: VIDEO_PROFILES_META_KEY } })
+  if (!setting?.value) return []
+  try {
+    const arr = JSON.parse(setting.value)
+    return Array.isArray(arr) ? arr : []
+  } catch {
+    return []
+  }
 }
 
-export async function getGroupVideoBroadcast(groupId: string): Promise<VideoBroadcastConfig | null> {
-  return getStoredVideoBroadcastOptional(groupKey(groupId))
-}
-
-export async function setGroupVideoBroadcast(groupId: string, config: VideoBroadcastConfig): Promise<void> {
-  await saveStoredVideoBroadcast(groupKey(groupId), config)
-}
-
-export async function getDeviceVideoBroadcast(deviceId: string): Promise<VideoBroadcastConfig | null> {
-  return getStoredVideoBroadcastOptional(deviceKey(deviceId))
-}
-
-export async function setDeviceVideoBroadcast(deviceId: string, config: VideoBroadcastConfig): Promise<void> {
-  await saveStoredVideoBroadcast(deviceKey(deviceId), config)
-}
-
-export async function clearScopedVideoBroadcast(scope: VideoBroadcastScope, id?: string): Promise<void> {
-  const key = resolveScopeKey(scope, id)
-  await prisma.appSetting.deleteMany({
-    where: { key },
+async function saveVideoBroadcastProfiles(profiles: VideoBroadcastProfile[]): Promise<void> {
+  await prisma.appSetting.upsert({
+    where: { key: VIDEO_PROFILES_META_KEY },
+    update: { value: JSON.stringify(profiles) },
+    create: { key: VIDEO_PROFILES_META_KEY, value: JSON.stringify(profiles) },
   })
+}
+
+export async function getVideoBroadcastProfileConfig(profileId: string): Promise<VideoBroadcastConfig | null> {
+  const setting = await prisma.appSetting.findUnique({ where: { key: videoProfileDataKey(profileId) } })
+  if (!setting?.value) return null
+  try {
+    return normalizeVideoBroadcastConfig(JSON.parse(setting.value))
+  } catch {
+    return null
+  }
+}
+
+export async function createVideoBroadcastProfile(input: {
+  name: string
+  description?: string
+}): Promise<VideoBroadcastProfile> {
+  const profiles = await getVideoBroadcastProfiles()
+  const profile: VideoBroadcastProfile = {
+    id: `vbp_${Date.now()}`,
+    name: input.name.trim() || 'Untitled Video Broadcast Profile',
+    description: (input.description || '').trim(),
+    createdAt: new Date().toISOString(),
+  }
+  profiles.push(profile)
+  await saveVideoBroadcastProfiles(profiles)
+  await saveVideoBroadcastProfileConfig(profile.id, FALLBACK_VIDEO_BROADCAST_CONFIG)
+  return profile
+}
+
+export async function updateVideoBroadcastProfileMeta(
+  profileId: string,
+  input: { name: string; description: string }
+): Promise<void> {
+  const profiles = await getVideoBroadcastProfiles()
+  await saveVideoBroadcastProfiles(
+    profiles.map((p) =>
+      p.id === profileId
+        ? { ...p, name: input.name.trim() || p.name, description: input.description.trim() }
+        : p
+    )
+  )
+}
+
+export async function saveVideoBroadcastProfileConfig(
+  profileId: string,
+  config: VideoBroadcastConfig
+): Promise<void> {
+  const safeConfig = normalizeVideoBroadcastConfig(config)
+  await prisma.appSetting.upsert({
+    where: { key: videoProfileDataKey(profileId) },
+    update: { value: JSON.stringify(safeConfig) },
+    create: { key: videoProfileDataKey(profileId), value: JSON.stringify(safeConfig) },
+  })
+}
+
+export async function deleteVideoBroadcastProfile(profileId: string): Promise<void> {
+  const profiles = await getVideoBroadcastProfiles()
+  await saveVideoBroadcastProfiles(profiles.filter((p) => p.id !== profileId))
+
+  await prisma.appSetting.deleteMany({ where: { key: videoProfileDataKey(profileId) } })
+
+  const globalId = await getVideoGlobalProfileId()
+  if (globalId === profileId) await setVideoGlobalProfileId(null)
+
+  const groupMap = await getVideoBroadcastGroupProfileMap()
+  await saveProfileMap(
+    VIDEO_GROUP_PROFILE_MAP_KEY,
+    Object.fromEntries(Object.entries(groupMap).filter(([, pid]) => pid !== profileId))
+  )
+
+  const deviceMap = await getVideoBroadcastDeviceProfileMap()
+  await saveProfileMap(
+    VIDEO_DEVICE_PROFILE_MAP_KEY,
+    Object.fromEntries(Object.entries(deviceMap).filter(([, pid]) => pid !== profileId))
+  )
+}
+
+export async function getVideoGlobalProfileId(): Promise<string | null> {
+  const setting = await prisma.appSetting.findUnique({ where: { key: VIDEO_GLOBAL_PROFILE_ID_KEY } })
+  return setting?.value?.trim() || null
+}
+
+export async function setVideoGlobalProfileId(profileId: string | null): Promise<void> {
+  if (!profileId) {
+    await prisma.appSetting.deleteMany({ where: { key: VIDEO_GLOBAL_PROFILE_ID_KEY } })
+    return
+  }
+  await prisma.appSetting.upsert({
+    where: { key: VIDEO_GLOBAL_PROFILE_ID_KEY },
+    update: { value: profileId },
+    create: { key: VIDEO_GLOBAL_PROFILE_ID_KEY, value: profileId },
+  })
+}
+
+export async function getVideoBroadcastGroupProfileMap(): Promise<Record<string, string>> {
+  return loadProfileMap(VIDEO_GROUP_PROFILE_MAP_KEY)
+}
+
+export async function getVideoBroadcastDeviceProfileMap(): Promise<Record<string, string>> {
+  return loadProfileMap(VIDEO_DEVICE_PROFILE_MAP_KEY)
+}
+
+async function loadProfileMap(key: string): Promise<Record<string, string>> {
+  const setting = await prisma.appSetting.findUnique({ where: { key } })
+  if (!setting?.value) return {}
+  try {
+    const obj = JSON.parse(setting.value)
+    return typeof obj === 'object' && obj !== null && !Array.isArray(obj) ? obj : {}
+  } catch {
+    return {}
+  }
+}
+
+async function saveProfileMap(key: string, map: Record<string, string>): Promise<void> {
+  await prisma.appSetting.upsert({
+    where: { key },
+    update: { value: JSON.stringify(map) },
+    create: { key, value: JSON.stringify(map) },
+  })
+}
+
+export async function assignVideoBroadcastProfileToGroup(groupId: string, profileId: string | null): Promise<void> {
+  const map = await getVideoBroadcastGroupProfileMap()
+  if (!profileId) {
+    delete map[groupId]
+  } else {
+    map[groupId] = profileId
+  }
+  await saveProfileMap(VIDEO_GROUP_PROFILE_MAP_KEY, map)
+}
+
+export async function assignVideoBroadcastProfileToDevice(deviceId: string, profileId: string | null): Promise<void> {
+  const map = await getVideoBroadcastDeviceProfileMap()
+  if (!profileId) {
+    delete map[deviceId]
+  } else {
+    map[deviceId] = profileId
+  }
+  await saveProfileMap(VIDEO_DEVICE_PROFILE_MAP_KEY, map)
 }
 
 export function videoBroadcastFromFormData(formData: FormData): VideoBroadcastConfig {
@@ -78,38 +219,53 @@ export function normalizeVideoBroadcastConfig(value: unknown): VideoBroadcastCon
 }
 
 export async function resolveEffectiveVideoBroadcast(deviceId: string): Promise<ResolvedVideoBroadcastConfig> {
-  const globalConfig = await getGlobalVideoBroadcast()
+  // 1. Global Profile
+  const globalProfileId = await getVideoGlobalProfileId()
+  const globalConfig = globalProfileId
+    ? (await getVideoBroadcastProfileConfig(globalProfileId))
+    : null
+
+  // 2. Group Profile
   const groupId = await getDeviceGroupForDevice(deviceId)
-  const groupConfig = groupId ? await getGroupVideoBroadcast(groupId) : null
-  const deviceConfig = await getDeviceVideoBroadcast(deviceId)
-
-  let effective = globalConfig
-  let scopeApplied: ResolvedVideoBroadcastConfig['scopeApplied'] = 'global'
-
-  if (groupConfig) {
-    effective = groupConfig
-    scopeApplied = 'group'
+  let groupConfig: VideoBroadcastConfig | null = null
+  if (groupId) {
+    const groupProfileMap = await getVideoBroadcastGroupProfileMap()
+    const groupProfileId = groupProfileMap[groupId]
+    if (groupProfileId) groupConfig = await getVideoBroadcastProfileConfig(groupProfileId)
   }
 
-  if (deviceConfig) {
-    effective = deviceConfig
-    scopeApplied = 'device'
-  }
+  // 3. Device Profile Override
+  const deviceProfileMap = await getVideoBroadcastDeviceProfileMap()
+  const deviceProfileId = deviceProfileMap[deviceId]
+  const deviceConfig = deviceProfileId
+    ? await getVideoBroadcastProfileConfig(deviceProfileId)
+    : null
 
-  const safeConfig = normalizeVideoBroadcastConfig(effective)
-  if (!safeConfig.enabled || !safeConfig.videoId) {
+  const base = globalConfig || FALLBACK_VIDEO_BROADCAST_CONFIG
+  const group = groupConfig || null
+  const device = deviceConfig || null
+
+  const merged = normalizeVideoBroadcastConfig({
+    ...base,
+    ...group,
+    ...device,
+  })
+
+  const scopeApplied = deviceConfig ? 'device' : groupConfig ? 'group' : globalProfileId ? 'global' : 'fallback'
+
+  if (!merged.enabled || !merged.videoId) {
     return {
-      ...safeConfig,
+      ...merged,
       enabled: false,
       videoTitle: '',
       videoUrl: '',
       thumbnailUrl: '',
-      scopeApplied: safeConfig === FALLBACK_VIDEO_BROADCAST_CONFIG ? 'fallback' : scopeApplied,
+      scopeApplied,
     }
   }
 
   const video = await prisma.educationVideo.findUnique({
-    where: { id: safeConfig.videoId },
+    where: { id: merged.videoId },
     include: { folder: true },
   })
 
@@ -121,7 +277,7 @@ export async function resolveEffectiveVideoBroadcast(deviceId: string): Promise<
 
   if (!isPlayable || !video) {
     return {
-      ...safeConfig,
+      ...merged,
       enabled: false,
       videoTitle: '',
       videoUrl: '',
@@ -131,7 +287,7 @@ export async function resolveEffectiveVideoBroadcast(deviceId: string): Promise<
   }
 
   return {
-    ...safeConfig,
+    ...merged,
     enabled: true,
     videoTitle: video.title,
     videoUrl: video.videoUrl,
@@ -140,52 +296,58 @@ export async function resolveEffectiveVideoBroadcast(deviceId: string): Promise<
   }
 }
 
-async function getStoredVideoBroadcast(key: string): Promise<VideoBroadcastConfig> {
-  const config = await getStoredVideoBroadcastOptional(key)
-  return config ?? FALLBACK_VIDEO_BROADCAST_CONFIG
+// Stored helpers (kept for backward compatibility)
+export async function getGlobalVideoBroadcast(): Promise<VideoBroadcastConfig> {
+  const globalProfileId = await getVideoGlobalProfileId()
+  return (globalProfileId ? await getVideoBroadcastProfileConfig(globalProfileId) : null) ?? FALLBACK_VIDEO_BROADCAST_CONFIG
 }
 
-async function getStoredVideoBroadcastOptional(key: string): Promise<VideoBroadcastConfig | null> {
-  const setting = await prisma.appSetting.findUnique({
-    where: { key },
-  })
-
-  if (!setting?.value) return null
-
-  try {
-    return normalizeVideoBroadcastConfig(JSON.parse(setting.value))
-  } catch {
-    return null
+export async function setGlobalVideoBroadcast(config: VideoBroadcastConfig): Promise<void> {
+  const globalProfileId = await getVideoGlobalProfileId()
+  if (globalProfileId) {
+    await saveVideoBroadcastProfileConfig(globalProfileId, config)
   }
 }
 
-async function saveStoredVideoBroadcast(key: string, config: VideoBroadcastConfig): Promise<void> {
-  const safeConfig = normalizeVideoBroadcastConfig(config)
-
-  await prisma.appSetting.upsert({
-    where: { key },
-    update: { value: JSON.stringify(safeConfig) },
-    create: {
-      key,
-      value: JSON.stringify(safeConfig),
-    },
-  })
+export async function getGroupVideoBroadcast(groupId: string): Promise<VideoBroadcastConfig | null> {
+  const groupProfileMap = await getVideoBroadcastGroupProfileMap()
+  const profileId = groupProfileMap[groupId]
+  return profileId ? await getVideoBroadcastProfileConfig(profileId) : null
 }
 
-function resolveScopeKey(scope: VideoBroadcastScope, id?: string): string {
-  if (scope === 'global') return GLOBAL_VIDEO_BROADCAST_KEY
-  if (scope === 'group') return groupKey(id || '')
-  return deviceKey(id || '')
+export async function setGroupVideoBroadcast(groupId: string, config: VideoBroadcastConfig): Promise<void> {
+  const groupProfileMap = await getVideoBroadcastGroupProfileMap()
+  const profileId = groupProfileMap[groupId]
+  if (profileId) {
+    await saveVideoBroadcastProfileConfig(profileId, config)
+  }
 }
 
-function groupKey(groupId: string): string {
-  return `videoBroadcast.group.${groupId}`
+export async function getDeviceVideoBroadcast(deviceId: string): Promise<VideoBroadcastConfig | null> {
+  const deviceProfileMap = await getVideoBroadcastDeviceProfileMap()
+  const profileId = deviceProfileMap[deviceId]
+  return profileId ? await getVideoBroadcastProfileConfig(profileId) : null
 }
 
-function deviceKey(deviceId: string): string {
-  return `videoBroadcast.device.${deviceId}`
+export async function setDeviceVideoBroadcast(deviceId: string, config: VideoBroadcastConfig): Promise<void> {
+  const deviceProfileMap = await getVideoBroadcastDeviceProfileMap()
+  const profileId = deviceProfileMap[deviceId]
+  if (profileId) {
+    await saveVideoBroadcastProfileConfig(profileId, config)
+  }
 }
 
+export async function clearScopedVideoBroadcast(scope: 'global' | 'group' | 'device', id?: string): Promise<void> {
+  if (scope === 'group' && id) {
+    await assignVideoBroadcastProfileToGroup(id, null)
+  } else if (scope === 'device' && id) {
+    await assignVideoBroadcastProfileToDevice(id, null)
+  } else if (scope === 'global') {
+    await setVideoGlobalProfileId(null)
+  }
+}
+
+// Basic internal helpers
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
 }

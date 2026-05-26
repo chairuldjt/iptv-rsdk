@@ -280,63 +280,11 @@ export default function HomeExperienceForm({
           </div>
         </section>
 
-        <section className="space-y-4 border-t border-border pt-6">
-          <div className="flex items-center justify-between gap-4">
-            <SectionTitle title="Running Text" description="Live running text yang bisa tampil di semua menu." />
-            <button
-              type="button"
-              onClick={() => setRunningTextItems((current) => [
-                ...current,
-                {
-                  id: `ticker_${Date.now()}`,
-                  enabled: true,
-                  text: 'Pesan baru',
-                },
-              ])}
-              className="rounded-xl border border-primary/20 px-3 py-2 text-xs font-semibold text-primary hover:bg-primary/10"
-            >
-              Tambah Pesan
-            </button>
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-            <Toggle name="runningTextEnabled" checked={runningTextEnabled} onChange={setRunningTextEnabled} title="Enable Running Text" description="Ticker global aktif di seluruh menu yang mendukung." />
-            <div className="grid grid-cols-3 gap-3">
-              <Field label="Visible Count">
-                <input type="number" name="runningTextVisibleCount" min={1} max={10} value={runningTextVisibleCount} onChange={(e) => setRunningTextVisibleCount(Number.parseInt(e.target.value || '1', 10) || 1)} className="field-input" />
-              </Field>
-              <Field label="Rotation Sec">
-                <input type="number" name="runningTextRotationSeconds" min={1} max={600} value={runningTextRotationSeconds} onChange={(e) => setRunningTextRotationSeconds(Number.parseInt(e.target.value || '10', 10) || 10)} className="field-input" />
-              </Field>
-              <Field label="Display Sec">
-                <input type="number" name="runningTextDisplaySeconds" min={1} max={600} value={runningTextDisplaySeconds} onChange={(e) => setRunningTextDisplaySeconds(Number.parseInt(e.target.value || '10', 10) || 10)} className="field-input" />
-              </Field>
-            </div>
-          </div>
-          <div className="space-y-3">
-            {runningTextItems.map((item) => (
-              <div key={item.id} className="rounded-2xl border border-border bg-accent/20 p-4">
-                <div className="grid grid-cols-1 md:grid-cols-[180px_minmax(0,1fr)_auto] gap-3 items-start">
-                  <Field label="ID">
-                    <input type="text" value={item.id} onChange={(e) => updateTicker(setRunningTextItems, item.id, { id: e.target.value })} className="field-input font-mono" />
-                  </Field>
-                  <Field label="Pesan">
-                    <textarea value={item.text} onChange={(e) => updateTicker(setRunningTextItems, item.id, { text: e.target.value })} className="field-input min-h-[72px]" />
-                  </Field>
-                  <div className="space-y-2 pt-5">
-                    <ToggleInline checked={item.enabled} onChange={(checked) => updateTicker(setRunningTextItems, item.id, { enabled: checked })} title="Aktif" description="Tampilkan" />
-                    <button
-                      type="button"
-                      onClick={() => setRunningTextItems((current) => current.filter((entry) => entry.id !== item.id))}
-                      className="w-full rounded-lg border border-rose-500/20 px-2.5 py-2 text-[10px] font-semibold text-rose-400 hover:bg-rose-500/10"
-                    >
-                      Hapus
-                    </button>
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-        </section>
+        <input type="hidden" name="runningTextEnabled" value={runningTextEnabled ? 'on' : 'off'} />
+        <input type="hidden" name="runningTextVisibleCount" value={runningTextVisibleCount} />
+        <input type="hidden" name="runningTextRotationSeconds" value={runningTextRotationSeconds} />
+        <input type="hidden" name="runningTextDisplaySeconds" value={runningTextDisplaySeconds} />
+        <input type="hidden" name="runningTextItemsJson" value={JSON.stringify(runningTextItems)} />
 
         <section className="space-y-4 border-t border-border pt-6">
           <SectionTitle title="Sound Effect" description="Untuk saat ini profile mengatur enable / disable built-in splash dan selection sound di shell Android." />
