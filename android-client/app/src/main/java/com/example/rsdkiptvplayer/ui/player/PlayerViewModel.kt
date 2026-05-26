@@ -326,11 +326,34 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         _errorMessage.value = null
     }
 
-    private fun buildMediaItem(streamUrl: String): MediaItem {
+    private fun isRelayedHls(streamUrl: String): Boolean {
         val lowerUrl = streamUrl.lowercase()
+        if (lowerUrl.contains(".m3u8")) return true
+        if (lowerUrl.contains("/api/stream/udp-hls")) return true
+        
+        if (lowerUrl.contains("/api/stream/relay")) {
+            runCatching {
+                val uri = android.net.Uri.parse(streamUrl)
+                val token = uri.getQueryParameter("t")
+                if (token != null) {
+                    val parts = token.split('.')
+                    if (parts.isNotEmpty()) {
+                        val payloadBytes = android.util.Base64.decode(parts[0], android.util.Base64.URL_SAFE)
+                        val json = String(payloadBytes, Charsets.UTF_8)
+                        if (json.lowercase().contains(".m3u8")) {
+                            return true
+                        }
+                    }
+                }
+            }
+        }
+        return false
+    }
+
+    private fun buildMediaItem(streamUrl: String): MediaItem {
         val builder = MediaItem.Builder().setUri(streamUrl)
 
-        if (lowerUrl.contains("/api/stream/udp-hls") || lowerUrl.contains(".m3u8")) {
+        if (isRelayedHls(streamUrl)) {
             builder.setMimeType(MimeTypes.APPLICATION_M3U8)
         }
 

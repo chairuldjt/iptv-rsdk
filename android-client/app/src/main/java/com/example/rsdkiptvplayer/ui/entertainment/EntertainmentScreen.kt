@@ -32,6 +32,9 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Text
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -73,6 +76,12 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.net.HttpURLConnection
 import java.net.URL
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.itemsIndexed
+import androidx.compose.foundation.lazy.grid.rememberLazyGridState
+import com.example.rsdkiptvplayer.data.cache.ChannelEntity
+import com.example.rsdkiptvplayer.data.parser.M3uParser
 
 private data class EntertainmentOption(
     val id: Int,
@@ -126,6 +135,7 @@ fun EntertainmentScreen(onBack: () -> Unit) {
     activeOption?.let { option ->
         when (option.contentType) {
             "media_player", "m3u_player" -> EntertainmentPlayer(option = option, onBack = { activeOption = null })
+            "m3u_playlist" -> EntertainmentM3uPlaylistScreen(option = option, serverUrl = serverUrl, onBack = { activeOption = null })
             else -> EntertainmentWebView(option = option, onBack = { activeOption = null })
         }
         return
@@ -258,6 +268,7 @@ private fun EntertainmentOptionCard(
     val accent = when (option.contentType) {
         "media_player" -> Color(0xFF86EFAC)
         "m3u_player" -> Color(0xFF7DD3FC)
+        "m3u_playlist" -> Color(0xFF38BDF8)
         else -> Color(0xFFFF9A76)
     }
 
@@ -403,6 +414,25 @@ private fun EntertainmentPlayer(option: EntertainmentOption, onBack: () -> Unit)
         }
     }
 
+    DisposableEffect(player) {
+        val listener = object : Player.Listener {
+            override fun onPlayerError(error: androidx.media3.common.PlaybackException) {
+                errorMessage = "Gagal memutar konten: ${error.localizedMessage ?: "Playback Error"}"
+                isPlaying = false
+            }
+
+            override fun onPlaybackStateChanged(playbackState: Int) {
+                if (playbackState == Player.STATE_READY) {
+                    errorMessage = null
+                }
+            }
+        }
+        player.addListener(listener)
+        onDispose {
+            player.removeListener(listener)
+        }
+    }
+
     BackHandler {
         if (controlsVisible) {
             onBack()
@@ -421,7 +451,8 @@ private fun EntertainmentPlayer(option: EntertainmentOption, onBack: () -> Unit)
             if (option.contentType == "m3u_player") resolveM3uUrl(option.url) else option.url
         }.onSuccess { mediaUrl ->
             resolvedUrl = mediaUrl
-            player.setMediaItem(MediaItem.fromUri(Uri.parse(mediaUrl)))
+            val mediaItem = buildMediaItem(mediaUrl)
+            player.setMediaItem(mediaItem)
             player.prepare()
             player.playWhenReady = true
             isPlaying = true
@@ -539,8 +570,63 @@ private fun EntertainmentPlayer(option: EntertainmentOption, onBack: () -> Unit)
                 }
             }
         }
-        errorMessage?.let {
-            Text(it, color = Color.White, fontSize = 16.sp, fontWeight = FontWeight.Bold, modifier = Modifier.align(Alignment.Center))
+        errorMessage?.let { msg ->
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(Color.Black.copy(alpha = 0.85f)),
+                contentAlignment = Alignment.Center
+            ) {
+                Card(
+                    colors = CardDefaults.cardColors(containerColor = Color(0xFF1E293B)),
+                    border = BorderStroke(1.dp, Color(0xFFEF4444).copy(alpha = 0.4f)),
+                    shape = RoundedCornerShape(16.dp),
+                    modifier = Modifier.width(420.dp).padding(16.dp)
+                ) {
+                    Column(
+                        modifier = Modifier.padding(24.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        Text("⚠️ playback error", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = Color(0xFFEF4444))
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text(
+                            text = msg,
+                            fontSize = 13.sp,
+                            color = Color(0xFFCBD5E1),
+                            textAlign = TextAlign.Center
+                        )
+                        Spacer(modifier = Modifier.height(20.dp))
+                        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                            var isRetryBtnFocused by remember { mutableStateOf(false) }
+                            Button(
+                                onClick = {
+                                    errorMessage = null
+                                    player.prepare()
+                                    player.play()
+                                },
+                                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF6366F1)),
+                                modifier = Modifier
+                                    .focusable()
+                                    .onFocusChanged { isRetryBtnFocused = it.isFocused }
+                            ) {
+                                Text("Coba Lagi", color = Color.White, fontWeight = FontWeight.Bold)
+                            }
+
+                            var isBackBtnFocused by remember { mutableStateOf(false) }
+                            OutlinedButton(
+                                onClick = onBack,
+                                colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.White),
+                                border = BorderStroke(1.dp, if (isBackBtnFocused) Color(0xFF6366F1) else Color(0xFF475569)),
+                                modifier = Modifier
+                                    .focusable()
+                                    .onFocusChanged { isBackBtnFocused = it.isFocused }
+                            ) {
+                                Text("Kembali", fontWeight = FontWeight.Bold)
+                            }
+                        }
+                    }
+                }
+            }
         }
 
         AnimatedVisibility(
@@ -771,9 +857,23 @@ private fun EntertainmentItemData.toOption(serverUrl: String): EntertainmentOpti
 }
 
 private fun resolveUrl(serverUrl: String, value: String): String {
-    if (value.startsWith("http://", true) || value.startsWith("https://", true)) return value
+    var url = value
+    if (url.startsWith("http://localhost", true) || url.startsWith("https://localhost", true)) {
+        runCatching {
+            val serverUri = Uri.parse(serverUrl)
+            val serverHost = serverUri.host
+            val serverPort = serverUri.port
+            if (serverHost != null) {
+                val itemUri = Uri.parse(url)
+                val builder = itemUri.buildUpon()
+                builder.encodedAuthority(if (serverPort != -1) "$serverHost:$serverPort" else serverHost)
+                url = builder.build().toString()
+            }
+        }
+    }
+    if (url.startsWith("http://", true) || url.startsWith("https://", true)) return url
     val base = serverUrl.trimEnd('/')
-    val path = value.trimStart('/')
+    val path = url.trimStart('/')
     return "$base/$path"
 }
 
@@ -795,3 +895,328 @@ private suspend fun resolveM3uUrl(url: String): String = withContext(Dispatchers
             ?: throw IllegalStateException("Playlist M3U kosong.")
     }
 }
+
+@Composable
+private fun EntertainmentM3uPlaylistScreen(option: EntertainmentOption, serverUrl: String, onBack: () -> Unit) {
+    val context = LocalContext.current
+    var channels by remember { mutableStateOf<List<ChannelEntity>>(emptyList()) }
+    var isLoading by remember { mutableStateOf(true) }
+    var errorMessage by remember { mutableStateOf<String?>(null) }
+    var selectedChannel by remember { mutableStateOf<ChannelEntity?>(null) }
+    var reloadTrigger by remember { mutableIntStateOf(0) }
+
+    LaunchedEffect(option.url, reloadTrigger) {
+        isLoading = true
+        errorMessage = null
+        withContext(Dispatchers.IO) {
+            runCatching {
+                val conn = URL(option.url).openConnection() as HttpURLConnection
+                conn.connectTimeout = 15000
+                conn.readTimeout = 15000
+                conn.connect()
+                if (conn.responseCode !in 200..299) {
+                    throw IllegalStateException("Gagal mengambil playlist: HTTP ${conn.responseCode}")
+                }
+                val content = conn.inputStream.bufferedReader().use { it.readText() }
+                M3uParser.parse(content)
+            }.onSuccess { parsed ->
+                channels = parsed.map { channel ->
+                    channel.copy(
+                        streamUrl = resolveUrl(serverUrl, channel.streamUrl),
+                        logo = channel.logo?.let { resolveUrl(serverUrl, it) }
+                    )
+                }
+                isLoading = false
+            }.onFailure { error ->
+                errorMessage = error.localizedMessage ?: "Gagal memuat playlist M3U."
+                isLoading = false
+            }
+        }
+    }
+
+    if (selectedChannel != null) {
+        EntertainmentPlayer(
+            option = EntertainmentOption(
+                id = selectedChannel!!.id,
+                title = selectedChannel!!.name,
+                subtitle = option.title,
+                url = selectedChannel!!.streamUrl,
+                contentType = "media_player",
+                thumbnailUrl = selectedChannel!!.logo
+            ),
+            onBack = { selectedChannel = null }
+        )
+        return
+    }
+
+    BackHandler { onBack() }
+
+    val configuration = LocalConfiguration.current
+    val screenWidth = configuration.screenWidthDp
+    val isSmallScreen = screenWidth < 760 || configuration.screenHeightDp < 500
+    val gridState = rememberLazyGridState()
+    val coroutineScope = rememberCoroutineScope()
+
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(
+                Brush.radialGradient(
+                    colors = listOf(Color(0xFF1F2937), Color(0xFF050914)),
+                    radius = 900f
+                )
+            )
+            .safeDrawingPadding()
+            .padding(
+                horizontal = if (isSmallScreen) 20.dp else 42.dp,
+                vertical = if (isSmallScreen) 12.dp else 26.dp
+            )
+    ) {
+        // Header
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.Top
+        ) {
+            Column {
+                Text(
+                    text = option.title.uppercase(),
+                    color = Color(0xFFFFE9A6),
+                    fontSize = if (isSmallScreen) 20.sp else 28.sp,
+                    fontWeight = FontWeight.ExtraBold,
+                    letterSpacing = 2.sp,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+                Text(
+                    text = option.subtitle.ifBlank { "Pilih saluran untuk diputar" },
+                    color = Color.White.copy(alpha = 0.72f),
+                    fontSize = if (isSmallScreen) 10.sp else 13.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+        }
+
+        when {
+            isLoading -> {
+                CircularProgressIndicator(
+                    color = Color(0xFFFFE9A6),
+                    modifier = Modifier.align(Alignment.Center)
+                )
+            }
+            errorMessage != null -> {
+                Column(
+                    modifier = Modifier.align(Alignment.Center),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    Text(
+                        text = errorMessage ?: "",
+                        color = Color(0xFFEF4444),
+                        fontSize = 16.sp,
+                        fontWeight = FontWeight.Bold,
+                        textAlign = TextAlign.Center
+                    )
+                    Spacer(modifier = Modifier.height(16.dp))
+                    var isRetryFocused by remember { mutableStateOf(false) }
+                    Card(
+                        colors = CardDefaults.cardColors(containerColor = if (isRetryFocused) Color(0xFF374151) else Color(0xFF1F2937)),
+                        border = BorderStroke(2.dp, if (isRetryFocused) Color.White else Color.Transparent),
+                        modifier = Modifier
+                            .clickable {
+                                reloadTrigger++
+                            }
+                            .focusable()
+                            .onFocusChanged { isRetryFocused = it.isFocused }
+                    ) {
+                        Text(
+                            text = "Coba Lagi",
+                            color = Color.White,
+                            modifier = Modifier.padding(horizontal = 24.dp, vertical = 12.dp),
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                }
+            }
+            channels.isEmpty() -> {
+                Text(
+                    text = "Tidak ada saluran dalam playlist ini.",
+                    color = Color.White.copy(alpha = 0.72f),
+                    fontSize = if (isSmallScreen) 15.sp else 18.sp,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.align(Alignment.Center)
+                )
+            }
+            else -> {
+                // Show channel grid
+                LazyVerticalGrid(
+                    columns = GridCells.Adaptive(minSize = if (isSmallScreen) 120.dp else 160.dp),
+                    state = gridState,
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(top = if (isSmallScreen) 50.dp else 70.dp, bottom = 20.dp),
+                    horizontalArrangement = Arrangement.spacedBy(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(16.dp)
+                ) {
+                    itemsIndexed(channels) { index, channel ->
+                        M3uChannelCard(
+                            channel = channel,
+                            focusOnStart = index == 0,
+                            isSmallScreen = isSmallScreen,
+                            onFocused = {
+                                coroutineScope.launch {
+                                    // Scroll to focused item if needed, but LazyVerticalGrid usually handles focus scrolling well.
+                                }
+                            },
+                            onClick = { selectedChannel = channel }
+                        )
+                    }
+                }
+            }
+        }
+
+        Text(
+            text = "Tekan kembali untuk ke menu sebelumnya",
+            color = Color.White.copy(alpha = 0.55f),
+            fontSize = if (isSmallScreen) 9.sp else 11.sp,
+            fontWeight = FontWeight.Medium,
+            modifier = Modifier.align(Alignment.BottomCenter)
+        )
+    }
+}
+
+@Composable
+private fun M3uChannelCard(
+    channel: ChannelEntity,
+    focusOnStart: Boolean,
+    isSmallScreen: Boolean,
+    onFocused: () -> Unit,
+    onClick: () -> Unit
+) {
+    var isFocused by remember { mutableStateOf(false) }
+    val focusRequester = remember { FocusRequester() }
+    val accent = Color(0xFF38BDF8) // M3U Playlist blue accent
+    val cardShape = RoundedCornerShape(12.dp)
+
+    LaunchedEffect(Unit) {
+        if (focusOnStart) {
+            delay(180)
+            runCatching { focusRequester.requestFocus() }
+        }
+    }
+
+    Card(
+        colors = CardDefaults.cardColors(containerColor = Color(0xD90B1220)),
+        border = BorderStroke(if (isFocused) 2.5.dp else 1.dp, if (isFocused) accent else Color.White.copy(alpha = 0.14f)),
+        shape = cardShape,
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(if (isSmallScreen) 80.dp else 100.dp)
+            .scale(if (isFocused) 1.05f else 1f)
+            .shadow(
+                elevation = if (isFocused) 16.dp else 4.dp,
+                shape = cardShape,
+                ambientColor = accent.copy(alpha = if (isFocused) 0.4f else 0.1f),
+                spotColor = accent.copy(alpha = if (isFocused) 0.4f else 0.1f)
+            )
+            .focusRequester(focusRequester)
+            .onFocusChanged { 
+                isFocused = it.isFocused 
+                if (it.isFocused) {
+                    onFocused()
+                }
+            }
+            .onPreviewKeyEvent { keyEvent ->
+                if (keyEvent.type == KeyEventType.KeyDown &&
+                    (keyEvent.key == Key.DirectionCenter || keyEvent.key == Key.Enter || keyEvent.key == Key.NumPadEnter)
+                ) {
+                    onClick()
+                    true
+                } else {
+                    false
+                }
+            }
+            .focusable()
+            .clickable(onClick = onClick)
+    ) {
+        Box(modifier = Modifier.fillMaxSize()) {
+            if (!channel.logo.isNullOrBlank()) {
+                AsyncImage(
+                    model = channel.logo,
+                    contentDescription = null,
+                    modifier = Modifier.fillMaxSize(),
+                    contentScale = androidx.compose.ui.layout.ContentScale.Fit
+                )
+                Box(modifier = Modifier.fillMaxSize().background(Brush.verticalGradient(listOf(Color.Transparent, Color.Black.copy(alpha = 0.8f)))))
+            } else {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(Brush.radialGradient(listOf(accent.copy(alpha = 0.25f), Color(0xFF0B1220)), radius = 250f))
+                )
+            }
+
+            Column(
+                modifier = Modifier
+                    .align(Alignment.BottomStart)
+                    .padding(8.dp)
+            ) {
+                Text(
+                    text = channel.name,
+                    color = Color.White,
+                    fontSize = if (isSmallScreen) 12.sp else 14.sp,
+                    fontWeight = FontWeight.ExtraBold,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis
+                )
+                if (!channel.groupName.isNullOrBlank() && channel.groupName != "Lainnya") {
+                    Text(
+                        text = channel.groupName,
+                        color = accent.copy(alpha = 0.85f),
+                        fontSize = if (isSmallScreen) 8.sp else 10.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+            }
+        }
+    }
+}
+
+private fun isRelayedHls(streamUrl: String): Boolean {
+    val lowerUrl = streamUrl.lowercase()
+    if (lowerUrl.contains(".m3u8")) return true
+    if (lowerUrl.contains("/api/stream/udp-hls")) return true
+    if (lowerUrl.contains("/api/playlist/export")) return true
+    
+    if (lowerUrl.contains("/api/stream/relay")) {
+        runCatching {
+            val uri = Uri.parse(streamUrl)
+            val token = uri.getQueryParameter("t")
+            if (token != null) {
+                val parts = token.split('.')
+                if (parts.isNotEmpty()) {
+                    val payloadBytes = android.util.Base64.decode(parts[0], android.util.Base64.URL_SAFE)
+                    val json = String(payloadBytes, Charsets.UTF_8)
+                    if (json.lowercase().contains(".m3u8")) {
+                        return true
+                    }
+                }
+            }
+        }
+    }
+    return false
+}
+
+private fun buildMediaItem(streamUrl: String): MediaItem {
+    val builder = MediaItem.Builder().setUri(Uri.parse(streamUrl))
+
+    if (isRelayedHls(streamUrl)) {
+        builder.setMimeType(androidx.media3.common.MimeTypes.APPLICATION_M3U8)
+    }
+
+    return builder.build()
+}
+
