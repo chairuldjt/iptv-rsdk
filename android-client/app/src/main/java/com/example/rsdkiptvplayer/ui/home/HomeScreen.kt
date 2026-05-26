@@ -62,6 +62,7 @@ import androidx.compose.ui.geometry.Offset as TextOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import coil.compose.AsyncImage
 import com.example.rsdkiptvplayer.R
 import com.example.rsdkiptvplayer.BuildConfig
 import com.example.rsdkiptvplayer.ui.components.KeyboardLayoutProvider
@@ -75,6 +76,9 @@ import java.text.SimpleDateFormat
 import java.util.*
 import android.widget.Toast
 import com.example.rsdkiptvplayer.util.UpdateManager
+import com.example.rsdkiptvplayer.util.HomeExperienceParser
+import com.example.rsdkiptvplayer.util.HomeExperienceStaticPage
+import com.example.rsdkiptvplayer.util.RemoteAudioPlayer
 import com.example.rsdkiptvplayer.data.api.RetrofitClient
 import com.example.rsdkiptvplayer.util.NtpTimeProvider
 import kotlinx.coroutines.launch
@@ -106,6 +110,8 @@ fun HomeScreen(
     val educationPath by dataStoreManager.educationVideoPathFlow.collectAsState(initial = null)
     val educationSource by dataStoreManager.educationSourceFlow.collectAsState(initial = null)
     val educationPlaybackMode by dataStoreManager.educationPlaybackModeFlow.collectAsState(initial = null)
+    val homeExperienceJson by dataStoreManager.homeExperienceJsonFlow.collectAsState(initial = "")
+    val homeExperience = remember(homeExperienceJson) { HomeExperienceParser.parse(homeExperienceJson) }
 
     var resolvedDeviceId by remember { mutableStateOf("STB-RSDK-DEVICE") }
     var macAddress by remember { mutableStateOf("Tidak tersedia") }
@@ -118,6 +124,7 @@ fun HomeScreen(
     var currentVersionCode by remember { mutableIntStateOf(0) }
     var showInfoDialog by remember { mutableStateOf(false) }
     var showStbNameDialog by remember { mutableStateOf(false) }
+    var selectedStaticPage by remember { mutableStateOf<HomeExperienceStaticPage?>(null) }
     val menuFocusRequester = remember { FocusRequester() }
     val displayedStbName = storedStbName.ifBlank { "${Build.MANUFACTURER} ${Build.MODEL}".trim() }
     val indonesianLocale = remember { Locale.forLanguageTag("id-ID") }
@@ -133,6 +140,7 @@ fun HomeScreen(
         }
     }
     var selectedHomeBackground by remember { mutableIntStateOf(R.drawable.home_bg_tv) }
+    var selectedHomeBackgroundUrl by remember { mutableStateOf("") }
 
     LaunchedEffect(Unit) {
         resolvedDeviceId = dataStoreManager.getDeviceId()
@@ -251,24 +259,50 @@ fun HomeScreen(
 
     Box(modifier = Modifier.fillMaxSize()) {
         if (BuildConfig.HOME_LOW_EFFECT_MODE) {
-            Image(
-                painter = painterResource(id = selectedHomeBackground),
-                contentDescription = "Hospitality menu background",
-                modifier = Modifier.fillMaxSize(),
-                contentScale = ContentScale.Crop
-            )
-        } else {
-            Crossfade(
-                targetState = selectedHomeBackground,
-                animationSpec = tween(durationMillis = 520),
-                label = "home_selection_background"
-            ) { backgroundRes ->
-                Image(
-                    painter = painterResource(id = backgroundRes),
+            if (selectedHomeBackgroundUrl.isNotBlank()) {
+                AsyncImage(
+                    model = selectedHomeBackgroundUrl,
                     contentDescription = "Hospitality menu background",
                     modifier = Modifier.fillMaxSize(),
                     contentScale = ContentScale.Crop
                 )
+            } else if (homeExperience.homeBackgroundUrl.isNotBlank()) {
+                AsyncImage(
+                    model = homeExperience.homeBackgroundUrl,
+                    contentDescription = "Hospitality menu background",
+                    modifier = Modifier.fillMaxSize(),
+                    contentScale = ContentScale.Crop
+                )
+            } else {
+                Image(
+                    painter = painterResource(id = selectedHomeBackground),
+                    contentDescription = "Hospitality menu background",
+                    modifier = Modifier.fillMaxSize(),
+                    contentScale = ContentScale.Crop
+                )
+            }
+        } else {
+            Crossfade(
+                targetState = selectedHomeBackgroundUrl.ifBlank { homeExperience.homeBackgroundUrl.ifBlank { selectedHomeBackground.toString() } },
+                animationSpec = tween(durationMillis = 520),
+                label = "home_selection_background"
+            ) { backgroundValue ->
+                val resourceId = backgroundValue.toIntOrNull()
+                if (resourceId != null) {
+                    Image(
+                        painter = painterResource(id = resourceId),
+                        contentDescription = "Hospitality menu background",
+                        modifier = Modifier.fillMaxSize(),
+                        contentScale = ContentScale.Crop
+                    )
+                } else {
+                    AsyncImage(
+                        model = backgroundValue,
+                        contentDescription = "Hospitality menu background",
+                        modifier = Modifier.fillMaxSize(),
+                        contentScale = ContentScale.Crop
+                    )
+                }
             }
         }
 
@@ -303,6 +337,7 @@ fun HomeScreen(
                 )
         ) {
             HospitalityHeader(
+                logoUrl = homeExperience.logoUrl,
                 stbName = displayedStbName,
                 deviceId = resolvedDeviceId,
                 ipAddress = localIpAddress,
@@ -312,6 +347,11 @@ fun HomeScreen(
                 version = versionText,
                 weather = weatherText
             )
+
+            if (homeExperience.runningText.enabled && homeExperience.runningText.items.isNotEmpty()) {
+                Spacer(modifier = Modifier.height(if (isUltraCompact) 4.dp else if (isSmallScreen) 6.dp else 10.dp))
+                RunningTextBanner(homeExperienceJson = homeExperienceJson)
+            }
 
             Spacer(modifier = Modifier.weight(1f))
 
@@ -357,8 +397,11 @@ fun HomeScreen(
                 menuFocusRequester = menuFocusRequester,
                 showFiveItems = showFiveItems,
                 isUltraCompact = isUltraCompact,
+                homeExperienceJson = homeExperienceJson,
+                onStaticPageRequested = { page -> selectedStaticPage = page },
                 onSelectionChanged = { item ->
                     selectedHomeBackground = item.backgroundRes
+                    selectedHomeBackgroundUrl = item.backgroundUrl
                 }
             )
         }
@@ -393,11 +436,19 @@ fun HomeScreen(
                 }
             )
         }
+
+        selectedStaticPage?.let { page ->
+            StaticInfoDialog(
+                page = page,
+                onDismiss = { selectedStaticPage = null }
+            )
+        }
     }
 }
 
 @Composable
 private fun HospitalityHeader(
+    logoUrl: String,
     stbName: String,
     deviceId: String,
     ipAddress: String,
@@ -458,13 +509,23 @@ private fun HospitalityHeader(
                 modifier = Modifier.weight(1.2f),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                Image(
-                    painter = painterResource(id = R.drawable.ic_global_iptv),
-                    contentDescription = "Hospitality IPTV",
-                    modifier = Modifier
-                        .size(if (isMediumHeight) 48.dp else 72.dp)
-                        .shadow(12.dp, RoundedCornerShape(16.dp))
-                )
+                if (logoUrl.isNotBlank()) {
+                    AsyncImage(
+                        model = logoUrl,
+                        contentDescription = "Hospitality IPTV",
+                        modifier = Modifier
+                            .size(if (isMediumHeight) 48.dp else 72.dp)
+                            .shadow(12.dp, RoundedCornerShape(16.dp))
+                    )
+                } else {
+                    Image(
+                        painter = painterResource(id = R.drawable.ic_global_iptv),
+                        contentDescription = "Hospitality IPTV",
+                        modifier = Modifier
+                            .size(if (isMediumHeight) 48.dp else 72.dp)
+                            .shadow(12.dp, RoundedCornerShape(16.dp))
+                    )
+                }
                 Spacer(modifier = Modifier.height(if (isMediumHeight) 4.dp else 8.dp))
                 Text(
                     text = "Hospitality IPTV",
@@ -545,6 +606,93 @@ private fun InfoChip(text: String, isSmallScreen: Boolean = false) {
 }
 
 @Composable
+private fun RunningTextBanner(homeExperienceJson: String) {
+    val profile = remember(homeExperienceJson) { HomeExperienceParser.parse(homeExperienceJson) }
+    val items = remember(profile.runningText.items) {
+        profile.runningText.items.filter { it.enabled && it.text.isNotBlank() }
+    }
+
+    if (!profile.runningText.enabled || items.isEmpty()) {
+        return
+    }
+
+    var startIndex by remember(items) { mutableIntStateOf(0) }
+    val visibleCount = profile.runningText.visibleCount.coerceAtLeast(1)
+    val visibleItems = remember(startIndex, items, visibleCount) {
+        List(minOf(visibleCount, items.size)) { offset ->
+            items[(startIndex + offset) % items.size].text
+        }
+    }
+
+    LaunchedEffect(items, profile.runningText.rotationSeconds) {
+        while (true) {
+            delay(profile.runningText.rotationSeconds * 1000L)
+            startIndex = (startIndex + visibleCount) % items.size
+        }
+    }
+
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(14.dp))
+            .background(Color.Black.copy(alpha = 0.38f))
+            .border(1.dp, Color.White.copy(alpha = 0.14f), RoundedCornerShape(14.dp))
+            .padding(horizontal = 12.dp, vertical = 8.dp),
+        verticalArrangement = Arrangement.spacedBy(4.dp)
+    ) {
+        visibleItems.forEach { text ->
+            Text(
+                text = text,
+                color = Color(0xFFFFE9A6),
+                fontSize = 11.sp,
+                fontWeight = FontWeight.Bold,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+        }
+    }
+}
+
+@Composable
+private fun StaticInfoDialog(
+    page: HomeExperienceStaticPage,
+    onDismiss: () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        confirmButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Tutup")
+            }
+        },
+        title = {
+            Text(
+                text = page.title,
+                fontWeight = FontWeight.Bold
+            )
+        },
+        text = {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(max = 420.dp)
+                    .verticalScroll(rememberScrollState())
+            ) {
+                Text(
+                    text = page.content,
+                    color = Color.White.copy(alpha = 0.9f),
+                    fontSize = 14.sp,
+                    lineHeight = 20.sp
+                )
+            }
+        },
+        containerColor = Color(0xFF101A24),
+        titleContentColor = Color.White,
+        textContentColor = Color.White.copy(alpha = 0.9f)
+    )
+}
+
+@Composable
 private fun HospitalityMenuBar(
     channelsCount: Int,
     serverUrl: String,
@@ -561,10 +709,13 @@ private fun HospitalityMenuBar(
     menuFocusRequester: FocusRequester,
     showFiveItems: Boolean,
     isUltraCompact: Boolean,
+    homeExperienceJson: String,
+    onStaticPageRequested: (HomeExperienceStaticPage) -> Unit,
     onSelectionChanged: (HospitalityCarouselItem) -> Unit
 ) {
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
+    val homeExperience = remember(homeExperienceJson) { HomeExperienceParser.parse(homeExperienceJson) }
     val configuration = androidx.compose.ui.platform.LocalConfiguration.current
     val screenWidth = configuration.screenWidthDp
     val screenHeight = configuration.screenHeightDp
@@ -584,67 +735,73 @@ private fun HospitalityMenuBar(
     }
     var selectionSoundId by remember { mutableIntStateOf(0) }
 
-    var selectedIndex by remember { mutableIntStateOf(2) }
+    var selectedIndex by remember { mutableIntStateOf(0) }
     var dragAmount by remember { mutableFloatStateOf(0f) }
     var okHoldJob by remember { mutableStateOf<Job?>(null) }
     var okLongPressTriggered by remember { mutableStateOf(false) }
     val carouselFocusRequester = menuFocusRequester
-    val menuItems = listOf(
-        HospitalityCarouselItem(
-            icon = Icons.AutoMirrored.Rounded.MenuBook,
-            title = "EDUKASI",
-            subtitle = when {
-                educationSource == null -> "Memuat..."
-                educationSource == "web" -> if (educationPlaybackMode == "stream") "Web Streaming" else "Web Repository"
-                educationPath == null -> "Memuat..."
-                educationPath.isBlank() -> "SMB belum disetting"
-                else -> "Video RS"
-            },
-            accent = Color(0xFF86EFAC),
-            backgroundRes = R.drawable.home_bg_education,
-            action = onEducationClick
-        ),
-        HospitalityCarouselItem(
-            icon = Icons.Rounded.RoomService,
-            title = "LAYANAN",
-            subtitle = "Informasi RS",
-            accent = Color(0xFFE7D8A0),
-            backgroundRes = R.drawable.home_bg_services,
-            action = onServiceClick
-        ),
-        HospitalityCarouselItem(
-            icon = Icons.Rounded.LiveTv,
-            title = "TV CHANNEL",
-            subtitle = "$channelsCount saluran",
-            accent = Color(0xFFFFE9A6),
-            backgroundRes = R.drawable.home_bg_tv,
-            action = onTvClick
-        ),
-        HospitalityCarouselItem(
-            icon = Icons.Rounded.Movie,
-            title = "HIBURAN",
-            subtitle = "Konten & Musik",
-            accent = Color(0xFFFF9A76),
-            backgroundRes = R.drawable.home_bg_youtube,
-            action = onEntertainmentClick
-        ),
-        HospitalityCarouselItem(
-            icon = Icons.Rounded.Info,
-            title = "INFO APLIKASI",
-            subtitle = "Cek Pembaruan",
-            accent = Color(0xFFC084FC),
-            backgroundRes = R.drawable.home_bg_info,
-            action = onInfoClick
-        ),
-        HospitalityCarouselItem(
-            icon = Icons.Rounded.Settings,
-            title = "SETTING",
-            subtitle = "Sistem",
-            accent = Color(0xFF7DD3FC),
-            backgroundRes = R.drawable.home_bg_settings,
-            action = onSettingsClick
-        )
-    )
+    val menuItems = remember(homeExperienceJson, channelsCount, educationSource, educationPath, educationPlaybackMode) {
+        val sourceMenus = if (homeExperience.menus.isEmpty()) {
+            HomeExperienceParser.parse("").menus
+        } else {
+            homeExperience.menus
+        }
+
+        sourceMenus.mapNotNull { menu ->
+            val subtitle = when (menu.type) {
+                "tv" -> if (menu.subtitle.isBlank()) "$channelsCount saluran" else menu.subtitle
+                "education" -> if (menu.subtitle.isNotBlank()) menu.subtitle else when {
+                    educationSource == null -> "Memuat..."
+                    educationSource == "web" -> if (educationPlaybackMode == "stream") "Web Streaming" else "Web Repository"
+                    educationPath == null -> "Memuat..."
+                    educationPath.isBlank() -> "SMB belum disetting"
+                    else -> "Video RS"
+                }
+                else -> menu.subtitle
+            }
+
+            val action = when (menu.type) {
+                "tv" -> onTvClick
+                "education" -> onEducationClick
+                "entertainment" -> onEntertainmentClick
+                "settings" -> onSettingsClick
+                "info_dialog" -> onInfoClick
+                "static_page" -> {
+                    val page = homeExperience.staticPages.firstOrNull { it.id == menu.staticPageId } ?: return@mapNotNull null
+                    { onStaticPageRequested(page) }
+                }
+                else -> onServiceClick
+            }
+
+            HospitalityCarouselItem(
+                icon = resolveHomeIcon(menu.icon),
+                title = menu.title,
+                subtitle = subtitle,
+                accent = HomeExperienceParser.colorOrDefault(menu.accentColorHex, Color(0xFFFFE9A6)),
+                textColor = HomeExperienceParser.colorOrDefault(menu.textColorHex, Color.White),
+                backgroundRes = defaultBackgroundForMenuType(menu.type),
+                backgroundUrl = menu.backgroundUrl,
+                action = action
+            )
+        }.ifEmpty {
+            listOf(
+                HospitalityCarouselItem(
+                    icon = Icons.Rounded.LiveTv,
+                    title = "TV CHANNEL",
+                    subtitle = "$channelsCount saluran",
+                    accent = Color(0xFFFFE9A6),
+                    textColor = Color.White,
+                    backgroundRes = R.drawable.home_bg_tv,
+                    backgroundUrl = "",
+                    action = onTvClick
+                )
+            )
+        }
+    }
+
+    LaunchedEffect(menuItems.size) {
+        selectedIndex = selectedIndex.coerceIn(0, (menuItems.size - 1).coerceAtLeast(0))
+    }
 
     DisposableEffect(Unit) {
         selectionSoundId = soundPool.load(context, R.raw.home_selection_chime, 1)
@@ -662,8 +819,12 @@ private fun HospitalityMenuBar(
             hasPlayedSelectionSound = true
             return@LaunchedEffect
         }
-        if (selectionSoundId != 0) {
-            soundPool.play(selectionSoundId, 0.38f, 0.42f, 1, 0, 1.0f)
+        if (homeExperience.sounds.enableSelectionSound) {
+            if (homeExperience.sounds.selectionSoundUrl.isNotBlank()) {
+                RemoteAudioPlayer.playOnce(context, homeExperience.sounds.selectionSoundUrl)
+            } else if (selectionSoundId != 0) {
+                soundPool.play(selectionSoundId, 0.38f, 0.42f, 1, 0, 1.0f)
+            }
         }
     }
 
@@ -870,9 +1031,33 @@ private data class HospitalityCarouselItem(
     val title: String,
     val subtitle: String,
     val accent: Color,
+    val textColor: Color,
     val backgroundRes: Int,
+    val backgroundUrl: String,
     val action: () -> Unit
 )
+
+private fun resolveHomeIcon(name: String): ImageVector {
+    return when (name.lowercase()) {
+        "live_tv" -> Icons.Rounded.LiveTv
+        "menu_book" -> Icons.AutoMirrored.Rounded.MenuBook
+        "movie" -> Icons.Rounded.Movie
+        "settings" -> Icons.Rounded.Settings
+        "room_service" -> Icons.Rounded.RoomService
+        else -> Icons.Rounded.Info
+    }
+}
+
+private fun defaultBackgroundForMenuType(type: String): Int {
+    return when (type) {
+        "tv" -> R.drawable.home_bg_tv
+        "education" -> R.drawable.home_bg_education
+        "entertainment" -> R.drawable.home_bg_youtube
+        "settings" -> R.drawable.home_bg_settings
+        "static_page" -> R.drawable.home_bg_info
+        else -> R.drawable.home_bg_info
+    }
+}
 
 private fun wrapCarouselIndex(index: Int, size: Int): Int {
     return ((index % size) + size) % size
@@ -900,7 +1085,7 @@ private fun SelectedMenuLabel(
     ) {
         Text(
             text = item.title,
-            color = item.accent,
+            color = item.textColor,
             fontSize = if (isUltraCompact) 10.sp else if (isSmallScreen) 12.sp else 17.sp,
             fontWeight = FontWeight.ExtraBold,
             maxLines = 1,

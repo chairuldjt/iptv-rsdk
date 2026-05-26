@@ -76,6 +76,17 @@ const menuItems = [
     ),
   },
   {
+    href: '/dashboard/experience',
+    label: 'Home Experience',
+    icon: (
+      <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+        <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 12l8.954-8.955a1.126 1.126 0 011.591 0L21.75 12M4.5 10.5v8.25a.75.75 0 00.75.75h4.5v-4.5a.75.75 0 01.75-.75h3a.75.75 0 01.75.75v4.5h4.5a.75.75 0 00.75-.75V10.5" />
+        <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 6.75h7.5" />
+        <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 9.75h5.25" />
+      </svg>
+    ),
+  },
+  {
     href: '/dashboard/logs',
     label: 'Diagnostics Logs',
     icon: (

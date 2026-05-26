@@ -50,6 +50,12 @@ import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.viewinterop.AndroidView
+import androidx.media3.common.MediaItem
+import androidx.media3.common.Player
+import androidx.media3.exoplayer.ExoPlayer
+import androidx.media3.ui.PlayerView
+import com.example.rsdkiptvplayer.util.HomeExperienceParser
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -69,7 +75,11 @@ class MainActivity : ComponentActivity() {
                     var activeSettingsTab by remember { mutableStateOf(0) }
                     var selectedChannelId by remember { mutableIntStateOf(-1) }
                     var showExitConfirmDialog by remember { mutableStateOf(false) }
+                    var showForcedVideoOverlay by remember { mutableStateOf(false) }
+                    var forceVideoAlreadyShown by remember { mutableStateOf(false) }
                     val confirmNoFocusRequester = remember { FocusRequester() }
+                    val homeExperienceJson by dataStoreManager.homeExperienceJsonFlow.collectAsState(initial = "")
+                    val homeExperience = remember(homeExperienceJson) { HomeExperienceParser.parse(homeExperienceJson) }
 
                     LaunchedEffect(Unit) {
                         app.repository.remoteCommandFlow.collect { (command, value) ->
@@ -175,6 +185,26 @@ class MainActivity : ComponentActivity() {
                                 onBack = { currentScreen = "home" }
                             )
                         }
+                    }
+
+                    LaunchedEffect(currentScreen, homeExperienceJson) {
+                        if (
+                            currentScreen != "splash" &&
+                            !forceVideoAlreadyShown &&
+                            homeExperience.forceVideo.enabled &&
+                            homeExperience.forceVideo.videoUrl.isNotBlank()
+                        ) {
+                            forceVideoAlreadyShown = true
+                            showForcedVideoOverlay = true
+                        }
+                    }
+
+                    if (showForcedVideoOverlay) {
+                        ForcedVideoOverlay(
+                            videoUrl = homeExperience.forceVideo.videoUrl,
+                            repeatCount = homeExperience.forceVideo.repeatCount,
+                            onFinished = { showForcedVideoOverlay = false }
+                        )
                     }
 
                     if (showExitConfirmDialog) {
@@ -292,6 +322,61 @@ class MainActivity : ComponentActivity() {
                     View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION or
                     View.SYSTEM_UI_FLAG_LAYOUT_STABLE
         }
+    }
+}
+
+@Composable
+private fun ForcedVideoOverlay(
+    videoUrl: String,
+    repeatCount: Int,
+    onFinished: () -> Unit
+) {
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val exoPlayer = remember(videoUrl) {
+        ExoPlayer.Builder(context).build().apply {
+            setMediaItem(MediaItem.fromUri(videoUrl))
+            prepare()
+            playWhenReady = true
+        }
+    }
+    var completedLoops by remember { mutableIntStateOf(0) }
+
+    DisposableEffect(videoUrl) {
+        val listener = object : Player.Listener {
+            override fun onPlaybackStateChanged(playbackState: Int) {
+                if (playbackState == Player.STATE_ENDED) {
+                    completedLoops += 1
+                    if (completedLoops >= repeatCount) {
+                        onFinished()
+                    } else {
+                        exoPlayer.seekTo(0)
+                        exoPlayer.playWhenReady = true
+                    }
+                }
+            }
+        }
+
+        exoPlayer.addListener(listener)
+        onDispose {
+            exoPlayer.removeListener(listener)
+            exoPlayer.release()
+        }
+    }
+
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color.Black)
+    ) {
+        AndroidView(
+            factory = { ctx ->
+                PlayerView(ctx).apply {
+                    player = exoPlayer
+                    useController = false
+                }
+            },
+            modifier = Modifier.fillMaxSize()
+        )
     }
 }
 

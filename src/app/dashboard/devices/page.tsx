@@ -15,6 +15,7 @@ import {
   setOfflineAutoDeleteDays,
 } from '@/lib/settings'
 import { DEFAULT_CUSTOM_M3U_URL, DEFAULT_SYNC_MODE, normalizeSyncMode } from '@/lib/defaults'
+import { assignDeviceToGroup, getDeviceGroupAssignments, getDeviceGroups } from '@/lib/deviceGroups'
 
 export const revalidate = 0
 type DeviceStatusFilter = 'all' | 'online' | 'offline' | 'disabled'
@@ -87,6 +88,20 @@ async function clearDeviceCacheAction(formData: FormData) {
     revalidatePath('/dashboard/devices')
   } catch (error) {
     console.error('Clear cache trigger error:', error)
+  }
+}
+
+async function assignDeviceGroupAction(formData: FormData) {
+  'use server'
+  const deviceId = formData.get('deviceId') as string
+  const groupId = ((formData.get('groupId') as string) || '').trim() || null
+
+  try {
+    await assignDeviceToGroup(deviceId, groupId)
+    revalidatePath('/dashboard/devices')
+    revalidatePath('/dashboard/experience')
+  } catch (error) {
+    console.error('Assign device group error:', error)
   }
 }
 
@@ -169,6 +184,8 @@ export default async function DevicesPage({
 
   const offlineAutoDeleteDays = await getOfflineAutoDeleteDays()
   const cleanedDeviceCount = await cleanupOfflineDevices(offlineAutoDeleteDays)
+  const deviceGroups = await getDeviceGroups()
+  const groupAssignments = await getDeviceGroupAssignments()
 
   const devices = await prisma.device.findMany({
     orderBy: { lastOnline: 'desc' },
@@ -201,9 +218,11 @@ export default async function DevicesPage({
   const searchedDevices = filteredDevices.filter((d) => {
     if (!searchQuery) return true
     const q = searchQuery.toLowerCase()
+    const groupName = deviceGroups.find((group) => group.id === groupAssignments[d.deviceId])?.name?.toLowerCase() || ''
     return (
       d.deviceName.toLowerCase().includes(q) ||
       d.deviceId.toLowerCase().includes(q) ||
+      groupName.includes(q) ||
       (d.lastIp && d.lastIp.toLowerCase().includes(q)) ||
       (d.macAddress && d.macAddress.toLowerCase().includes(q))
     )
@@ -288,6 +307,7 @@ export default async function DevicesPage({
               <tr className="border-b border-border text-muted-foreground text-[10px] font-semibold uppercase tracking-wider">
                 <th className="p-4 px-5">Status</th>
                 <th className="p-4 min-w-[260px]">Device Details</th>
+                <th className="p-4">Group</th>
                 <th className="p-4">Sync Mode</th>
                 <th className="p-4">Versions & Network</th>
                 <th className="p-4 px-5 text-right">Actions</th>
@@ -296,7 +316,7 @@ export default async function DevicesPage({
             <tbody className="divide-y divide-border/50 text-xs">
               {searchedDevices.length === 0 ? (
                 <tr>
-                  <td colSpan={5}>
+                  <td colSpan={6}>
                     <EmptyState
                       title={devices.length === 0 ? 'No Devices Registered' : 'No Matching Devices'}
                       description={devices.length === 0
@@ -308,6 +328,8 @@ export default async function DevicesPage({
               ) : (
                 paginatedDevices.map((d) => {
                   const isOnline = d.isActive && d.lastOnline && d.lastOnline.getTime() >= tenMinutesAgo.getTime()
+                  const assignedGroupId = groupAssignments[d.deviceId] || ''
+                  const assignedGroup = deviceGroups.find((group) => group.id === assignedGroupId)
                   return (
                     <tr key={d.id} className="hover:bg-accent/30 transition-colors">
                       <td className="p-4 px-5">
@@ -332,6 +354,32 @@ export default async function DevicesPage({
                         <div className="text-muted-foreground text-[10px] mt-0.5 font-mono break-all" title={d.deviceId}>
                           <span className="text-muted-foreground/60">ID:</span> {d.deviceId}
                         </div>
+                      </td>
+                      <td className="p-4 min-w-[220px]">
+                        <form action={assignDeviceGroupAction} className="space-y-2">
+                          <input type="hidden" name="deviceId" value={d.deviceId} />
+                          <select
+                            name="groupId"
+                            defaultValue={assignedGroupId}
+                            className="field-input py-2 text-[11px]"
+                          >
+                            <option value="">Tanpa Group</option>
+                            {deviceGroups.map((group) => (
+                              <option key={group.id} value={group.id}>{group.name}</option>
+                            ))}
+                          </select>
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="text-[9px] text-muted-foreground">
+                              {assignedGroup ? assignedGroup.name : 'Global only'}
+                            </span>
+                            <button
+                              type="submit"
+                              className="rounded-lg border border-primary/20 px-2 py-1 text-[10px] font-semibold text-primary hover:bg-primary/10"
+                            >
+                              Save
+                            </button>
+                          </div>
+                        </form>
                       </td>
                       <td className="p-4">
                         <div className="flex flex-col gap-1">

@@ -26,8 +26,12 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import coil.compose.AsyncImage
 import com.example.rsdkiptvplayer.R
+import com.example.rsdkiptvplayer.IptvApplication
 import com.example.rsdkiptvplayer.util.UpdateManager
+import com.example.rsdkiptvplayer.util.HomeExperienceParser
+import com.example.rsdkiptvplayer.util.RemoteAudioPlayer
 import kotlinx.coroutines.delay
 
 @Composable
@@ -35,8 +39,11 @@ fun SplashScreen(
     onSplashComplete: () -> Unit
 ) {
     val context = LocalContext.current
+    val app = context.applicationContext as IptvApplication
     val alpha = remember { Animatable(0f) }
     val scale = remember { Animatable(0.88f) }
+    val homeExperienceJson by app.dataStoreManager.homeExperienceJsonFlow.collectAsState(initial = "")
+    val homeExperience = remember(homeExperienceJson) { HomeExperienceParser.parse(homeExperienceJson) }
     val soundPool = remember {
         SoundPool.Builder()
             .setMaxStreams(1)
@@ -53,10 +60,14 @@ fun SplashScreen(
     var currentVersionCode by remember { mutableIntStateOf(0) }
     var splashSoundId by remember { mutableIntStateOf(0) }
 
-    DisposableEffect(Unit) {
+    DisposableEffect(homeExperience.sounds.enableSplashSound, homeExperience.splash.showSound) {
         soundPool.setOnLoadCompleteListener { _, sampleId, status ->
-            if (status == 0) {
-                soundPool.play(sampleId, 1.0f, 1.0f, 1, 0, 1.0f)
+            if (status == 0 && homeExperience.sounds.enableSplashSound && homeExperience.splash.showSound) {
+                if (homeExperience.splash.soundUrl.isNotBlank()) {
+                    RemoteAudioPlayer.playOnce(context, homeExperience.splash.soundUrl)
+                } else {
+                    soundPool.play(sampleId, 1.0f, 1.0f, 1, 0, 1.0f)
+                }
             }
         }
         splashSoundId = soundPool.load(context, R.raw.splash_opening_chime, 1)
@@ -84,12 +95,21 @@ fun SplashScreen(
     }
 
     Box(modifier = Modifier.fillMaxSize()) {
-        Image(
-            painter = painterResource(id = R.drawable.global_home_bg),
-            contentDescription = "Hospitality IPTV background",
-            modifier = Modifier.fillMaxSize(),
-            contentScale = ContentScale.Crop
-        )
+        if (homeExperience.splash.enabled && homeExperience.splash.backgroundUrl.isNotBlank()) {
+            AsyncImage(
+                model = homeExperience.splash.backgroundUrl,
+                contentDescription = "Hospitality IPTV background",
+                modifier = Modifier.fillMaxSize(),
+                contentScale = ContentScale.Crop
+            )
+        } else {
+            Image(
+                painter = painterResource(id = R.drawable.global_home_bg),
+                contentDescription = "Hospitality IPTV background",
+                modifier = Modifier.fillMaxSize(),
+                contentScale = ContentScale.Crop
+            )
+        }
 
         Box(
             modifier = Modifier
@@ -128,17 +148,25 @@ fun SplashScreen(
                     .padding(14.dp),
                 contentAlignment = Alignment.Center
             ) {
-                Image(
-                    painter = painterResource(id = R.drawable.ic_global_iptv),
-                    contentDescription = "Hospitality IPTV",
-                    modifier = Modifier.fillMaxSize()
-                )
+                if (homeExperience.splash.enabled && homeExperience.splash.logoUrl.isNotBlank()) {
+                    AsyncImage(
+                        model = homeExperience.splash.logoUrl,
+                        contentDescription = "Hospitality IPTV",
+                        modifier = Modifier.fillMaxSize()
+                    )
+                } else {
+                    Image(
+                        painter = painterResource(id = R.drawable.ic_global_iptv),
+                        contentDescription = "Hospitality IPTV",
+                        modifier = Modifier.fillMaxSize()
+                    )
+                }
             }
 
             Spacer(modifier = Modifier.height(26.dp))
 
             Text(
-                text = "Hospitality IPTV",
+                text = if (homeExperience.splash.enabled) homeExperience.splash.title else "Hospitality IPTV",
                 color = Color.White,
                 fontSize = 32.sp,
                 fontWeight = FontWeight.ExtraBold,
@@ -149,7 +177,7 @@ fun SplashScreen(
             Spacer(modifier = Modifier.height(8.dp))
 
             Text(
-                text = "Live TV • Guest Services • Education",
+                text = if (homeExperience.splash.enabled) homeExperience.splash.subtitle else "Live TV • Guest Services • Education",
                 color = Color(0xFFE9F7F6),
                 fontSize = 14.sp,
                 fontWeight = FontWeight.SemiBold,
@@ -166,7 +194,7 @@ fun SplashScreen(
             )
             Spacer(modifier = Modifier.height(12.dp))
             Text(
-                text = "Preparing your experience...",
+                text = if (homeExperience.splash.enabled) homeExperience.splash.loadingText else "Preparing your experience...",
                 color = Color.White.copy(alpha = 0.6f),
                 fontSize = 12.sp
             )
@@ -180,7 +208,7 @@ fun SplashScreen(
                 .alpha(alpha.value)
         ) {
             Text(
-                text = "PREMIUM IPTV PLATFORM",
+                text = if (homeExperience.splash.enabled) homeExperience.splash.footerText else "PREMIUM IPTV PLATFORM",
                 color = Color.White.copy(alpha = 0.70f),
                 fontSize = 12.sp,
                 fontWeight = FontWeight.Bold,

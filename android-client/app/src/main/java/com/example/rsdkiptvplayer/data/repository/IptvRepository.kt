@@ -136,6 +136,7 @@ class IptvRepository(
                     dataStoreManager.setEducationPlaybackMode(config.education_playback_mode ?: "copy")
                     dataStoreManager.setNtpServer(config.ntp_server ?: "0.id.pool.ntp.org")
                     dataStoreManager.setAutoStartOnBoot(config.auto_start_on_boot ?: false)
+                    config.home_experience_json?.let { dataStoreManager.setHomeExperienceJson(it) }
 
                     if (config.force_sync == true) {
                         dataStoreManager.addLog("Remote trigger: FORCE SYNC enabled!")
