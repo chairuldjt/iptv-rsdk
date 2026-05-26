@@ -3,6 +3,7 @@ import prisma from '@/lib/db'
 import { getErrorMessage } from '@/lib/errors'
 import { writeFile, mkdir, unlink } from 'fs/promises'
 import path from 'path'
+import { generateVideoThumbnail } from '@/lib/videoThumbnail'
 
 const VIDEO_UPLOAD_DIR = path.join(process.cwd(), 'public', 'uploads', 'videos')
 const THUMB_UPLOAD_DIR = path.join(process.cwd(), 'public', 'uploads', 'video-thumbnails')
@@ -75,6 +76,14 @@ export async function PUT(
           { status: 500 }
         )
       }
+    }
+    if (!thumbnailUrl && videoFile && videoFile.size > 0) {
+      thumbnailUrl = await generateVideoThumbnail({
+        videoUrl,
+        outputDir: THUMB_UPLOAD_DIR,
+        publicPrefix: THUMB_URL_PREFIX,
+        fileNameBase: title,
+      })
     }
 
     const updated = await prisma.educationVideo.update({

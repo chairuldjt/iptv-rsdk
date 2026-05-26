@@ -198,7 +198,7 @@ export default function EntertainmentItemForm({
   }
 
   return (
-    <div className="glass-panel border border-border rounded-2xl p-5 h-fit sticky top-6">
+    <div className="card rounded-2xl p-5 sticky top-20 max-h-[calc(100vh-6rem)] min-h-0 overflow-y-auto">
       <div className="mb-5">
         <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-amber-300">Entertainment Item</p>
         <h3 className="font-bold text-white text-lg mt-1">{editingItem ? 'Edit Konten' : 'Tambah Konten'}</h3>

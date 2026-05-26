@@ -53,7 +53,7 @@ export default async function EntertainmentPage({
         </div>
       )}
 
-      <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_340px] gap-6 items-start">
+      <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_320px] gap-6 items-start">
         <section className="grid grid-cols-1 md:grid-cols-2 2xl:grid-cols-3 gap-4">
           {items.length === 0 ? (
             <div className="md:col-span-2 min-h-[300px] rounded-2xl border border-dashed border-border flex items-center justify-center text-center px-8">

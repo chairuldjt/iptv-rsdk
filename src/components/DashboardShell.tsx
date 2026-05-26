@@ -106,7 +106,7 @@ export default function DashboardShell({ children }: DashboardShellProps) {
   }
 
   return (
-    <div className="flex min-h-screen bg-background text-foreground relative">
+    <div className="relative flex min-h-screen bg-transparent text-foreground">
       {/* Mobile Overlay */}
       {mobileOpen && (
         <div
@@ -116,15 +116,15 @@ export default function DashboardShell({ children }: DashboardShellProps) {
       )}
 
       {/* Sidebar */}
-      <aside
-        className={`fixed md:sticky top-0 bottom-0 left-0 z-50 flex flex-col border-r border-border bg-[#0c0c0e] shrink-0 transition-all duration-300 ease-in-out
+        <aside
+        className={`fixed md:sticky top-0 bottom-0 left-0 z-50 flex flex-col border-r border-white/8 bg-[linear-gradient(180deg,rgba(8,14,24,0.98),rgba(5,10,19,0.98))] shrink-0 transition-all duration-300 ease-in-out
           ${collapsed ? 'w-[72px]' : 'w-[260px]'}
           ${mobileOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}
-          h-screen`}
+          h-screen shadow-[0_20px_80px_rgba(0,0,0,0.32)]`}
       >
         {/* Logo */}
-        <div className="h-16 border-b border-border flex items-center px-4 gap-3 shrink-0">
-          <div className="w-9 h-9 rounded-xl bg-primary flex items-center justify-center shrink-0">
+        <div className="flex h-16 items-center gap-3 border-b border-white/8 px-4 shrink-0">
+          <div className="flex h-9 w-9 items-center justify-center rounded-2xl border border-primary/20 bg-primary/15 shrink-0">
             <span className="font-extrabold text-white text-base">R</span>
           </div>
           {!collapsed && (
@@ -136,7 +136,7 @@ export default function DashboardShell({ children }: DashboardShellProps) {
         </div>
 
         {/* Navigation */}
-        <nav className="flex-1 px-3 py-4 space-y-0.5 overflow-y-auto">
+        <nav className="flex-1 space-y-1 overflow-y-auto px-3 py-4">
           {menuItems.map((item) => {
             const active = isActiveLink(item.href)
             return (
@@ -144,10 +144,10 @@ export default function DashboardShell({ children }: DashboardShellProps) {
                 key={item.href}
                 href={item.href}
                 onClick={() => setMobileOpen(false)}
-                className={`flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all duration-200 group relative
+                className={`group relative flex items-center gap-3 rounded-2xl px-3 py-3 transition-all duration-200
                   ${active
-                    ? 'bg-primary/10 text-primary font-semibold'
-                    : 'text-muted-foreground hover:text-foreground hover:bg-accent/50'
+                    ? 'bg-primary/12 text-primary font-semibold shadow-[inset_0_1px_0_rgba(255,255,255,0.06)]'
+                    : 'text-muted-foreground hover:bg-white/[0.05] hover:text-foreground'
                   }`}
                 title={collapsed ? item.label : undefined}
               >
@@ -166,7 +166,7 @@ export default function DashboardShell({ children }: DashboardShellProps) {
         </nav>
 
         {/* Footer */}
-        <div className="p-3 border-t border-border shrink-0 space-y-2">
+        <div className="space-y-2 border-t border-white/8 p-3 shrink-0">
           <LogoutButton />
           {!collapsed && (
             <div className="px-2 pb-1 flex flex-col gap-1.5 text-[10px] text-muted-foreground">
@@ -186,7 +186,7 @@ export default function DashboardShell({ children }: DashboardShellProps) {
       {/* Main Content */}
       <div className="flex-1 flex flex-col min-w-0 min-h-screen">
         {/* Topbar */}
-        <header className="sticky top-0 h-16 border-b border-border px-4 md:px-6 flex items-center justify-between z-30 glass-panel shrink-0">
+        <header className="glass-panel sticky top-0 z-30 flex h-16 items-center justify-between border-b border-white/8 px-4 md:px-6 shrink-0">
           <div className="flex items-center gap-3">
             {/* Mobile Menu */}
             <button
@@ -220,7 +220,7 @@ export default function DashboardShell({ children }: DashboardShellProps) {
               <input
                 type="text"
                 placeholder="Search..."
-                className="w-48 lg:w-64 pl-9 pr-3 py-1.5 bg-transparent border border-border rounded-lg text-xs text-foreground placeholder:text-muted-foreground/60 focus:outline-none focus:border-primary/50 focus:ring-1 focus:ring-primary/20 transition-all"
+                className="w-48 rounded-xl border border-white/8 bg-white/[0.03] py-2 pl-9 pr-3 text-xs text-foreground placeholder:text-muted-foreground/60 transition-all focus:border-primary/50 focus:ring-1 focus:ring-primary/20 lg:w-64"
               />
             </div>
           </div>
@@ -232,13 +232,13 @@ export default function DashboardShell({ children }: DashboardShellProps) {
               <span className="hidden sm:inline font-medium">System Online</span>
             </div>
 
-            <div className="h-5 w-px bg-border hidden md:block" />
+            <div className="hidden h-5 w-px bg-white/8 md:block" />
 
             <div className="hidden md:flex flex-col text-right">
               <span className="text-xs font-semibold text-foreground">Administrator</span>
               <span className="text-[10px] text-muted-foreground">Super Admin</span>
             </div>
-            <div className="w-8 h-8 rounded-full bg-primary/10 border border-primary/20 flex items-center justify-center text-xs font-bold text-primary">
+            <div className="flex h-8 w-8 items-center justify-center rounded-full border border-primary/20 bg-primary/10 text-xs font-bold text-primary">
               AD
             </div>
           </div>

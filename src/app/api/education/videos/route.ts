@@ -3,6 +3,7 @@ import prisma from '@/lib/db'
 import { getErrorMessage } from '@/lib/errors'
 import { writeFile, mkdir } from 'fs/promises'
 import path from 'path'
+import { generateVideoThumbnail } from '@/lib/videoThumbnail'
 
 export const revalidate = 0 // Disable cache
 
@@ -106,6 +107,15 @@ export async function POST(request: Request) {
         { status: false, message: 'Harap masukkan URL video atau unggah berkas video.' },
         { status: 400 }
       )
+    }
+
+    if (!thumbnailUrl) {
+      thumbnailUrl = await generateVideoThumbnail({
+        videoUrl,
+        outputDir: THUMB_UPLOAD_DIR,
+        publicPrefix: THUMB_URL_PREFIX,
+        fileNameBase: title,
+      })
     }
 
     const video = await prisma.educationVideo.create({

@@ -2,18 +2,35 @@
 
 import React, { useState, useRef, useTransition } from 'react'
 import { createPortal } from 'react-dom'
+import { useToast } from '@/components/Toast'
 
 interface ConfirmFormProps extends React.FormHTMLAttributes<HTMLFormElement> {
   action: (formData: FormData) => void | Promise<void>
-  message: string
+  title?: string
+  message?: string
+  description?: string
+  confirmLabel?: string
+  cancelLabel?: string
+  successToast?: string
   children: React.ReactNode
 }
 
-export default function ConfirmForm({ action, message, children, ...props }: ConfirmFormProps) {
+export default function ConfirmForm({
+  action,
+  title = 'Konfirmasi Hapus',
+  message,
+  description,
+  confirmLabel = 'Hapus',
+  cancelLabel = 'Batal',
+  successToast,
+  children,
+  ...props
+}: ConfirmFormProps) {
   const [showModal, setShowModal] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [isPending, startTransition] = useTransition()
   const formRef = useRef<HTMLFormElement>(null)
+  const { showToast } = useToast()
 
   const handleInitialSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
@@ -27,6 +44,9 @@ export default function ConfirmForm({ action, message, children, ...props }: Con
     startTransition(async () => {
       try {
         await action(formData)
+        if (successToast) {
+          showToast('success', successToast)
+        }
         setShowModal(false)
       } catch (err: unknown) {
         const isRedirect =
@@ -48,41 +68,47 @@ export default function ConfirmForm({ action, message, children, ...props }: Con
       </form>
 
       {showModal && createPortal(
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-background/90 backdrop-blur-sm animate-fade-in">
-          <div className="w-full max-w-md card p-6 rounded-2xl border border-border shadow-2xl animate-slide-up text-center space-y-6">
-            <div className="w-12 h-12 rounded-full bg-destructive/10 border border-destructive/20 flex items-center justify-center mx-auto text-destructive">
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/78 p-4 backdrop-blur-md animate-fade-in">
+          <div className="w-full max-w-md rounded-[28px] border border-white/10 bg-[linear-gradient(180deg,rgba(25,28,45,0.98),rgba(11,15,27,0.98))] p-6 shadow-[0_30px_90px_rgba(0,0,0,0.55)] animate-slide-up">
+            <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl border border-rose-500/20 bg-rose-500/10 text-rose-300">
               <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z" />
               </svg>
             </div>
 
-            <div className="space-y-2">
-              <h3 className="text-lg font-bold text-foreground">Konfirmasi Hapus</h3>
-              <p className="text-xs text-muted-foreground leading-relaxed px-2">
-                {message || 'Data yang dihapus tidak dapat dikembalikan. Apakah Anda yakin ingin melanjutkan?'}
+            <div className="mt-5 space-y-2 text-center">
+              <h3 className="text-lg font-semibold text-white">{title}</h3>
+              <p className="text-sm leading-relaxed text-slate-300">
+                {description || message || 'Data yang dihapus tidak dapat dikembalikan. Apakah Anda yakin ingin melanjutkan?'}
               </p>
             </div>
 
             {error && (
-              <div className="p-3 rounded-lg bg-destructive/10 border border-destructive/20 text-destructive text-xs text-left font-semibold leading-relaxed animate-fade-in">
+              <div className="mt-5 rounded-2xl border border-rose-500/20 bg-rose-500/10 p-3 text-left text-xs font-semibold leading-relaxed text-rose-300 animate-fade-in">
                 {error}
               </div>
             )}
 
-            <div className="flex flex-col sm:flex-row gap-3">
+            {message && description && (
+              <div className="mt-4 rounded-2xl border border-white/8 bg-white/4 px-4 py-3 text-left text-xs leading-relaxed text-slate-400">
+                {message}
+              </div>
+            )}
+
+            <div className="mt-6 flex flex-col gap-3 sm:flex-row">
               <button
                 type="button"
                 disabled={isPending}
                 onClick={() => setShowModal(false)}
-                className="flex-1 order-2 sm:order-1 btn btn-secondary btn-sm py-2.5"
+                className="btn btn-secondary flex-1 py-2.5"
               >
-                Batal
+                {cancelLabel}
               </button>
               <button
                 type="button"
                 disabled={isPending}
                 onClick={handleConfirm}
-                className="flex-1 order-1 sm:order-2 btn btn-destructive btn-sm py-2.5"
+                className="btn btn-destructive flex-1 py-2.5"
               >
                 {isPending ? (
                   <>
@@ -93,7 +119,7 @@ export default function ConfirmForm({ action, message, children, ...props }: Con
                     Menghapus...
                   </>
                 ) : (
-                  'Ya, Hapus Sekarang'
+                  confirmLabel
                 )}
               </button>
             </div>

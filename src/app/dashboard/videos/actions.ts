@@ -6,6 +6,7 @@ import { redirect } from 'next/navigation'
 import { writeFile, mkdir, unlink } from 'fs/promises'
 import path from 'path'
 import { getErrorMessage } from '@/lib/errors'
+import { generateVideoThumbnail } from '@/lib/videoThumbnail'
 
 const VIDEO_UPLOAD_DIR = path.join(process.cwd(), 'public', 'uploads', 'videos')
 const THUMB_UPLOAD_DIR = path.join(process.cwd(), 'public', 'uploads', 'video-thumbnails')
@@ -29,7 +30,7 @@ export async function createFolderAction(formData: FormData) {
     console.error('Create education folder error:', error)
   }
 
-  if (folderId) redirect(`/dashboard/videos?folder=${folderId}`)
+  if (folderId) redirect(`/dashboard/videos?folder=${folderId}&notice=folder-created`)
 }
 
 export async function renameFolderAction(formData: FormData) {
@@ -48,7 +49,7 @@ export async function renameFolderAction(formData: FormData) {
     console.error('Rename education folder error:', error)
   }
 
-  redirect(`/dashboard/videos?folder=${folderId}&saved=1`)
+  redirect(`/dashboard/videos?folder=${folderId}&notice=folder-updated`)
 }
 
 export async function toggleFolderPublishedAction(formData: FormData) {
@@ -68,7 +69,7 @@ export async function toggleFolderPublishedAction(formData: FormData) {
     console.error('Toggle education folder publish error:', error)
   }
 
-  redirect(`/dashboard/videos?folder=${folderId}&saved=1`)
+  redirect(`/dashboard/videos?folder=${folderId}&notice=folder-status`)
 }
 
 export async function deleteFolderAction(formData: FormData) {
@@ -84,7 +85,7 @@ export async function deleteFolderAction(formData: FormData) {
     console.error('Delete education folder error:', error)
   }
 
-  redirect('/dashboard/videos?saved=1')
+  redirect('/dashboard/videos?notice=folder-deleted')
 }
 
 export async function toggleVideoPublishedAction(formData: FormData) {
@@ -106,9 +107,9 @@ export async function toggleVideoPublishedAction(formData: FormData) {
   }
 
   if (Number.isFinite(folderId)) {
-    redirect(`/dashboard/videos?folder=${folderId}&saved=1`)
+    redirect(`/dashboard/videos?folder=${folderId}&notice=video-status`)
   }
-  redirect('/dashboard/videos?saved=1')
+  redirect('/dashboard/videos?notice=video-status')
 }
 
 export async function addVideoAction(formData: FormData) {
@@ -133,6 +134,14 @@ export async function addVideoAction(formData: FormData) {
     let thumbnailUrl = thumbnailUrlInput || null
     if (thumbnailFile && thumbnailFile.size > 0) {
       thumbnailUrl = await saveUpload(thumbnailFile, THUMB_UPLOAD_DIR, THUMB_URL_PREFIX)
+    }
+    if (!thumbnailUrl) {
+      thumbnailUrl = await generateVideoThumbnail({
+        videoUrl,
+        outputDir: THUMB_UPLOAD_DIR,
+        publicPrefix: THUMB_URL_PREFIX,
+        fileNameBase: title,
+      })
     }
 
     await prisma.educationVideo.create({
@@ -187,6 +196,14 @@ export async function editVideoAction(formData: FormData) {
       thumbnailUrl = await saveUpload(thumbnailFile, THUMB_UPLOAD_DIR, THUMB_URL_PREFIX)
       await removeLocalFile(existing.thumbnailUrl, THUMB_URL_PREFIX)
     }
+    if (!thumbnailUrl && videoFile && videoFile.size > 0) {
+      thumbnailUrl = await generateVideoThumbnail({
+        videoUrl,
+        outputDir: THUMB_UPLOAD_DIR,
+        publicPrefix: THUMB_URL_PREFIX,
+        fileNameBase: title,
+      })
+    }
 
     await prisma.educationVideo.update({
       where: { id },
@@ -204,7 +221,7 @@ export async function editVideoAction(formData: FormData) {
     return { success: false, message: `Gagal memperbarui video: ${getErrorMessage(error)}` }
   }
 
-  redirect(`/dashboard/videos${folderId ? `?folder=${folderId}&saved=1` : '?saved=1'}`)
+  redirect(`/dashboard/videos${folderId ? `?folder=${folderId}&notice=video-updated` : '?notice=video-updated'}`)
 }
 
 export async function deleteVideoAction(formData: FormData) {
@@ -226,7 +243,7 @@ export async function deleteVideoAction(formData: FormData) {
   }
 
   if (Number.isFinite(folderId)) {
-    redirect(`/dashboard/videos?folder=${folderId}&saved=1`)
+    redirect(`/dashboard/videos?folder=${folderId}&notice=video-deleted`)
   }
 }
 
