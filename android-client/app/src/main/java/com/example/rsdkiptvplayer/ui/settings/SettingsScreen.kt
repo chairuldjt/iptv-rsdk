@@ -871,14 +871,25 @@ fun SettingsScreen(
                                 },
                                 onSetDefaultLauncher = {
                                     if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q) {
-                                        // Android 10+ — gunakan RoleManager untuk dialog native
+                                        // Android 10+ — jika belum default, pakai RoleManager dialog native
+                                        // jika sudah default, tetap buka ACTION_HOME_SETTINGS agar user bisa ganti
                                         val roleManager = context.getSystemService(android.app.role.RoleManager::class.java)
                                         if (roleManager != null && !roleManager.isRoleHeld(android.app.role.RoleManager.ROLE_HOME)) {
                                             roleRequestLauncher.launch(
                                                 roleManager.createRequestRoleIntent(android.app.role.RoleManager.ROLE_HOME)
                                             )
                                         } else {
-                                            Toast.makeText(context, "Aplikasi ini sudah menjadi default launcher.", Toast.LENGTH_SHORT).show()
+                                            try {
+                                                val intent = android.content.Intent(android.provider.Settings.ACTION_HOME_SETTINGS)
+                                                context.startActivity(intent)
+                                            } catch (e: android.content.ActivityNotFoundException) {
+                                                try {
+                                                    val fallback = android.content.Intent(android.provider.Settings.ACTION_MANAGE_DEFAULT_APPS_SETTINGS)
+                                                    context.startActivity(fallback)
+                                                } catch (e2: android.content.ActivityNotFoundException) {
+                                                    Toast.makeText(context, "Pengaturan launcher tidak tersedia di perangkat ini.", Toast.LENGTH_LONG).show()
+                                                }
+                                            }
                                         }
                                     } else {
                                         // Android 6–9 — buka halaman Home Settings
