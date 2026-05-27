@@ -64,7 +64,16 @@ log "Deploying ${APP_NAME} from branch ${BRANCH}"
 if [[ "${SKIP_GIT_PULL:-0}" != "1" ]]; then
   git fetch origin "$BRANCH"
   git checkout "$BRANCH"
-  git pull --ff-only origin "$BRANCH"
+  # Preserve user-uploaded files that live inside tracked directories.
+  # These files are gitignored but git pull --ff-only aborts if they
+  # happen to share a path with a file being added/modified in the pull.
+  # Strategy: stash any conflicting untracked/modified files, pull, restore.
+  if ! git pull --ff-only origin "$BRANCH" 2>/dev/null; then
+    log "Fast-forward blocked by local changes — stashing uploads and retrying"
+    git stash --include-untracked -m "deploy-auto-stash"
+    git pull --ff-only origin "$BRANCH"
+    git stash pop || log "Warning: stash pop had conflicts — check public/uploads manually"
+  fi
 fi
 
 log "Installing dependencies"
