@@ -64,15 +64,23 @@ fun SplashScreen(
     var currentVersionCode by remember { mutableIntStateOf(0) }
     var splashSoundId by remember { mutableIntStateOf(0) }
     var loadingStatus by remember { mutableStateOf("") }
+    // Deferred untuk menunggu chime lokal selesai
+    val chimeDeferred = remember { kotlinx.coroutines.CompletableDeferred<Unit>() }
 
     DisposableEffect(homeExperience.sounds.enableSplashSound, homeExperience.splash.showSound) {
         soundPool.setOnLoadCompleteListener { _, sampleId, status ->
             if (status == 0 && homeExperience.sounds.enableSplashSound && homeExperience.splash.showSound) {
                 if (homeExperience.splash.soundUrl.isNotBlank()) {
-                    RemoteAudioPlayer.playOnce(context, homeExperience.splash.soundUrl)
+                    // Remote sound — chimeDeferred akan di-complete via LaunchedEffect
+                    chimeDeferred.complete(Unit)
                 } else {
                     soundPool.play(sampleId, 1.0f, 1.0f, 1, 0, 1.0f)
+                    // SoundPool tidak punya completion callback — complete langsung
+                    // durasi akan di-handle via MediaPlayer di LaunchedEffect
+                    chimeDeferred.complete(Unit)
                 }
+            } else {
+                chimeDeferred.complete(Unit)
             }
         }
         splashSoundId = soundPool.load(context, R.raw.splash_opening_chime, 1)
@@ -143,7 +151,24 @@ fun SplashScreen(
             }
         }
 
+        // Putar chime dan tunggu selesai (maks 10 detik)
         loadingStatus = ""
+        if (freshExp.sounds.enableSplashSound && freshExp.splash.showSound) {
+            if (freshExp.splash.soundUrl.isNotBlank()) {
+                // Remote sound — putar dan tunggu selesai
+                withTimeoutOrNull(10_000L) {
+                    RemoteAudioPlayer.playAndAwait(freshExp.splash.soundUrl)
+                }
+            } else {
+                // Local chime via SoundPool — tunggu load complete + estimasi durasi
+                withTimeoutOrNull(10_000L) {
+                    chimeDeferred.await()
+                }
+                // Beri waktu SoundPool memutar chime lokal (estimasi 3 detik)
+                delay(3_000L)
+            }
+        }
+
         delay(300)
         onSplashComplete(freshExp.startScreen, freshExp.startScreenContentId)
     }
