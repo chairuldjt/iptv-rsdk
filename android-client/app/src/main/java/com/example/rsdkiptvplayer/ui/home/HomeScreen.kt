@@ -310,7 +310,7 @@ fun HomeScreen(
         val screenHeight = configuration.screenHeightDp
         val isSmallScreen = screenWidth < 760 || screenHeight < 500
         val isUltraCompact = screenWidth < 600 || screenHeight < 400
-        val showFiveItems = screenWidth >= 760 && screenHeight >= 440
+        val showFiveItems = screenWidth >= 560 && screenHeight >= 360
 
         Box(
             modifier = Modifier
