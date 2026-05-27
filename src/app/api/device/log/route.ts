@@ -38,6 +38,24 @@ export async function POST(request: Request) {
       },
     })
 
+    // Auto-cleanup: keep only the latest MAX_LOG_ROWS rows to prevent storage bloat
+    const MAX_LOG_ROWS = 10_000
+    const totalCount = await prisma.deviceLog.count()
+    if (totalCount > MAX_LOG_ROWS) {
+      // Find the cutoff id: the oldest row that should be deleted
+      const cutoff = await prisma.deviceLog.findMany({
+        orderBy: { createdAt: 'desc' },
+        skip: MAX_LOG_ROWS,
+        take: 1,
+        select: { createdAt: true },
+      })
+      if (cutoff.length > 0) {
+        await prisma.deviceLog.deleteMany({
+          where: { createdAt: { lte: cutoff[0].createdAt } },
+        })
+      }
+    }
+
     return NextResponse.json({
       status: true,
       message: 'Error log recorded successfully',

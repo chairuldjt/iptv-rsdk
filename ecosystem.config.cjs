@@ -17,6 +17,10 @@ module.exports = {
       error_file: './logs/pm2-error.log',
       out_file: './logs/pm2-out.log',
       log_date_format: 'YYYY-MM-DD HH:mm:ss Z',
+      // Log rotation: max 10MB per file, keep 7 rotated copies, compress old logs
+      max_size: '10M',
+      retain: 7,
+      compress: true,
     },
   ],
 }
