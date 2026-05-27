@@ -135,10 +135,21 @@ class IptvRepository(
                             val previousUrl = currentUrl
                             dataStoreManager.setServerUrlOverride(newApiBaseUrl)
                             val testSuccess = try {
-                                val testService = com.example.rsdkiptvplayer.data.api.RetrofitClient.getService(newApiBaseUrl)
-                                val testDeviceId = dataStoreManager.getDeviceId()
-                                val testResponse = testService.getDeviceConfig(testDeviceId)
-                                testResponse.isSuccessful || testResponse.code() == 403
+                                // Buat HTTP client baru tanpa cache untuk test koneksi
+                                // agar tidak terpengaruh cached instance RetrofitClient
+                                val testClient = okhttp3.OkHttpClient.Builder()
+                                    .connectTimeout(10, java.util.concurrent.TimeUnit.SECONDS)
+                                    .readTimeout(10, java.util.concurrent.TimeUnit.SECONDS)
+                                    .build()
+                                val formattedUrl = if (newApiBaseUrl.endsWith("/")) newApiBaseUrl else "$newApiBaseUrl/"
+                                val testRequest = okhttp3.Request.Builder()
+                                    .url("${formattedUrl}api/device/config/${dataStoreManager.getDeviceId()}")
+                                    .build()
+                                val testResponse = testClient.newCall(testRequest).execute()
+                                val code = testResponse.code
+                                testResponse.close()
+                                dataStoreManager.addLog("Config Sync: Connection test result: HTTP $code")
+                                code in 200..299 || code == 403 || code == 404
                             } catch (e: Exception) {
                                 dataStoreManager.addLog("Config Sync: Connection test to new URL failed: ${e.message}")
                                 false
