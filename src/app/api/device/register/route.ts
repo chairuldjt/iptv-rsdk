@@ -6,7 +6,7 @@ import { createDeviceConfigData, getDefaultDeviceConfig } from '@/lib/defaultDev
 export async function POST(request: Request) {
   try {
     const body = await request.json()
-    const { device_id, device_name, app_version, android_version, mac_address, local_ip } = body
+    const { device_id, device_name, device_name_updated_at, app_version, app_version_code, android_version, mac_address, local_ip, api_base_url_confirmed } = body
 
     if (!device_id) {
       return NextResponse.json(
@@ -31,12 +31,16 @@ export async function POST(request: Request) {
  
         if (existingDeviceByMac) {
           // Hardware match found! Update deviceId (which cascades automatically to DeviceConfig)
+          // Selalu update nama jika berbeda — last sender wins
+          const shouldUpdateName = device_name && device_name !== existingDeviceByMac.deviceName
+
           device = await prisma.device.update({
             where: { id: existingDeviceByMac.id },
             data: {
               deviceId: device_id,
-              ...(device_name ? { deviceName: device_name, deviceNameUpdatedAt: new Date() } : {}),
+              ...(shouldUpdateName ? { deviceName: device_name, deviceNameUpdatedAt: new Date() } : {}),
               appVersion: app_version || existingDeviceByMac.appVersion,
+              appVersionCode: app_version_code ?? existingDeviceByMac.appVersionCode,
               androidVersion: android_version || existingDeviceByMac.androidVersion,
               lastIp: local_ip || existingDeviceByMac.lastIp,
               lastOnline: new Date(),
@@ -57,6 +61,7 @@ export async function POST(request: Request) {
             deviceName: device_name || 'Android STB',
             isActive: true,
             appVersion: app_version,
+            appVersionCode: app_version_code ?? null,
             androidVersion: android_version,
             lastIp: local_ip,
             macAddress: mac_address,
@@ -84,15 +89,24 @@ export async function POST(request: Request) {
       })
     } else {
       // Device exists -> Update heartbeat details
+      // Selalu update nama jika berbeda — last sender wins
+      const shouldUpdateName = device_name && device_name !== device.deviceName
+
       const updatedDevice = await prisma.device.update({
         where: { deviceId: device_id },
         data: {
-          ...(device_name ? { deviceName: device_name, deviceNameUpdatedAt: new Date() } : {}),
+          ...(shouldUpdateName ? { deviceName: device_name, deviceNameUpdatedAt: new Date() } : {}),
           appVersion: app_version || device.appVersion,
+          appVersionCode: app_version_code ?? device.appVersionCode,
           androidVersion: android_version || device.androidVersion,
           lastIp: local_ip || device.lastIp,
           macAddress: mac_address || device.macAddress,
           lastOnline: new Date(),
+          // Jika Android konfirmasi sudah pindah ke URL baru, reset apiBaseUrl di server
+          // agar tidak dikirim lagi ke device lain atau saat sync berikutnya
+          ...(api_base_url_confirmed === true ? {
+            config: { update: { apiBaseUrl: null } }
+          } : {}),
         },
         include: { config: true },
       })

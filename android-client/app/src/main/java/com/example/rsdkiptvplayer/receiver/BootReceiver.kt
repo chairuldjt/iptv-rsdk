@@ -3,8 +3,10 @@ package com.example.rsdkiptvplayer.receiver
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
+import android.os.Build
 import com.example.rsdkiptvplayer.MainActivity
 import com.example.rsdkiptvplayer.data.datastore.DataStoreManager
+import com.example.rsdkiptvplayer.service.RemotePollerService
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -32,8 +34,19 @@ class BootReceiver : BroadcastReceiver() {
                 dataStoreManager.addLog("Auto-start receiver triggered by: $action")
                 val autoStart = dataStoreManager.autoStartFlow.first()
                 if (autoStart) {
-                    dataStoreManager.addLog("Auto-start is ACTIVE. Launching application after boot delay...")
+                    dataStoreManager.addLog("Auto-start is ACTIVE. Starting remote service and launching app after boot delay...")
                     delay(500)
+
+                    // Selalu start RemotePollerService agar remote bisa bekerja
+                    // meski pengguna belum membuka aplikasi
+                    val serviceIntent = RemotePollerService.startIntent(context.applicationContext)
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                        context.startForegroundService(serviceIntent)
+                    } else {
+                        context.startService(serviceIntent)
+                    }
+
+                    // Juga launch activity agar tampilan muncul di layar TV
                     val launchIntent = context.packageManager
                         .getLaunchIntentForPackage(context.packageName)
                         ?.apply {

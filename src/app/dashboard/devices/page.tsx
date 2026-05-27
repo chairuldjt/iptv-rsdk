@@ -7,6 +7,7 @@ import DeviceSearchAndLimit from '@/components/DeviceSearchAndLimit'
 import DevicePagination from '@/components/DevicePagination'
 import PageHeader from '@/components/PageHeader'
 import EmptyState from '@/components/FeedbackState'
+import AutoRefresh from '@/components/AutoRefresh'
 import { redirect } from 'next/navigation'
 import { getOnlineThreshold } from '@/lib/time'
 import {
@@ -246,6 +247,7 @@ export default async function DevicesPage({
 
   return (
     <div className="space-y-6 animate-fade-in">
+      <AutoRefresh intervalMs={15000} />
       <PageHeader
         title="Device Fleet Manager"
         description="Monitor all registered Android STBs, control active status, assign playlists, and set remote configuration overrides."
@@ -391,7 +393,8 @@ export default async function DevicesPage({
                         </span>
                       </td>
                       <td>
-                        <div className="text-foreground/80">App v{d.appVersion || '1.0.0'}</div>
+                        <div className="text-foreground/80">App v{d.appVersion || '-'}{d.appVersionCode ? ` (${d.appVersionCode})` : ''}</div>
+                        <div className="text-[0.625rem] text-muted-foreground mt-0.5">Android {d.androidVersion || '-'}</div>
                         <div className="text-[0.625rem] text-muted-foreground mt-0.5 font-mono">IP: {d.lastIp || '-'}</div>
                         {d.macAddress && (
                           <div className="text-[0.625rem] text-muted-foreground font-mono">MAC: {d.macAddress}</div>

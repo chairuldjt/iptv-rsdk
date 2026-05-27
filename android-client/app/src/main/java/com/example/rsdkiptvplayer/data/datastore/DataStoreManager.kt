@@ -17,6 +17,7 @@ class DataStoreManager(private val context: Context) {
     companion object {
         val DEVICE_ID = stringPreferencesKey("device_id")
         val STB_NAME = stringPreferencesKey("stb_name")
+        val STB_NAME_UPDATED_AT = longPreferencesKey("stb_name_updated_at")
         val SERVER_URL_OVERRIDE = stringPreferencesKey("server_url_override")
         val SERVER_API_ENABLED = booleanPreferencesKey("server_api_enabled")
         val LAST_SELECTED_CHANNEL_ID = intPreferencesKey("last_selected_channel_id")
@@ -73,9 +74,29 @@ class DataStoreManager(private val context: Context) {
         if (current != normalizedName) {
             context.dataStore.edit { prefs ->
                 prefs[STB_NAME] = normalizedName
+                prefs[STB_NAME_UPDATED_AT] = System.currentTimeMillis()
             }
             addLog("STB name updated to: ${normalizedName.ifBlank { "(default device name)" }}")
         }
+    }
+
+    // Dipakai saat menerima nama dari server (syncConfig) — tidak update timestamp
+    // agar Android tidak mengklaim perubahan ini sebagai perubahan dari device
+    suspend fun setStbNameFromServer(name: String) {
+        val normalizedName = name.trim()
+        val current = getStbName()
+        if (current != normalizedName) {
+            context.dataStore.edit { prefs ->
+                prefs[STB_NAME] = normalizedName
+                prefs[STB_NAME_UPDATED_AT] = 0L
+            }
+            addLog("STB name synced from server: $normalizedName")
+        }
+    }
+
+    suspend fun getStbNameUpdatedAt(): Long {
+        val prefs = context.dataStore.data.first()
+        return prefs[STB_NAME_UPDATED_AT] ?: 0L
     }
 
     // Get dynamic server URL (override or buildConfig)

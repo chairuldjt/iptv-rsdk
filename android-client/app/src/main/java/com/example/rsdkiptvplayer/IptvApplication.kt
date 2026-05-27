@@ -2,11 +2,13 @@ package com.example.rsdkiptvplayer
 
 import android.app.Activity
 import android.app.Application
+import android.os.Build
 import android.os.Bundle
 import com.example.rsdkiptvplayer.util.CrashHandler
 import com.example.rsdkiptvplayer.data.cache.IptvDatabase
 import com.example.rsdkiptvplayer.data.datastore.DataStoreManager
 import com.example.rsdkiptvplayer.data.repository.IptvRepository
+import com.example.rsdkiptvplayer.service.RemotePollerService
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -54,6 +56,15 @@ class IptvApplication : Application() {
 
         remotePoller = com.example.rsdkiptvplayer.util.RemoteCommandPoller(dataStoreManager, remoteServer)
         remotePoller.start()
+
+        // Start foreground service agar polling tetap berjalan
+        // meski app di-background atau di-close oleh sistem
+        val serviceIntent = RemotePollerService.startIntent(this)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            startForegroundService(serviceIntent)
+        } else {
+            startService(serviceIntent)
+        }
 
         registerActivityLifecycleCallbacks(object : ActivityLifecycleCallbacks {
             override fun onActivityCreated(activity: Activity, savedInstanceState: Bundle?) {}

@@ -84,7 +84,10 @@ export async function GET(
       message: 'Config loaded',
       data: {
         device_id: device.deviceId,
+        device_name: device.deviceName,
+        device_name_updated_at: device.deviceNameUpdatedAt ? device.deviceNameUpdatedAt.getTime() : 0,
         active: device.isActive,
+        api_base_url: config.apiBaseUrl || null,
         playlist_id: normalizeSyncMode(config.syncMode || DEFAULT_SYNC_MODE) === 'custom' ? null : (globalPlaylist?.id || null),
         sync_mode: normalizeSyncMode(config.syncMode || DEFAULT_SYNC_MODE),
         custom_m3u_url: config.customM3uUrl || DEFAULT_CUSTOM_M3U_URL,

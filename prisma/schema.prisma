@@ -67,6 +67,7 @@ model Device {
   playlistId     Int?
   playlist       Playlist?     @relation(fields: [playlistId], references: [id], onDelete: SetNull)
   appVersion     String?
+  appVersionCode Int?
   androidVersion String?
   lastIp         String?
   macAddress     String?

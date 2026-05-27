@@ -64,13 +64,13 @@ class IptvRepository(
         val request = RegisterRequest(
             device_id = deviceId,
             device_name = deviceName,
+            device_name_updated_at = dataStoreManager.getStbNameUpdatedAt(),
             app_version = BuildConfig.VERSION_NAME,
+            app_version_code = BuildConfig.VERSION_CODE,
             android_version = Build.VERSION.RELEASE,
             mac_address = getMacAddress(),
             local_ip = getLocalIpAddress()
         )
-
-        dataStoreManager.addLog("Registering device on endpoint $serverUrl...")
         return try {
             val apiService = RetrofitClient.getService(serverUrl)
             val response = apiService.registerDevice(request)
@@ -114,6 +114,90 @@ class IptvRepository(
                 if (body.status && body.data != null) {
                     val config = body.data
                     dataStoreManager.addLog("Config Sync: Server returned lock_settings=${config.lock_settings}, mode=${config.sync_mode}")
+
+                    // --- Device name update dari server ---
+                    // Selalu terima nama dari server saat syncConfig — server adalah
+                    // source of truth untuk perubahan dari web admin.
+                    // setStbNameFromServer() juga reset timestamp lokal ke 0 agar
+                    // register berikutnya tidak menimpa nama yang baru disync.
+                    config.device_name?.let { serverName ->
+                        if (serverName.isNotBlank()) {
+                            dataStoreManager.setStbNameFromServer(serverName)
+                        }
+                    }
+
+                    // --- API Base URL override dari server dengan fallback ---
+                    val newApiBaseUrl = config.api_base_url
+                    if (!newApiBaseUrl.isNullOrBlank()) {
+                        val currentUrl = dataStoreManager.getServerUrl()
+                        if (newApiBaseUrl != currentUrl) {
+                            dataStoreManager.addLog("Config Sync: New API base URL received: $newApiBaseUrl — testing connection...")
+                            val previousUrl = currentUrl
+                            dataStoreManager.setServerUrlOverride(newApiBaseUrl)
+                            val testSuccess = try {
+                                val testService = com.example.rsdkiptvplayer.data.api.RetrofitClient.getService(newApiBaseUrl)
+                                val testDeviceId = dataStoreManager.getDeviceId()
+                                val testResponse = testService.getDeviceConfig(testDeviceId)
+                                testResponse.isSuccessful || testResponse.code() == 403
+                            } catch (e: Exception) {
+                                dataStoreManager.addLog("Config Sync: Connection test to new URL failed: ${e.message}")
+                                false
+                            }
+                            if (testSuccess) {
+                                dataStoreManager.addLog("Config Sync: API base URL updated to $newApiBaseUrl")
+                                // Konfirmasi ke server baru bahwa device sudah pindah
+                                // Server akan reset apiBaseUrl = null agar tidak dikirim lagi
+                                try {
+                                    val confirmService = com.example.rsdkiptvplayer.data.api.RetrofitClient.getService(newApiBaseUrl)
+                                    val deviceId = dataStoreManager.getDeviceId()
+                                    val deviceName = getEffectiveDeviceName()
+                                    confirmService.registerDevice(
+                                        com.example.rsdkiptvplayer.data.api.RegisterRequest(
+                                            device_id = deviceId,
+                                            device_name = deviceName,
+                                            device_name_updated_at = dataStoreManager.getStbNameUpdatedAt(),
+                                            app_version = BuildConfig.VERSION_NAME,
+                                            app_version_code = BuildConfig.VERSION_CODE,
+                                            android_version = android.os.Build.VERSION.RELEASE,
+                                            mac_address = getMacAddress(),
+                                            local_ip = getLocalIpAddress(),
+                                            api_base_url_confirmed = true
+                                        )
+                                    )
+                                    dataStoreManager.addLog("Config Sync: URL migration confirmed to server")
+                                } catch (e: Exception) {
+                                    dataStoreManager.addLog("Config Sync: Failed to confirm URL migration: ${e.message}")
+                                }
+                            } else {
+                                // Rollback URL lokal
+                                dataStoreManager.setServerUrlOverride(previousUrl)
+                                dataStoreManager.addLog("Config Sync: Rollback — reverted to previous URL $previousUrl")
+                                // Notify server lama untuk reset apiBaseUrl agar tidak dikirim lagi
+                                try {
+                                    val oldService = com.example.rsdkiptvplayer.data.api.RetrofitClient.getService(previousUrl)
+                                    val deviceId = dataStoreManager.getDeviceId()
+                                    val deviceName = getEffectiveDeviceName()
+                                    oldService.registerDevice(
+                                        com.example.rsdkiptvplayer.data.api.RegisterRequest(
+                                            device_id = deviceId,
+                                            device_name = deviceName,
+                                            device_name_updated_at = dataStoreManager.getStbNameUpdatedAt(),
+                                            app_version = BuildConfig.VERSION_NAME,
+                                            app_version_code = BuildConfig.VERSION_CODE,
+                                            android_version = android.os.Build.VERSION.RELEASE,
+                                            mac_address = getMacAddress(),
+                                            local_ip = getLocalIpAddress(),
+                                            api_base_url_confirmed = true
+                                        )
+                                    )
+                                    dataStoreManager.addLog("Config Sync: Server notified to reset failed URL")
+                                } catch (e: Exception) {
+                                    dataStoreManager.addLog("Config Sync: Failed to notify server of rollback: ${e.message}")
+                                }
+                            }
+                        }
+                    }
+
                     dataStoreManager.setLockSettings(config.lock_settings ?: true)
                     dataStoreManager.setSyncInterval(config.sync_interval ?: 1800)
                     dataStoreManager.setAspectRatio(config.aspect_ratio ?: "fit")
@@ -382,7 +466,9 @@ class IptvRepository(
             val request = RegisterRequest(
                 device_id = deviceId,
                 device_name = deviceName,
+                device_name_updated_at = dataStoreManager.getStbNameUpdatedAt(),
                 app_version = BuildConfig.VERSION_NAME,
+                app_version_code = BuildConfig.VERSION_CODE,
                 android_version = Build.VERSION.RELEASE,
                 mac_address = getMacAddress(),
                 local_ip = getLocalIpAddress()

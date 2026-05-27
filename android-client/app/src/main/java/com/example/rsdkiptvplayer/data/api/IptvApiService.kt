@@ -12,10 +12,13 @@ import retrofit2.http.Query
 data class RegisterRequest(
     val device_id: String,
     val device_name: String,
+    val device_name_updated_at: Long,
     val app_version: String,
+    val app_version_code: Int,
     val android_version: String,
     val mac_address: String?,
-    val local_ip: String?
+    val local_ip: String?,
+    val api_base_url_confirmed: Boolean = false
 )
 
 data class RegisterResponse(
@@ -38,7 +41,10 @@ data class ConfigResponse(
 
 data class ConfigData(
     val device_id: String,
+    val device_name: String? = null,
+    val device_name_updated_at: Long? = null,
     val active: Boolean,
+    val api_base_url: String? = null,
     val playlist_id: Int?,
     val sync_mode: String?,
     val custom_m3u_url: String?,

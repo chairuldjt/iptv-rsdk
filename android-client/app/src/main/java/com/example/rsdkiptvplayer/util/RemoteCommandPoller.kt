@@ -95,6 +95,8 @@ class RemoteCommandPoller(
         pollerJob?.cancel()
     }
 
+    fun isRunning(): Boolean = isPolling && pollerJob?.isActive == true
+
     @Synchronized
     private fun startScreenshotLoop(apiService: IptvApiService, deviceId: String) {
         if (screenshotJob != null && screenshotJob!!.isActive) return
