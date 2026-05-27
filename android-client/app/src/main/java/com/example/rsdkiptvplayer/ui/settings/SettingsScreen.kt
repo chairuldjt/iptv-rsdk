@@ -871,8 +871,6 @@ fun SettingsScreen(
                                 },
                                 onSetDefaultLauncher = {
                                     if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q) {
-                                        // Android 10+ — jika belum default, pakai RoleManager dialog native
-                                        // jika sudah default, tetap buka ACTION_HOME_SETTINGS agar user bisa ganti
                                         val roleManager = context.getSystemService(android.app.role.RoleManager::class.java)
                                         if (roleManager != null && !roleManager.isRoleHeld(android.app.role.RoleManager.ROLE_HOME)) {
                                             roleRequestLauncher.launch(
@@ -892,7 +890,6 @@ fun SettingsScreen(
                                             }
                                         }
                                     } else {
-                                        // Android 6–9 — buka halaman Home Settings
                                         try {
                                             val intent = android.content.Intent(android.provider.Settings.ACTION_HOME_SETTINGS)
                                             context.startActivity(intent)
@@ -903,6 +900,19 @@ fun SettingsScreen(
                                             } catch (e2: android.content.ActivityNotFoundException) {
                                                 Toast.makeText(context, "Pengaturan launcher tidak tersedia di perangkat ini.", Toast.LENGTH_LONG).show()
                                             }
+                                        }
+                                    }
+                                },
+                                onOpenDeveloperOptions = {
+                                    try {
+                                        val intent = android.content.Intent(android.provider.Settings.ACTION_APPLICATION_DEVELOPMENT_SETTINGS)
+                                        context.startActivity(intent)
+                                    } catch (e: android.content.ActivityNotFoundException) {
+                                        try {
+                                            val fallback = android.content.Intent(android.provider.Settings.ACTION_SETTINGS)
+                                            context.startActivity(fallback)
+                                        } catch (e2: android.content.ActivityNotFoundException) {
+                                            Toast.makeText(context, "Pengaturan tidak tersedia di perangkat ini.", Toast.LENGTH_LONG).show()
                                         }
                                     }
                                 },
@@ -1339,7 +1349,8 @@ fun DisplayBootPane(
     autoStart: Boolean,
     onRatioChange: (String) -> Unit,
     onAutoStartChange: (Boolean) -> Unit,
-    onSetDefaultLauncher: () -> Unit
+    onSetDefaultLauncher: () -> Unit,
+    onOpenDeveloperOptions: () -> Unit
 ) {
     Column(
         modifier = Modifier
@@ -1427,6 +1438,27 @@ fun DisplayBootPane(
                 modifier = Modifier.settingsFocusGlow()
             ) {
                 Text("Set Launcher")
+            }
+        }
+
+        HorizontalDivider(color = Color(0xFF334155))
+
+        // Item Developer Options & ADB
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text("Developer Options & ADB", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                Text("Buka halaman Developer Options untuk mengaktifkan USB/Wireless debugging (ADB).", color = Color.Gray, fontSize = 11.sp)
+            }
+            Button(
+                onClick = onOpenDeveloperOptions,
+                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF0F766E)),
+                modifier = Modifier.settingsFocusGlow()
+            ) {
+                Text("Buka Dev Options")
             }
         }
 
