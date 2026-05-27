@@ -268,7 +268,7 @@ export async function resolveEffectiveHomeExperience(deviceId: string): Promise<
   // Override runningText with the resolved Running Text profile settings
   const effectiveRunningText = await resolveEffectiveRunningText(deviceId)
   merged.runningText = {
-    enabled: effectiveRunningText.enabled,
+    enabled: false,
     visibleCount: effectiveRunningText.visibleCount,
     rotationSeconds: effectiveRunningText.rotationSeconds,
     displaySeconds: effectiveRunningText.displaySeconds,
@@ -628,7 +628,7 @@ function normalizeRunningText(value: unknown): HomeExperienceConfig['runningText
     enabled: safeBoolean(source.enabled, FALLBACK_HOME_EXPERIENCE_CONFIG.runningText.enabled),
     visibleCount: clampInt(source.visibleCount, 1, 10, FALLBACK_HOME_EXPERIENCE_CONFIG.runningText.visibleCount),
     rotationSeconds: clampInt(source.rotationSeconds, 1, 600, FALLBACK_HOME_EXPERIENCE_CONFIG.runningText.rotationSeconds),
-    displaySeconds: clampInt(source.displaySeconds, 1, 600, FALLBACK_HOME_EXPERIENCE_CONFIG.runningText.displaySeconds),
+    displaySeconds: clampInt(source.displaySeconds, 0, 600, FALLBACK_HOME_EXPERIENCE_CONFIG.runningText.displaySeconds),
     items: itemsSource
       .filter((entry): entry is Record<string, unknown> => isRecord(entry))
       .map((entry, index) => ({

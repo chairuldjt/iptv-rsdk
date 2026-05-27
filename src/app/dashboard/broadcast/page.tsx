@@ -46,6 +46,7 @@ import {
   assignRunningGroupAction,
   assignRunningDeviceAction,
   pushRunningTextLiveAction,
+  stopRunningTextLiveAction,
 } from './actions/runningTextActions'
 
 export const revalidate = 0
@@ -124,6 +125,37 @@ function buildVideoNotice(sp: BroadcastSearchParams): { message: string; tone: '
   if (sp.notice === 'broadcast-live-stopped') {
     const count = Number.parseInt(sp.count || '0', 10) || 0
     return { message: `Perintah stop broadcast berhasil dikirim ke ${count} device aktif.`, tone: 'success' }
+  }
+
+  return null
+}
+
+function buildRunningNotice(sp: BroadcastSearchParams): { message: string; tone: 'success' | 'error' | 'info' } | null {
+  if (sp.error) {
+    return {
+      message: decodeURIComponent(sp.error),
+      tone: 'error',
+    }
+  }
+
+  if (sp.saved) {
+    return { message: 'Konfigurasi Running Text berhasil disimpan ke profile.', tone: 'success' }
+  }
+
+  if (sp.notice === 'running-live-queued') {
+    const count = Number.parseInt(sp.count || '0', 10) || 0
+    return {
+      message: `Perintah marquee live berhasil diantrikan ke ${count} device aktif.`,
+      tone: 'success',
+    }
+  }
+
+  if (sp.notice === 'running-live-stopped') {
+    const count = Number.parseInt(sp.count || '0', 10) || 0
+    return {
+      message: `Perintah stop marquee berhasil diantrikan ke ${count} device aktif.`,
+      tone: 'success',
+    }
   }
 
   return null
@@ -364,11 +396,7 @@ export default async function BroadcastPage({
 
       const rawConfig = (await getRunningTextProfileConfig(profile.id)) ?? FALLBACK_RUNNING_TEXT_CONFIG
 
-      const notifMessage = sp.saved
-        ? 'Konfigurasi Running Text berhasil disimpan ke profile.'
-        : sp.pushed
-        ? 'Konfigurasi Running Text berhasil dikirim live ke device.'
-        : null
+      const runningNotice = buildRunningNotice(sp)
 
       return (
         <div className="space-y-6 animate-fade-in">
@@ -377,7 +405,7 @@ export default async function BroadcastPage({
             backLabel="Kembali ke Daftar Profile Running Text"
             currentLabel={`Edit Config: ${profile.name}`}
           />
-          {notifMessage && <NotificationBar message={notifMessage} tone="success" />}
+          {runningNotice && <NotificationBar message={runningNotice.message} tone={runningNotice.tone} />}
           <RunningTextPanelClient
             profileId={profile.id}
             profileName={profile.name}
@@ -387,6 +415,7 @@ export default async function BroadcastPage({
             assignedDeviceCount={Object.values(deviceRunningProfileMap).filter((pid) => pid === profile.id).length}
             saveAction={saveRunningProfileConfigAction}
             pushLiveAction={pushRunningTextLiveAction}
+            stopLiveAction={stopRunningTextLiveAction}
           />
         </div>
       )

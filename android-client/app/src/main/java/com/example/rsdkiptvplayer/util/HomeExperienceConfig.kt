@@ -87,6 +87,15 @@ object HomeExperienceParser {
         }
     }
 
+    fun parseRunningTextJson(json: String?): HomeExperienceRunningText {
+        if (json.isNullOrBlank()) return HomeExperienceRunningText()
+        return try {
+            parseRunningText(JSONObject(json))
+        } catch (_: Exception) {
+            HomeExperienceRunningText()
+        }
+    }
+
     fun colorOrDefault(hex: String, fallback: Color): Color {
         return try {
             val clean = hex.removePrefix("#")
@@ -168,7 +177,7 @@ object HomeExperienceParser {
             enabled = obj.optBoolean("enabled", false),
             visibleCount = obj.optInt("visibleCount", 1).coerceIn(1, 10),
             rotationSeconds = obj.optInt("rotationSeconds", 10).coerceIn(1, 600),
-            displaySeconds = obj.optInt("displaySeconds", 10).coerceIn(1, 600),
+            displaySeconds = obj.optInt("displaySeconds", 10).coerceIn(0, 600),
             items = items
         )
     }

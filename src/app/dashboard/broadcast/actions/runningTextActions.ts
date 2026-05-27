@@ -2,9 +2,7 @@
 
 import { redirect, RedirectType } from 'next/navigation'
 import { revalidatePath } from 'next/cache'
-import prisma from '@/lib/db'
 import {
-  FALLBACK_RUNNING_TEXT_CONFIG,
   createRunningTextProfile,
   updateRunningTextProfileMeta,
   saveRunningTextProfileConfig,
@@ -30,6 +28,10 @@ function parseRunningTextItems(formData: FormData): HomeExperienceRunningTextIte
   return []
 }
 
+function hasActiveRunningItems(items: HomeExperienceRunningTextItem[]): boolean {
+  return items.some((item) => item.enabled && item.text.trim().length > 0)
+}
+
 // ── Profile CRUD ──────────────────────────────────────────────────────────────
 
 export async function createRunningProfileAction(formData: FormData) {
@@ -53,16 +55,15 @@ export async function saveRunningProfileConfigAction(formData: FormData) {
   const profileId = (formData.get('profileId') as string) || ''
   if (!profileId) return
   const items: HomeExperienceRunningTextItem[] = parseRunningTextItems(formData)
-  const enabled = formData.get('rtEnabled') === 'on'
   const visibleCount = parseInt((formData.get('rtVisibleCount') as string) || '1', 10)
   const rotationSeconds = parseInt((formData.get('rtRotationSeconds') as string) || '10', 10)
   const displaySeconds = parseInt((formData.get('rtDisplaySeconds') as string) || '10', 10)
 
   await saveRunningTextProfileConfig(profileId, {
-    enabled,
+    enabled: false,
     visibleCount: Math.max(1, Math.min(10, visibleCount)),
     rotationSeconds: Math.max(1, Math.min(600, rotationSeconds)),
-    displaySeconds: Math.max(1, Math.min(600, displaySeconds)),
+    displaySeconds: Math.max(0, Math.min(600, displaySeconds)),
     items,
   })
 
@@ -113,7 +114,7 @@ export async function assignRunningDeviceAction(formData: FormData) {
 export async function pushRunningTextLiveAction(formData: FormData) {
   const profileId = (formData.get('profileId') as string) || ''
   const items: HomeExperienceRunningTextItem[] = parseRunningTextItems(formData)
-  const enabled = formData.get('rtEnabled') === 'on'
+  const enabled = hasActiveRunningItems(items)
   const visibleCount = parseInt((formData.get('rtVisibleCount') as string) || '1', 10)
   const rotationSeconds = parseInt((formData.get('rtRotationSeconds') as string) || '10', 10)
   const displaySeconds = parseInt((formData.get('rtDisplaySeconds') as string) || '10', 10)
@@ -123,10 +124,19 @@ export async function pushRunningTextLiveAction(formData: FormData) {
     items,
     visibleCount,
     rotationSeconds: Math.max(1, Math.min(600, rotationSeconds)),
-    displaySeconds: Math.max(1, Math.min(600, displaySeconds)),
+    displaySeconds: Math.max(0, Math.min(600, displaySeconds)),
   })
 
   const recipients = await resolveProfileRecipientDevices(profileId, 'running')
+  if (recipients.length === 0) {
+    revalidatePath('/dashboard/broadcast')
+    redirect(
+      `/dashboard/broadcast?tab=ticker&editRunningProfile=${encodeURIComponent(profileId)}&error=${encodeURIComponent(
+        'Tidak ada device aktif yang menjadi target profile ini.'
+      )}`,
+      RedirectType.replace
+    )
+  }
 
   for (const deviceId of recipients) {
     pushCommand(deviceId, 'UPDATE_RUNNING_TEXT', payload)
@@ -134,8 +144,44 @@ export async function pushRunningTextLiveAction(formData: FormData) {
 
   revalidatePath('/dashboard/broadcast')
   if (profileId) {
-    redirect(`/dashboard/broadcast?tab=ticker&editRunningProfile=${encodeURIComponent(profileId)}&pushed=1`, RedirectType.replace)
+    redirect(
+      `/dashboard/broadcast?tab=ticker&editRunningProfile=${encodeURIComponent(profileId)}&notice=running-live-queued&count=${recipients.length}`,
+      RedirectType.replace
+    )
   } else {
-    redirect(`/dashboard/broadcast?tab=ticker&pushed=1`, RedirectType.replace)
+    redirect(`/dashboard/broadcast?tab=ticker&notice=running-live-queued&count=${recipients.length}`, RedirectType.replace)
   }
+}
+
+export async function stopRunningTextLiveAction(formData: FormData) {
+  const profileId = (formData.get('profileId') as string) || ''
+  const recipients = await resolveProfileRecipientDevices(profileId, 'running')
+
+  if (recipients.length === 0) {
+    revalidatePath('/dashboard/broadcast')
+    redirect(
+      `/dashboard/broadcast?tab=ticker&editRunningProfile=${encodeURIComponent(profileId)}&error=${encodeURIComponent(
+        'Tidak ada device aktif yang bisa dikirimi perintah stop.'
+      )}`,
+      RedirectType.replace
+    )
+  }
+
+  const payload = JSON.stringify({
+    enabled: false,
+    items: [],
+    visibleCount: 1,
+    rotationSeconds: 10,
+    displaySeconds: 0,
+  })
+
+  for (const deviceId of recipients) {
+    pushCommand(deviceId, 'UPDATE_RUNNING_TEXT', payload)
+  }
+
+  revalidatePath('/dashboard/broadcast')
+  redirect(
+    `/dashboard/broadcast?tab=ticker&editRunningProfile=${encodeURIComponent(profileId)}&notice=running-live-stopped&count=${recipients.length}`,
+    RedirectType.replace
+  )
 }

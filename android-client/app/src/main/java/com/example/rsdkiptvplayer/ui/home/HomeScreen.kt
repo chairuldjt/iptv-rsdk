@@ -348,11 +348,6 @@ fun HomeScreen(
                 weather = weatherText
             )
 
-            if (homeExperience.runningText.enabled && homeExperience.runningText.items.isNotEmpty()) {
-                Spacer(modifier = Modifier.height(if (isUltraCompact) 4.dp else if (isSmallScreen) 6.dp else 10.dp))
-                RunningTextBanner(homeExperienceJson = homeExperienceJson)
-            }
-
             Spacer(modifier = Modifier.weight(1f))
 
             HospitalityMenuBar(
@@ -605,53 +600,6 @@ private fun InfoChip(text: String, isSmallScreen: Boolean = false) {
     }
 }
 
-@Composable
-private fun RunningTextBanner(homeExperienceJson: String) {
-    val profile = remember(homeExperienceJson) { HomeExperienceParser.parse(homeExperienceJson) }
-    val items = remember(profile.runningText.items) {
-        profile.runningText.items.filter { it.enabled && it.text.isNotBlank() }
-    }
-
-    if (!profile.runningText.enabled || items.isEmpty()) {
-        return
-    }
-
-    var startIndex by remember(items) { mutableIntStateOf(0) }
-    val visibleCount = profile.runningText.visibleCount.coerceAtLeast(1)
-    val visibleItems = remember(startIndex, items, visibleCount) {
-        List(minOf(visibleCount, items.size)) { offset ->
-            items[(startIndex + offset) % items.size].text
-        }
-    }
-
-    LaunchedEffect(items, profile.runningText.rotationSeconds) {
-        while (true) {
-            delay(profile.runningText.rotationSeconds * 1000L)
-            startIndex = (startIndex + visibleCount) % items.size
-        }
-    }
-
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(14.dp))
-            .background(Color.Black.copy(alpha = 0.38f))
-            .border(1.dp, Color.White.copy(alpha = 0.14f), RoundedCornerShape(14.dp))
-            .padding(horizontal = 12.dp, vertical = 8.dp),
-        verticalArrangement = Arrangement.spacedBy(4.dp)
-    ) {
-        visibleItems.forEach { text ->
-            Text(
-                text = text,
-                color = Color(0xFFFFE9A6),
-                fontSize = 11.sp,
-                fontWeight = FontWeight.Bold,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
-        }
-    }
-}
 
 @Composable
 private fun StaticInfoDialog(

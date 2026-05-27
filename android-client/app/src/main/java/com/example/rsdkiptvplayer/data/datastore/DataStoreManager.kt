@@ -41,6 +41,8 @@ class DataStoreManager(private val context: Context) {
         val NTP_SERVER = stringPreferencesKey("ntp_server")
         val HOME_EXPERIENCE_JSON = stringPreferencesKey("home_experience_json")
         val VIDEO_BROADCAST_JSON = stringPreferencesKey("video_broadcast_json")
+        val RUNNING_TEXT_OVERRIDE_JSON = stringPreferencesKey("running_text_override_json")
+        val RUNNING_TEXT_OVERRIDE_EXPIRES_AT = longPreferencesKey("running_text_override_expires_at")
     }
 
     // Generate or get existing Device ID
@@ -374,6 +376,54 @@ class DataStoreManager(private val context: Context) {
                 prefs[HOME_EXPERIENCE_JSON] = normalized
             }
             addLog("Home experience profile updated from server.")
+        }
+    }
+
+    val runningTextOverrideJsonFlow: Flow<String> = context.dataStore.data.map { prefs ->
+        prefs[RUNNING_TEXT_OVERRIDE_JSON] ?: ""
+    }
+
+    val runningTextOverrideExpiresAtFlow: Flow<Long> = context.dataStore.data.map { prefs ->
+        prefs[RUNNING_TEXT_OVERRIDE_EXPIRES_AT] ?: 0L
+    }
+
+    suspend fun getRunningTextOverrideJson(): String {
+        val prefs = context.dataStore.data.first()
+        return prefs[RUNNING_TEXT_OVERRIDE_JSON] ?: ""
+    }
+
+    suspend fun setRunningTextOverrideJson(json: String) {
+        val normalized = json.trim()
+        val current = getRunningTextOverrideJson()
+        if (current != normalized) {
+            context.dataStore.edit { prefs ->
+                prefs[RUNNING_TEXT_OVERRIDE_JSON] = normalized
+            }
+            addLog("Running text live override updated.")
+        }
+    }
+
+    suspend fun setRunningTextOverrideExpiresAt(epochMillis: Long) {
+        val current = runningTextOverrideExpiresAtFlow.first()
+        if (current != epochMillis) {
+            context.dataStore.edit { prefs ->
+                prefs[RUNNING_TEXT_OVERRIDE_EXPIRES_AT] = epochMillis
+            }
+            if (epochMillis > 0L) {
+                addLog("Running text live override will stop at: $epochMillis")
+            }
+        }
+    }
+
+    suspend fun clearRunningTextOverride() {
+        val current = getRunningTextOverrideJson()
+        val currentExpiresAt = runningTextOverrideExpiresAtFlow.first()
+        if (current.isNotBlank() || currentExpiresAt > 0L) {
+            context.dataStore.edit { prefs ->
+                prefs.remove(RUNNING_TEXT_OVERRIDE_JSON)
+                prefs.remove(RUNNING_TEXT_OVERRIDE_EXPIRES_AT)
+            }
+            addLog("Running text live override cleared after config sync.")
         }
     }
 

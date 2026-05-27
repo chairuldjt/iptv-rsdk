@@ -136,7 +136,10 @@ class IptvRepository(
                     dataStoreManager.setEducationPlaybackMode(config.education_playback_mode ?: "copy")
                     dataStoreManager.setNtpServer(config.ntp_server ?: "0.id.pool.ntp.org")
                     dataStoreManager.setAutoStartOnBoot(config.auto_start_on_boot ?: false)
-                    config.home_experience_json?.let { dataStoreManager.setHomeExperienceJson(it) }
+                    config.home_experience_json?.let {
+                        dataStoreManager.setHomeExperienceJson(it)
+                        dataStoreManager.clearRunningTextOverride()
+                    }
                     config.video_broadcast_json?.let { dataStoreManager.setVideoBroadcastJson(it) }
 
                     if (config.force_sync == true) {

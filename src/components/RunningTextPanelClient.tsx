@@ -19,6 +19,7 @@ type RunningTextPanelClientProps = {
   assignedDeviceCount: number
   saveAction: (fd: FormData) => Promise<void>
   pushLiveAction: (fd: FormData) => Promise<void>
+  stopLiveAction: (fd: FormData) => Promise<void>
 }
 
 export default function RunningTextPanelClient({
@@ -30,20 +31,22 @@ export default function RunningTextPanelClient({
   assignedDeviceCount,
   saveAction,
   pushLiveAction,
+  stopLiveAction,
 }: RunningTextPanelClientProps) {
   // Client state for running text parameters
   const [items, setItems] = useState<HomeExperienceRunningTextItem[]>(runningText.items)
-  const [enabled, setEnabled] = useState<boolean>(runningText.enabled)
-  const [visibleCount, setVisibleCount] = useState<number>(runningText.visibleCount)
   const [rotationSeconds, setRotationSeconds] = useState<number>(runningText.rotationSeconds)
   const [displaySeconds, setDisplaySeconds] = useState<number>(runningText.displaySeconds)
 
   // Confirmation state
   const [showPushConfirm, setShowPushConfirm] = useState(false)
+  const [showStopConfirm, setShowStopConfirm] = useState(false)
 
   const formRef = useRef<HTMLFormElement>(null)
   const [isPushPending, startPushTransition] = useTransition()
+  const [isStopPending, startStopTransition] = useTransition()
   const [pushError, setPushError] = useState<string | null>(null)
+  const [stopError, setStopError] = useState<string | null>(null)
 
   const handlePushConfirm = () => {
     setPushError(null)
@@ -68,15 +71,39 @@ export default function RunningTextPanelClient({
     })
   }
 
+  const handleStopConfirm = () => {
+    setStopError(null)
+    if (!formRef.current) return
+    const formData = new FormData(formRef.current)
+    startStopTransition(async () => {
+      try {
+        await stopLiveAction(formData)
+        setShowStopConfirm(false)
+      } catch (err: unknown) {
+        const isRedirect =
+          err instanceof Error &&
+          (err.message.includes('NEXT_REDIRECT') ||
+            ('digest' in err && String((err as { digest?: string }).digest).includes('NEXT_REDIRECT')))
+        if (isRedirect) {
+          setShowStopConfirm(false)
+          return
+        }
+        console.error('Stop live action failed:', err)
+        setStopError(err instanceof Error ? err.message : 'Gagal menghentikan marquee live.')
+      }
+    })
+  }
+
   const hasTargets = isGlobal || assignedGroupCount > 0 || assignedDeviceCount > 0
 
   const targetLabel = isGlobal
     ? 'semua device aktif (Global Profile)'
     : hasTargets
-    ? `${assignedGroupCount} grup dan ${assignedDeviceCount} device yang terhubung`
-    : 'tidak ada device terhubung (silakan assign profile ini terlebih dahulu)'
+      ? `${assignedGroupCount} grup dan ${assignedDeviceCount} device yang terhubung`
+      : 'tidak ada device terhubung (silakan assign profile ini terlebih dahulu)'
 
   const activeItems = items.filter((i) => i.enabled && i.text.trim())
+  const isEnabled = activeItems.length > 0
 
   const handleAddItem = () => {
     setItems((current) => [
@@ -125,35 +152,11 @@ export default function RunningTextPanelClient({
         <form action={saveAction} className="space-y-5">
           {/* Profile ID identifier */}
           <input type="hidden" name="profileId" value={profileId} />
+          <input type="hidden" name="rtVisibleCount" value={1} />
           {/* Main settings row */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 p-4 rounded-xl bg-accent/15 border border-border/80">
-            <label className="flex flex-col justify-center">
-              <span className="block text-[9px] font-bold uppercase tracking-wider text-muted-foreground mb-1.5">Status Ticker</span>
-              <label className="flex items-center gap-2 cursor-pointer w-fit">
-                <input
-                  type="checkbox"
-                  name="rtEnabled"
-                  checked={enabled}
-                  onChange={(e) => setEnabled(e.target.checked)}
-                  className="h-4.5 w-4.5 rounded accent-primary cursor-pointer"
-                />
-                <span className="text-xs font-semibold text-foreground select-none">Aktifkan Running Text</span>
-              </label>
-            </label>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 p-4 rounded-xl bg-accent/15 border border-border/80">
             <label>
-              <span className="block text-[9px] font-bold uppercase tracking-wider text-muted-foreground mb-1.5">Visible Count (Jumlah Baris)</span>
-              <input
-                type="number"
-                name="rtVisibleCount"
-                value={visibleCount}
-                onChange={(e) => setVisibleCount(Math.max(1, Math.min(10, parseInt(e.target.value) || 1)))}
-                min={1}
-                max={10}
-                className="field-input py-1.5 text-xs w-full"
-              />
-            </label>
-            <label>
-              <span className="block text-[9px] font-bold uppercase tracking-wider text-muted-foreground mb-1.5">Rotation Speed (Detik)</span>
+              <span className="block text-[9px] font-bold uppercase tracking-wider text-muted-foreground mb-1.5">Speed Marquee (Detik per Loop)</span>
               <input
                 type="number"
                 name="rtRotationSeconds"
@@ -164,8 +167,18 @@ export default function RunningTextPanelClient({
                 className="field-input py-1.5 text-xs w-full"
               />
             </label>
-            {/* Hidden field to keep database structure intact */}
-            <input type="hidden" name="rtDisplaySeconds" value={displaySeconds} />
+            <label>
+              <span className="block text-[9px] font-bold uppercase tracking-wider text-muted-foreground mb-1.5">Timer Stop Live (Detik) (0 = tanpa batas)</span>
+              <input
+                type="number"
+                name="rtDisplaySeconds"
+                value={displaySeconds}
+                onChange={(e) => setDisplaySeconds(Math.max(0, Math.min(600, parseInt(e.target.value) || 0)))}
+                min={0}
+                max={600}
+                className="field-input py-1.5 text-xs w-full"
+              />
+            </label>
           </div>
 
           {/* Hidden text items payload */}
@@ -206,11 +219,10 @@ export default function RunningTextPanelClient({
                     <button
                       type="button"
                       onClick={() => handleUpdateItem(item.id, { enabled: !item.enabled })}
-                      className={`rounded-lg px-2.5 py-1.5 text-[10px] font-bold border transition-all select-none cursor-pointer ${
-                        item.enabled
+                      className={`rounded-lg px-2.5 py-1.5 text-[10px] font-bold border transition-all select-none cursor-pointer ${item.enabled
                           ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400 hover:bg-emerald-500/25'
                           : 'bg-muted/10 border-border text-muted-foreground hover:bg-muted/20'
-                      }`}
+                        }`}
                     >
                       {item.enabled ? 'Aktif' : 'Nonaktif'}
                     </button>
@@ -246,8 +258,8 @@ export default function RunningTextPanelClient({
           <div className="space-y-2 text-xs">
             <div className="flex items-center justify-between">
               <span className="text-muted-foreground">Status (Unsaved)</span>
-              <span className={`font-semibold ${enabled ? 'text-emerald-400' : 'text-muted-foreground'}`}>
-                {enabled ? 'Aktif' : 'Nonaktif'}
+              <span className={`font-semibold ${isEnabled ? 'text-emerald-400' : 'text-muted-foreground'}`}>
+                {isEnabled ? 'Siap Tayang' : 'Belum Ada Pesan Aktif'}
               </span>
             </div>
             <div className="flex items-center justify-between">
@@ -258,15 +270,26 @@ export default function RunningTextPanelClient({
               <span className="text-muted-foreground">Pesan Aktif</span>
               <span className="font-semibold text-foreground">{activeItems.length}</span>
             </div>
+            <div className="flex items-center justify-between">
+              <span className="text-muted-foreground">Speed Marquee</span>
+              <span className="font-semibold text-foreground">{rotationSeconds} dtk/loop</span>
+            </div>
+            <div className="flex items-center justify-between">
+              <span className="text-muted-foreground">Timer Stop Live</span>
+              <span className="font-semibold text-foreground">{displaySeconds > 0 ? `${displaySeconds} dtk` : 'Tidak ada'}</span>
+            </div>
           </div>
 
           {/* Preview marquee */}
           {activeItems.length > 0 && (
             <div className="rounded-xl bg-amber-500/5 border border-amber-500/15 p-3.5 space-y-1">
-              <div className="text-[9px] font-bold uppercase tracking-wider text-amber-400">Preview Layout</div>
-              <div className="text-xs text-amber-200 leading-relaxed font-medium bg-black/20 p-2 rounded-lg border border-white/5 whitespace-pre-wrap">
-                {activeItems.slice(0, 3).map((i) => i.text).join('  |  ')}
-                {activeItems.length > 3 && ` ...+${activeItems.length - 3} lagi`}
+              <div className="text-[9px] font-bold uppercase tracking-wider text-amber-400">Preview Bottom Marquee</div>
+              <div className="rounded-lg border border-white/5 bg-black/30 px-3 py-2">
+                <div className="text-[9px] uppercase tracking-[0.24em] text-amber-300/80">Live Feed</div>
+                <div className="mt-1 overflow-hidden whitespace-nowrap text-xs font-medium text-amber-100">
+                  {activeItems.slice(0, 4).map((i) => i.text).join('   |   ')}
+                  {activeItems.length > 4 && `   |   +${activeItems.length - 4} pesan lagi`}
+                </div>
               </div>
             </div>
           )}
@@ -280,8 +303,7 @@ export default function RunningTextPanelClient({
         >
           {/* Synchronize editor state to this form's submission inputs */}
           <input type="hidden" name="profileId" value={profileId} />
-          <input type="hidden" name="rtEnabled" value={enabled ? 'on' : 'off'} />
-          <input type="hidden" name="rtVisibleCount" value={visibleCount} />
+          <input type="hidden" name="rtVisibleCount" value={1} />
           <input type="hidden" name="rtRotationSeconds" value={rotationSeconds} />
           <input type="hidden" name="rtDisplaySeconds" value={displaySeconds} />
           <input type="hidden" name="rtItemsJson" value={JSON.stringify(items)} />
@@ -293,17 +315,27 @@ export default function RunningTextPanelClient({
             </p>
           </div>
 
-          <button
-            type="button"
-            onClick={() => setShowPushConfirm(true)}
-            disabled={!hasTargets}
-            className="w-full rounded-xl border border-emerald-400/20 bg-emerald-500/10 hover:bg-emerald-500/15 py-2.5 text-xs font-bold text-emerald-300 transition-all cursor-pointer select-none disabled:opacity-40 disabled:cursor-not-allowed"
-          >
-            📢 Kirim Live ke Device
-          </button>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <button
+              type="button"
+              onClick={() => setShowPushConfirm(true)}
+              disabled={!hasTargets}
+              className="w-full rounded-xl border border-emerald-400/20 bg-emerald-500/10 hover:bg-emerald-500/15 py-2.5 text-xs font-bold text-emerald-300 transition-all cursor-pointer select-none disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              📢 Kirim Live
+            </button>
+            <button
+              type="button"
+              onClick={() => setShowStopConfirm(true)}
+              disabled={!hasTargets}
+              className="w-full rounded-xl border border-rose-400/20 bg-rose-500/10 hover:bg-rose-500/15 py-2.5 text-xs font-bold text-rose-300 transition-all cursor-pointer select-none disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              ⏹ Stop Broadcast
+            </button>
+          </div>
 
           <p className="text-[10px] text-muted-foreground/60 leading-relaxed bg-accent/10 p-2.5 rounded-lg border border-border">
-            <strong>Catatan UX:</strong> Tombol ini langsung mengirimkan pesan-pesan di atas ke memori device target secara real-time tanpa perlu restart app atau menyimpan konfigurasi terlebih dahulu.
+            <strong>Catatan UX:</strong> Marquee live tampil di bagian paling bawah layar seperti RSS feed. Jika timer diisi, override live akan berhenti otomatis setelah waktunya habis; jika `0`, override bertahan sampai sync config berikutnya.
           </p>
         </form>
       </div>
@@ -356,6 +388,50 @@ export default function RunningTextPanelClient({
                 ) : (
                   'Ya, Kirim Sekarang'
                 )}
+              </button>
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
+
+      {showStopConfirm && typeof window !== 'undefined' && createPortal(
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/78 p-4 backdrop-blur-md animate-fade-in" onClick={() => !isStopPending && setShowStopConfirm(false)}>
+          <div className="w-full max-w-md rounded-[28px] border border-border bg-card p-6 shadow-[0_30px_90px_rgba(0,0,0,0.55)] animate-slide-up" onClick={e => e.stopPropagation()}>
+            <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl border border-rose-500/20 bg-rose-500/10 text-rose-300">
+              <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M5.25 7.5A2.25 2.25 0 017.5 5.25h9a2.25 2.25 0 012.25 2.25v9A2.25 2.25 0 0116.5 18.75h-9a2.25 2.25 0 01-2.25-2.25v-9z" />
+              </svg>
+            </div>
+            <div className="mt-5 space-y-2 text-center">
+              <h3 className="text-lg font-semibold text-foreground">Konfirmasi Stop Live</h3>
+              <p className="text-sm leading-relaxed text-muted-foreground">
+                Marquee live akan dihentikan untuk <strong className="text-foreground">{targetLabel}</strong>.
+              </p>
+            </div>
+
+            {stopError && (
+              <div className="mt-4 rounded-xl border border-rose-500/20 bg-rose-500/10 p-3 text-xs font-semibold text-rose-300">
+                {stopError}
+              </div>
+            )}
+
+            <div className="mt-6 flex flex-col gap-3 sm:flex-row">
+              <button
+                type="button"
+                disabled={isStopPending}
+                onClick={() => setShowStopConfirm(false)}
+                className="btn btn-secondary flex-1 py-2.5"
+              >
+                Batal
+              </button>
+              <button
+                type="button"
+                disabled={isStopPending}
+                onClick={handleStopConfirm}
+                className="flex-1 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-bold py-2.5 text-xs transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+              >
+                {isStopPending ? 'Memproses...' : 'Ya, Stop Sekarang'}
               </button>
             </div>
           </div>

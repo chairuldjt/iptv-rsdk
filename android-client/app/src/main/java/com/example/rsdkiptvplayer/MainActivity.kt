@@ -25,6 +25,7 @@ import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.foundation.focusable
 import com.example.rsdkiptvplayer.theme.RSDKIPTVPlayerTheme
 import com.example.rsdkiptvplayer.ui.channels.ChannelBrowserScreen
+import com.example.rsdkiptvplayer.ui.components.AppRunningTextBanner
 import com.example.rsdkiptvplayer.ui.education.EducationScreen
 import com.example.rsdkiptvplayer.ui.entertainment.EntertainmentScreen
 import com.example.rsdkiptvplayer.ui.home.HomeScreen
@@ -33,6 +34,7 @@ import com.example.rsdkiptvplayer.ui.settings.SettingsScreen
 import com.example.rsdkiptvplayer.ui.splash.SplashScreen
 import com.example.rsdkiptvplayer.data.api.RetrofitClient
 import com.example.rsdkiptvplayer.data.api.UpdateCheckResponse
+import com.example.rsdkiptvplayer.util.HomeExperienceParser
 import com.example.rsdkiptvplayer.util.UpdateManager
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
@@ -84,6 +86,29 @@ class MainActivity : ComponentActivity() {
                     var videoBroadcastSessionKey by remember { mutableIntStateOf(0) }
                     val confirmNoFocusRequester = remember { FocusRequester() }
                     val serverUrl by dataStoreManager.serverUrlFlow.collectAsState(initial = "")
+                    val homeExperienceJson by dataStoreManager.homeExperienceJsonFlow.collectAsState(initial = "")
+                    val runningTextOverrideJson by dataStoreManager.runningTextOverrideJsonFlow.collectAsState(initial = "")
+                    val runningTextOverrideExpiresAt by dataStoreManager.runningTextOverrideExpiresAtFlow.collectAsState(initial = 0L)
+                    val homeExperience = remember(homeExperienceJson) { HomeExperienceParser.parse(homeExperienceJson) }
+                    val isRunningTextOverrideActive = remember(runningTextOverrideJson, runningTextOverrideExpiresAt) {
+                        runningTextOverrideJson.isNotBlank() &&
+                            (runningTextOverrideExpiresAt <= 0L || System.currentTimeMillis() < runningTextOverrideExpiresAt)
+                    }
+                    val effectiveRunningText = remember(homeExperienceJson, runningTextOverrideJson, runningTextOverrideExpiresAt) {
+                        val runtimeOverride = HomeExperienceParser.parseRunningTextJson(runningTextOverrideJson)
+                        if (isRunningTextOverrideActive) runtimeOverride else homeExperience.runningText
+                    }
+
+                    LaunchedEffect(runningTextOverrideJson, runningTextOverrideExpiresAt) {
+                        if (runningTextOverrideJson.isBlank() || runningTextOverrideExpiresAt <= 0L) return@LaunchedEffect
+                        val delayMillis = runningTextOverrideExpiresAt - System.currentTimeMillis()
+                        if (delayMillis <= 0L) {
+                            dataStoreManager.clearRunningTextOverride()
+                            return@LaunchedEffect
+                        }
+                        delay(delayMillis)
+                        dataStoreManager.clearRunningTextOverride()
+                    }
 
                     LaunchedEffect(Unit) {
                         app.repository.remoteCommandFlow.collect { (command, value) ->
@@ -124,14 +149,14 @@ class MainActivity : ComponentActivity() {
                                     if (!value.isNullOrBlank()) {
                                         try {
                                             val newRunningTextObj = org.json.JSONObject(value)
-                                            val currentJson = dataStoreManager.getHomeExperienceJson()
-                                            val root = if (currentJson.isNotBlank()) {
-                                                org.json.JSONObject(currentJson)
+                                            dataStoreManager.setRunningTextOverrideJson(newRunningTextObj.toString())
+                                            val stopAfterSeconds = newRunningTextObj.optInt("displaySeconds", 0).coerceAtLeast(0)
+                                            val expiresAt = if (stopAfterSeconds > 0) {
+                                                System.currentTimeMillis() + (stopAfterSeconds * 1000L)
                                             } else {
-                                                org.json.JSONObject()
+                                                0L
                                             }
-                                            root.put("runningText", newRunningTextObj)
-                                            dataStoreManager.setHomeExperienceJson(root.toString())
+                                            dataStoreManager.setRunningTextOverrideExpiresAt(expiresAt)
                                         } catch (e: Exception) {
                                             e.printStackTrace()
                                         }
@@ -140,89 +165,100 @@ class MainActivity : ComponentActivity() {
                             }
                         }
                     }
+                    Box(modifier = Modifier.fillMaxSize()) {
+                        when (currentScreen) {
+                            "splash" -> {
+                                SplashScreen(
+                                    onSplashComplete = { currentScreen = "home" }
+                                )
+                            }
+                            "home" -> {
+                                BackHandler {
+                                    showExitConfirmDialog = true
+                                }
+                                HomeScreen(
+                                    onNavigateToPlayer = {
+                                        selectedChannelId = -1
+                                        currentScreen = "player"
+                                    },
+                                    onNavigateToEducation = { currentScreen = "education" },
+                                    onNavigateToEntertainment = { currentScreen = "entertainment" },
+                                    onNavigateToSettings = { tabIdx ->
+                                        activeSettingsTab = tabIdx
+                                        currentScreen = "settings"
+                                    }
+                                )
+                            }
+                            "channels" -> {
+                                BackHandler {
+                                    currentScreen = "home"
+                                }
+                                ChannelBrowserScreen(
+                                    onChannelSelected = { channelId ->
+                                        selectedChannelId = channelId
+                                        currentScreen = "player"
+                                    },
+                                    onBack = { currentScreen = "home" },
+                                    onNavigateToSettings = { tabIdx ->
+                                        activeSettingsTab = tabIdx
+                                        currentScreen = "settings"
+                                    }
+                                )
+                            }
+                            "education" -> {
+                                BackHandler {
+                                    currentScreen = "home"
+                                }
+                                EducationScreen(
+                                    onBack = { currentScreen = "home" },
+                                    onOpenSettings = {
+                                        activeSettingsTab = 4
+                                        currentScreen = "settings"
+                                    }
+                                )
+                            }
+                            "entertainment" -> {
+                                BackHandler {
+                                    currentScreen = "home"
+                                }
+                                EntertainmentScreen(
+                                    onBack = { currentScreen = "home" }
+                                )
+                            }
+                            "player" -> {
+                                BackHandler {
+                                    currentScreen = "channels"
+                                }
+                                PlayerScreen(
+                                    initialChannelId = if (selectedChannelId >= 0) selectedChannelId else null,
+                                    onBack = { currentScreen = "channels" },
+                                    onOpenSettings = {
+                                        activeSettingsTab = 0
+                                        currentScreen = "settings"
+                                    }
+                                )
+                            }
+                            "settings" -> {
+                                BackHandler {
+                                    currentScreen = "home"
+                                }
+                                SettingsScreen(
+                                    initialTabIdx = activeSettingsTab,
+                                    onBack = { currentScreen = "home" }
+                                )
+                            }
+                        }
 
-
-
-                    when (currentScreen) {
-                        "splash" -> {
-                            SplashScreen(
-                                onSplashComplete = { currentScreen = "home" }
-                            )
-                        }
-                        "home" -> {
-                            BackHandler {
-                                showExitConfirmDialog = true
+                        if (currentScreen != "splash" && effectiveRunningText.enabled && effectiveRunningText.items.isNotEmpty()) {
+                            Box(
+                                modifier = Modifier
+                                    .align(Alignment.BottomCenter)
+                                    .fillMaxWidth()
+                                    .safeDrawingPadding()
+                                    .padding(horizontal = 14.dp, vertical = 8.dp)
+                            ) {
+                                AppRunningTextBanner(runningText = effectiveRunningText)
                             }
-                            HomeScreen(
-                                onNavigateToPlayer = {
-                                    selectedChannelId = -1
-                                    currentScreen = "player"
-                                },
-                                onNavigateToEducation = { currentScreen = "education" },
-                                onNavigateToEntertainment = { currentScreen = "entertainment" },
-                                onNavigateToSettings = { tabIdx ->
-                                    activeSettingsTab = tabIdx
-                                    currentScreen = "settings"
-                                }
-                            )
-                        }
-                        "channels" -> {
-                            BackHandler {
-                                currentScreen = "home"
-                            }
-                            ChannelBrowserScreen(
-                                onChannelSelected = { channelId ->
-                                    selectedChannelId = channelId
-                                    currentScreen = "player"
-                                },
-                                onBack = { currentScreen = "home" },
-                                onNavigateToSettings = { tabIdx ->
-                                    activeSettingsTab = tabIdx
-                                    currentScreen = "settings"
-                                }
-                            )
-                        }
-                        "education" -> {
-                            BackHandler {
-                                currentScreen = "home"
-                            }
-                            EducationScreen(
-                                onBack = { currentScreen = "home" },
-                                onOpenSettings = {
-                                    activeSettingsTab = 4
-                                    currentScreen = "settings"
-                                }
-                            )
-                        }
-                        "entertainment" -> {
-                            BackHandler {
-                                currentScreen = "home"
-                            }
-                            EntertainmentScreen(
-                                onBack = { currentScreen = "home" }
-                            )
-                        }
-                        "player" -> {
-                            BackHandler {
-                                currentScreen = "channels"
-                            }
-                            PlayerScreen(
-                                initialChannelId = if (selectedChannelId >= 0) selectedChannelId else null,
-                                onBack = { currentScreen = "channels" },
-                                onOpenSettings = {
-                                    activeSettingsTab = 0
-                                    currentScreen = "settings"
-                                }
-                            )
-                        }
-                        "settings" -> {
-                            BackHandler {
-                                currentScreen = "home"
-                            }
-                            SettingsScreen(
-                                initialTabIdx = activeSettingsTab,
-                                onBack = { currentScreen = "home" }
-                            )
                         }
                     }
 

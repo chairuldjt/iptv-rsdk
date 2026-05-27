@@ -243,7 +243,7 @@ function normalizeRunningTextConfig(value: unknown): RunningTextConfig {
     enabled: typeof src.enabled === 'boolean' ? src.enabled : FALLBACK_RUNNING_TEXT_CONFIG.enabled,
     visibleCount: clamp(src.visibleCount, 1, 10, FALLBACK_RUNNING_TEXT_CONFIG.visibleCount),
     rotationSeconds: clamp(src.rotationSeconds, 1, 600, FALLBACK_RUNNING_TEXT_CONFIG.rotationSeconds),
-    displaySeconds: clamp(src.displaySeconds, 1, 600, FALLBACK_RUNNING_TEXT_CONFIG.displaySeconds),
+    displaySeconds: clamp(src.displaySeconds, 0, 600, FALLBACK_RUNNING_TEXT_CONFIG.displaySeconds),
     items: itemsSource
       .filter((item): item is Record<string, unknown> => typeof item === 'object' && item !== null)
       .map((item, idx) => ({
