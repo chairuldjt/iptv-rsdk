@@ -2,7 +2,7 @@ import prisma from '@/lib/db'
 import { getDeviceGroupForDevice } from '@/lib/deviceGroups'
 
 const GLOBAL_HOME_EXPERIENCE_KEY = 'homeExperience.global'
-const HOME_EXPERIENCE_MENU_TYPES = ['tv', 'education', 'entertainment', 'settings', 'info_dialog', 'static_page', 'recommendations', 'favorites', 'search'] as const
+const HOME_EXPERIENCE_MENU_TYPES = ['tv', 'education', 'entertainment', 'settings', 'info_dialog', 'konten', 'recommendations', 'favorites', 'search'] as const
 
 export type HomeExperienceScope = 'global' | 'group' | 'device' | 'profile'
 
@@ -12,7 +12,7 @@ export type HomeExperienceMenuType =
   | 'entertainment'
   | 'settings'
   | 'info_dialog'
-  | 'static_page'
+  | 'konten'
   | 'recommendations'
   | 'favorites'
   | 'search'
@@ -28,7 +28,7 @@ export type HomeExperienceMenuItem = {
   borderColor: string
   accentColor: string
   backgroundUrl: string
-  staticPageId: string
+  entertainmentItemId: number
   sortOrder: number
   isPinned?: boolean
   badge?: {
@@ -36,12 +36,6 @@ export type HomeExperienceMenuItem = {
     color: string
     position: 'top-right' | 'top-left' | 'bottom-right'
   }
-}
-
-export type HomeExperienceStaticPage = {
-  id: string
-  title: string
-  content: string
 }
 
 export type HomeExperienceRunningTextItem = {
@@ -55,7 +49,6 @@ export type HomeExperienceResolvedConfig = {
   logoUrl: string
   homeBackgroundUrl: string
   menus: HomeExperienceMenuItem[]
-  staticPages: HomeExperienceStaticPage[]
   splash: {
     enabled: boolean
     backgroundUrl: string
@@ -85,7 +78,7 @@ export type HomeExperienceMenuPatch = {
   borderColor?: string
   accentColor?: string
   backgroundUrl?: string
-  staticPageId?: string
+  entertainmentItemId?: number
   sortOrder?: number
   isPinned?: boolean
   badge?: {
@@ -95,18 +88,11 @@ export type HomeExperienceMenuPatch = {
   }
 }
 
-export type HomeExperienceStaticPagePatch = {
-  id: string
-  title?: string
-  content?: string
-}
-
 export type HomeExperiencePatch = {
   revision?: number
   logoUrl?: string
   homeBackgroundUrl?: string
   menus?: HomeExperienceMenuPatch[]
-  staticPages?: HomeExperienceStaticPagePatch[]
   splash?: Partial<HomeExperienceResolvedConfig['splash']>
   sounds?: Partial<HomeExperienceResolvedConfig['sounds']>
 }
@@ -129,36 +115,8 @@ export const FALLBACK_HOME_EXPERIENCE_CONFIG: HomeExperienceResolvedConfig = {
       borderColor: '#FFE9A6',
       accentColor: '#FFE9A6',
       backgroundUrl: '',
-      staticPageId: '',
+      entertainmentItemId: 0,
       sortOrder: 10,
-    },
-    {
-      id: 'recommendations',
-      enabled: true,
-      type: 'recommendations',
-      title: 'REKOMENDASI',
-      subtitle: 'Konten Pilihan',
-      icon: 'star',
-      textColor: '#FFFFFF',
-      borderColor: '#FFD700',
-      accentColor: '#FFD700',
-      backgroundUrl: '',
-      staticPageId: '',
-      sortOrder: 15,
-    },
-    {
-      id: 'favorites',
-      enabled: true,
-      type: 'favorites',
-      title: 'FAVORIT',
-      subtitle: 'Konten Tersimpan',
-      icon: 'bookmark',
-      textColor: '#FFFFFF',
-      borderColor: '#EF4444',
-      accentColor: '#EF4444',
-      backgroundUrl: '',
-      staticPageId: '',
-      sortOrder: 20,
     },
     {
       id: 'education',
@@ -171,7 +129,7 @@ export const FALLBACK_HOME_EXPERIENCE_CONFIG: HomeExperienceResolvedConfig = {
       borderColor: '#86EFAC',
       accentColor: '#86EFAC',
       backgroundUrl: '',
-      staticPageId: '',
+      entertainmentItemId: 0,
       sortOrder: 30,
     },
     {
@@ -185,22 +143,8 @@ export const FALLBACK_HOME_EXPERIENCE_CONFIG: HomeExperienceResolvedConfig = {
       borderColor: '#FF9A76',
       accentColor: '#FF9A76',
       backgroundUrl: '',
-      staticPageId: '',
+      entertainmentItemId: 0,
       sortOrder: 40,
-    },
-    {
-      id: 'search',
-      enabled: true,
-      type: 'search',
-      title: 'PENCARIAN',
-      subtitle: 'Cari Konten',
-      icon: 'search',
-      textColor: '#FFFFFF',
-      borderColor: '#3B82F6',
-      accentColor: '#3B82F6',
-      backgroundUrl: '',
-      staticPageId: '',
-      sortOrder: 45,
     },
     {
       id: 'info',
@@ -213,7 +157,7 @@ export const FALLBACK_HOME_EXPERIENCE_CONFIG: HomeExperienceResolvedConfig = {
       borderColor: '#C084FC',
       accentColor: '#C084FC',
       backgroundUrl: '',
-      staticPageId: '',
+      entertainmentItemId: 0,
       sortOrder: 50,
     },
     {
@@ -227,15 +171,8 @@ export const FALLBACK_HOME_EXPERIENCE_CONFIG: HomeExperienceResolvedConfig = {
       borderColor: '#7DD3FC',
       accentColor: '#7DD3FC',
       backgroundUrl: '',
-      staticPageId: '',
+      entertainmentItemId: 0,
       sortOrder: 60,
-    },
-  ],
-  staticPages: [
-    {
-      id: 'welcome',
-      title: 'Informasi',
-      content: 'Selamat datang di IPTV RSDK. Halaman ini dapat diatur dari Web Admin.',
     },
   ],
   splash: {
@@ -297,9 +234,16 @@ export async function clearScopedHomeExperience(scope: HomeExperienceScope, id?:
 
 export async function resolveEffectiveHomeExperience(deviceId: string): Promise<HomeExperienceResolvedConfig> {
   const globalProfileId = await getGlobalProfileId()
-  const globalPatch = globalProfileId
-    ? ((await getHomeExperienceProfilePatch(globalProfileId)) ?? await getGlobalHomeExperiencePatch())
-    : await getGlobalHomeExperiencePatch()
+  let globalPatch: HomeExperiencePatch | null
+  if (globalProfileId) {
+    // A global profile is explicitly assigned. Use only its patch — if the
+    // profile record is missing or empty, fall through to the default build
+    // instead of silently picking up the raw `homeExperience.global` patch.
+    globalPatch = await getHomeExperienceProfilePatch(globalProfileId)
+  } else {
+    globalPatch = await getGlobalHomeExperiencePatch()
+  }
+  if (isHomeExperiencePatchEmpty(globalPatch)) globalPatch = null
 
   const groupId = await getDeviceGroupForDevice(deviceId)
   let groupPatch: HomeExperiencePatch | null = null
@@ -309,21 +253,52 @@ export async function resolveEffectiveHomeExperience(deviceId: string): Promise<
     groupPatch = groupProfileId
       ? await getHomeExperienceProfilePatch(groupProfileId)
       : await getGroupHomeExperiencePatch(groupId)
+    if (isHomeExperiencePatchEmpty(groupPatch)) groupPatch = null
   }
 
   const deviceProfileMap = await getDeviceProfileMap()
   const deviceProfileId = deviceProfileMap[deviceId]
-  const devicePatch = deviceProfileId
+  let devicePatch: HomeExperiencePatch | null = deviceProfileId
     ? await getHomeExperienceProfilePatch(deviceProfileId)
     : await getDeviceHomeExperiencePatch(deviceId)
+  if (isHomeExperiencePatchEmpty(devicePatch)) devicePatch = null
 
-  return applyHomeExperiencePatch(
+  const merged = applyHomeExperiencePatch(
     applyHomeExperiencePatch(
       applyHomeExperiencePatch(FALLBACK_HOME_EXPERIENCE_CONFIG, globalPatch),
       groupPatch
     ),
     devicePatch
   )
+
+  // Final safety net: if every patch in the chain resolves to a home with no
+  // visible content (e.g. all menus disabled), serve the pristine default build
+  // so the device is never stranded with a blank UI.
+  if (isHomeExperienceConfigEmpty(merged)) {
+    return FALLBACK_HOME_EXPERIENCE_CONFIG
+  }
+
+  return merged
+}
+
+/**
+ * A patch is considered empty when there is nothing meaningful to merge on top
+ * of the fallback. Patches stored in AppSetting are already compacted on read
+ * (see `compactHomeExperiencePatch`), so a key-less object means the profile
+ * matches the default build exactly.
+ */
+export function isHomeExperiencePatchEmpty(patch: HomeExperiencePatch | null | undefined): boolean {
+  if (!patch) return true
+  return Object.keys(patch).length === 0
+}
+
+/**
+ * A resolved config is "empty" when no menu would render — typically because
+ * an admin disabled every menu in a profile. In that case we treat the profile
+ * as inactive and the device should fall back to the default build.
+ */
+export function isHomeExperienceConfigEmpty(config: HomeExperienceResolvedConfig): boolean {
+  return !config.menus.some((menu) => menu.enabled)
 }
 
 export function homeExperienceFromFormData(formData: FormData): HomeExperienceResolvedConfig {
@@ -332,7 +307,6 @@ export function homeExperienceFromFormData(formData: FormData): HomeExperienceRe
     logoUrl: formData.get('logoUrl'),
     homeBackgroundUrl: formData.get('homeBackgroundUrl'),
     menus: parseJsonArray(formData.get('menusJson'), FALLBACK_HOME_EXPERIENCE_CONFIG.menus),
-    staticPages: parseJsonArray(formData.get('staticPagesJson'), FALLBACK_HOME_EXPERIENCE_CONFIG.staticPages),
     splash: {
       enabled: formData.get('splashEnabled') === 'on',
       backgroundUrl: formData.get('splashBackgroundUrl'),
@@ -360,7 +334,6 @@ export function normalizeHomeExperienceConfig(value: unknown): HomeExperienceRes
     logoUrl: safeString(source.logoUrl, ''),
     homeBackgroundUrl: safeString(source.homeBackgroundUrl, ''),
     menus: normalizeMenus(source.menus),
-    staticPages: normalizeStaticPages(source.staticPages),
     splash: normalizeSplash(source.splash),
     sounds: normalizeSounds(source.sounds),
   }
@@ -374,7 +347,6 @@ export function normalizeHomeExperiencePatch(value: unknown): HomeExperiencePatc
   if (hasOwn(source, 'logoUrl')) patch.logoUrl = safeString(source.logoUrl, '')
   if (hasOwn(source, 'homeBackgroundUrl')) patch.homeBackgroundUrl = safeString(source.homeBackgroundUrl, '')
   if (hasOwn(source, 'menus')) patch.menus = normalizeMenuPatches(source.menus)
-  if (hasOwn(source, 'staticPages')) patch.staticPages = normalizeStaticPagePatches(source.staticPages)
   if (hasOwn(source, 'splash')) patch.splash = normalizeSplashPatch(source.splash)
   if (hasOwn(source, 'sounds')) patch.sounds = normalizeSoundsPatch(source.sounds)
 
@@ -401,7 +373,6 @@ export function applyHomeExperiencePatch(
       ...(patch.sounds ?? {}),
     },
     menus: mergeMenuPatches(base.menus, patch.menus),
-    staticPages: mergeStaticPagePatches(base.staticPages, patch.staticPages),
   })
 }
 
@@ -658,22 +629,10 @@ function normalizeMenus(value: unknown): HomeExperienceMenuItem[] {
       borderColor: normalizeHexColor(entry.borderColor, '#FFFFFF'),
       accentColor: normalizeHexColor(entry.accentColor, '#FFFFFF'),
       backgroundUrl: safeString(entry.backgroundUrl, ''),
-      staticPageId: safeString(entry.staticPageId, ''),
+      entertainmentItemId: clampInt(entry.entertainmentItemId, 0, 1_000_000, 0),
       sortOrder: clampInt(entry.sortOrder, 0, 9999, index * 10),
     }))
     .sort((a, b) => a.sortOrder - b.sortOrder)
-}
-
-function normalizeStaticPages(value: unknown): HomeExperienceStaticPage[] {
-  const source = Array.isArray(value) ? value : FALLBACK_HOME_EXPERIENCE_CONFIG.staticPages
-
-  return source
-    .filter((entry): entry is Record<string, unknown> => isRecord(entry))
-    .map((entry, index) => ({
-      id: safeString(entry.id, `page_${index}`),
-      title: safeString(entry.title, `Halaman ${index + 1}`),
-      content: safeString(entry.content, ''),
-    }))
 }
 
 function normalizeSplash(value: unknown): HomeExperienceResolvedConfig['splash'] {
@@ -741,22 +700,8 @@ function normalizeMenuPatches(value: unknown): HomeExperienceMenuPatch[] {
       if (hasOwn(entry, 'borderColor')) patch.borderColor = normalizeHexColor(entry.borderColor, '#FFFFFF')
       if (hasOwn(entry, 'accentColor')) patch.accentColor = normalizeHexColor(entry.accentColor, '#FFFFFF')
       if (hasOwn(entry, 'backgroundUrl')) patch.backgroundUrl = safeString(entry.backgroundUrl, '')
-      if (hasOwn(entry, 'staticPageId')) patch.staticPageId = safeString(entry.staticPageId, '')
+      if (hasOwn(entry, 'entertainmentItemId')) patch.entertainmentItemId = clampInt(entry.entertainmentItemId, 0, 1_000_000, 0)
       if (hasOwn(entry, 'sortOrder')) patch.sortOrder = clampInt(entry.sortOrder, 0, 9999, index * 10)
-      return patch
-    })
-}
-
-function normalizeStaticPagePatches(value: unknown): HomeExperienceStaticPagePatch[] {
-  const source = Array.isArray(value) ? value : []
-  return source
-    .filter((entry): entry is Record<string, unknown> => isRecord(entry))
-    .map((entry, index) => {
-      const patch: HomeExperienceStaticPagePatch = {
-        id: safeString(entry.id, `page_${index}`),
-      }
-      if (hasOwn(entry, 'title')) patch.title = safeString(entry.title, `Halaman ${index + 1}`)
-      if (hasOwn(entry, 'content')) patch.content = safeString(entry.content, '')
       return patch
     })
 }
@@ -775,20 +720,6 @@ function mergeMenuPatches(baseMenus: HomeExperienceMenuItem[], patches?: HomeExp
   return Array.from(baseMap.values()).sort((a, b) => a.sortOrder - b.sortOrder)
 }
 
-function mergeStaticPagePatches(basePages: HomeExperienceStaticPage[], patches?: HomeExperienceStaticPagePatch[]): HomeExperienceStaticPage[] {
-  if (!patches || patches.length === 0) return basePages
-
-  const baseMap = new Map(basePages.map((page) => [page.id, page]))
-  for (const patch of patches) {
-    const existing = baseMap.get(patch.id)
-    const fallback = FALLBACK_HOME_EXPERIENCE_CONFIG.staticPages.find((page) => page.id === patch.id)
-    const seed = existing ?? fallback ?? { id: patch.id, title: patch.id, content: '' }
-    const merged = normalizeStaticPages([{ ...seed, ...patch }])[0]
-    if (merged) baseMap.set(patch.id, merged)
-  }
-  return Array.from(baseMap.values())
-}
-
 function compactHomeExperiencePatch(patch: HomeExperiencePatch): HomeExperiencePatch {
   const compacted: HomeExperiencePatch = {}
 
@@ -800,9 +731,6 @@ function compactHomeExperiencePatch(patch: HomeExperiencePatch): HomeExperienceP
 
   const compactMenus = compactMenuPatches(patch.menus)
   if (compactMenus.length > 0) compacted.menus = compactMenus
-
-  const compactPages = compactStaticPagePatches(patch.staticPages)
-  if (compactPages.length > 0) compacted.staticPages = compactPages
 
   const compactSplash = compactObjectPatch(patch.splash, FALLBACK_HOME_EXPERIENCE_CONFIG.splash)
   if (Object.keys(compactSplash).length > 0) compacted.splash = compactSplash
@@ -829,23 +757,8 @@ function compactMenuPatches(patches?: HomeExperienceMenuPatch[]): HomeExperience
       if (patch.borderColor !== undefined && patch.borderColor !== fallback.borderColor) compact.borderColor = patch.borderColor
       if (patch.accentColor !== undefined && patch.accentColor !== fallback.accentColor) compact.accentColor = patch.accentColor
       if (patch.backgroundUrl !== undefined && patch.backgroundUrl !== fallback.backgroundUrl) compact.backgroundUrl = patch.backgroundUrl
-      if (patch.staticPageId !== undefined && patch.staticPageId !== fallback.staticPageId) compact.staticPageId = patch.staticPageId
+      if (patch.entertainmentItemId !== undefined && patch.entertainmentItemId !== fallback.entertainmentItemId) compact.entertainmentItemId = patch.entertainmentItemId
       if (patch.sortOrder !== undefined && patch.sortOrder !== fallback.sortOrder) compact.sortOrder = patch.sortOrder
-      return compact
-    })
-    .filter((patch) => Object.keys(patch).length > 1)
-}
-
-function compactStaticPagePatches(patches?: HomeExperienceStaticPagePatch[]): HomeExperienceStaticPagePatch[] {
-  if (!patches) return []
-
-  return patches
-    .map((patch, index) => {
-      const fallback = FALLBACK_HOME_EXPERIENCE_CONFIG.staticPages.find((page) => page.id === patch.id)
-        ?? { id: patch.id, title: `Halaman ${index + 1}`, content: '' }
-      const compact: HomeExperienceStaticPagePatch = { id: patch.id }
-      if (patch.title !== undefined && patch.title !== fallback.title) compact.title = patch.title
-      if (patch.content !== undefined && patch.content !== fallback.content) compact.content = patch.content
       return compact
     })
     .filter((patch) => Object.keys(patch).length > 1)
@@ -872,7 +785,7 @@ function createDefaultMenu(id: string, index: number): HomeExperienceMenuItem {
     borderColor: '#FFFFFF',
     accentColor: '#FFFFFF',
     backgroundUrl: '',
-    staticPageId: '',
+    entertainmentItemId: 0,
     sortOrder: index * 10,
   }
 }
@@ -918,4 +831,48 @@ function clampInt(value: unknown, min: number, max: number, fallback: number): n
 
 function oneOf<T extends string>(value: unknown, allowed: readonly T[], fallback: T): T {
   return typeof value === 'string' && allowed.includes(value as T) ? (value as T) : fallback
+}
+
+/**
+ * Rewrite every relative `/uploads/...` URL inside a resolved home experience
+ * config to an absolute URL using the supplied public origin. The Android STB
+ * client passes the URL straight to Coil's `AsyncImage`, which silently fails
+ * on path-only inputs and leaves the surface blank — see the bug report where
+ * a uploaded TV menu background rendered as a white screen on the device.
+ *
+ * Server-side absolutisation also covers splash background, splash logo,
+ * splash sound, home background, and the selection sound URL with no extra
+ * client work.
+ */
+export function absolutizeHomeExperienceUrls(
+  config: HomeExperienceResolvedConfig,
+  origin: string
+): HomeExperienceResolvedConfig {
+  const trimmedOrigin = (origin || '').replace(/\/$/, '')
+  if (!trimmedOrigin) return config
+
+  const rewrite = (value: string): string => {
+    if (!value) return value
+    return value.startsWith('/') ? `${trimmedOrigin}${value}` : value
+  }
+
+  return {
+    ...config,
+    logoUrl: rewrite(config.logoUrl),
+    homeBackgroundUrl: rewrite(config.homeBackgroundUrl),
+    menus: config.menus.map((menu) => ({
+      ...menu,
+      backgroundUrl: rewrite(menu.backgroundUrl),
+    })),
+    splash: {
+      ...config.splash,
+      backgroundUrl: rewrite(config.splash.backgroundUrl),
+      logoUrl: rewrite(config.splash.logoUrl),
+      soundUrl: rewrite(config.splash.soundUrl),
+    },
+    sounds: {
+      ...config.sounds,
+      selectionSoundUrl: rewrite(config.sounds.selectionSoundUrl),
+    },
+  }
 }

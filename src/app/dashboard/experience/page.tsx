@@ -24,7 +24,8 @@ import {
   type HomeExperienceResolvedConfig,
   type HomeExperienceProfile,
 } from '@/lib/homeExperience'
-import { saveHomeExperienceAsset } from '@/lib/uploadedAssets'
+import { saveHomeExperienceAudio, saveHomeExperienceImage } from '@/lib/uploadedAssets'
+import type { ImageAssetKind } from '@/lib/assetValidation'
 import { getDeviceGroupAssignments, getDeviceGroups, type DeviceGroup } from '@/lib/deviceGroups'
 
 export const revalidate = 0
@@ -46,18 +47,33 @@ async function saveProfileConfigAction(formData: FormData) {
   if (!profileId) return
   const config = homeExperienceFromFormData(formData)
 
-  config.logoUrl = await resolveAsset(formData, 'logoFile', 'logo', config.logoUrl)
-  config.homeBackgroundUrl = await resolveAsset(formData, 'homeBackgroundFile', 'home-bg', config.homeBackgroundUrl)
-  config.splash.backgroundUrl = await resolveAsset(formData, 'splashBackgroundFile', 'splash-bg', config.splash.backgroundUrl)
-  config.splash.logoUrl = await resolveAsset(formData, 'splashLogoFile', 'splash-logo', config.splash.logoUrl)
-  config.splash.soundUrl = await resolveAsset(formData, 'splashSoundFile', 'splash-sound', config.splash.soundUrl)
-  config.sounds.selectionSoundUrl = await resolveAsset(formData, 'selectionSoundFile', 'selection-sound', config.sounds.selectionSoundUrl)
-  config.menus = await Promise.all(
-    config.menus.map(async (menu) => ({
-      ...menu,
-      backgroundUrl: await resolveAsset(formData, `menuBackgroundFile__${menu.id}`, `menu-bg-${menu.id}`, menu.backgroundUrl),
-    }))
-  )
+  try {
+    config.logoUrl = await resolveImageAsset(formData, 'logoFile', 'logo', 'logo', config.logoUrl)
+    config.homeBackgroundUrl = await resolveImageAsset(formData, 'homeBackgroundFile', 'home-bg', 'background', config.homeBackgroundUrl)
+    config.splash.backgroundUrl = await resolveImageAsset(formData, 'splashBackgroundFile', 'splash-bg', 'background', config.splash.backgroundUrl)
+    config.splash.logoUrl = await resolveImageAsset(formData, 'splashLogoFile', 'splash-logo', 'logo', config.splash.logoUrl)
+    config.splash.soundUrl = await resolveAudioAsset(formData, 'splashSoundFile', 'splash-sound', config.splash.soundUrl)
+    config.sounds.selectionSoundUrl = await resolveAudioAsset(formData, 'selectionSoundFile', 'selection-sound', config.sounds.selectionSoundUrl)
+    config.menus = await Promise.all(
+      config.menus.map(async (menu) => ({
+        ...menu,
+        backgroundUrl: await resolveImageAsset(
+          formData,
+          `menuBackgroundFile__${menu.id}`,
+          `menu-bg-${menu.id}`,
+          'background',
+          menu.backgroundUrl
+        ),
+      }))
+    )
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Upload gagal divalidasi.'
+    revalidatePath('/dashboard/experience')
+    redirect(
+      `/dashboard/experience?edit=${encodeURIComponent(profileId)}&uploadError=${encodeURIComponent(message)}`
+    )
+  }
+
   await saveHomeExperienceProfileConfig(profileId, config)
   revalidatePath('/dashboard/experience')
   redirect(`/dashboard/experience?edit=${encodeURIComponent(profileId)}&saved=1`)
@@ -127,6 +143,7 @@ export default async function ExperiencePage({
     deleted?: string
     globalSet?: string
     ok?: string
+    uploadError?: string
   }>
 }) {
   const sp = await searchParams
@@ -151,6 +168,10 @@ export default async function ExperiencePage({
     const profile = profiles.find((p) => p.id === editProfileId)
     if (!profile) redirect('/dashboard/experience')
     const config = (await getHomeExperienceProfileConfig(editProfileId)) ?? FALLBACK_HOME_EXPERIENCE_CONFIG
+    const entertainmentItems = await prisma.entertainmentItem.findMany({
+      orderBy: [{ sortOrder: 'asc' }, { title: 'asc' }],
+      select: { id: true, title: true, subtitle: true, isActive: true },
+    })
     const previewContexts = await buildEffectivePreviewContexts({
       profileId: editProfileId,
       profileName: profile.name,
@@ -189,11 +210,20 @@ export default async function ExperiencePage({
           </div>
         )}
 
+        {sp.uploadError && (
+          <div className="p-3.5 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-400 text-xs font-semibold">
+            <div className="font-bold mb-1">Upload ditolak</div>
+            <div className="font-normal">{sp.uploadError}</div>
+            <div className="mt-2 font-normal text-rose-300/80">Konfig lain tidak ikut tersimpan. Perbaiki file lalu submit ulang.</div>
+          </div>
+        )}
+
         <HomeExperienceForm
           scope="profile"
           targetId={editProfileId}
           config={config}
           currentScopeLabel={`Config Profile: ${profile.name}`}
+          entertainmentItems={entertainmentItems}
           onSaveAction={saveProfileConfigAction}
           onResetAction={resetProfileConfigAction}
         />
@@ -618,7 +648,7 @@ type EffectivePreviewContext = {
   title: string
   description: string
   config: HomeExperienceResolvedConfig
-  fieldSources: Record<'logoUrl' | 'homeBackgroundUrl' | 'menus' | 'staticPages' | 'splash' | 'sounds', PreviewSourceLabel>
+  fieldSources: Record<'logoUrl' | 'homeBackgroundUrl' | 'menus' | 'splash' | 'sounds', PreviewSourceLabel>
 }
 
 async function buildEffectivePreviewContexts(input: {
@@ -745,7 +775,6 @@ function buildFieldSourceMap(
     logoUrl: resolvePatchSource(layers, 'logoUrl'),
     homeBackgroundUrl: resolvePatchSource(layers, 'homeBackgroundUrl'),
     menus: resolvePatchSource(layers, 'menus'),
-    staticPages: resolvePatchSource(layers, 'staticPages'),
     splash: resolvePatchSource(layers, 'splash'),
     sounds: resolvePatchSource(layers, 'sounds'),
   }
@@ -787,7 +816,6 @@ function EffectivePreviewSection({ contexts }: { contexts: EffectivePreviewConte
                 <SourceBadge label="Logo" source={context.fieldSources.logoUrl} />
                 <SourceBadge label="Background" source={context.fieldSources.homeBackgroundUrl} />
                 <SourceBadge label="Menus" source={context.fieldSources.menus} />
-                <SourceBadge label="Pages" source={context.fieldSources.staticPages} />
                 <SourceBadge label="Splash" source={context.fieldSources.splash} />
                 <SourceBadge label="Sounds" source={context.fieldSources.sounds} />
               </div>
@@ -830,13 +858,29 @@ function SourceBadge({ label, source }: { label: string; source: PreviewSourceLa
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-async function resolveAsset(
+async function resolveImageAsset(
+  formData: FormData,
+  fieldName: string,
+  prefix: string,
+  kind: ImageAssetKind,
+  fallbackUrl: string
+): Promise<string> {
+  const file = formData.get(fieldName)
+  if (file instanceof File && file.size > 0) {
+    return saveHomeExperienceImage(file, prefix, kind)
+  }
+  return fallbackUrl
+}
+
+async function resolveAudioAsset(
   formData: FormData,
   fieldName: string,
   prefix: string,
   fallbackUrl: string
 ): Promise<string> {
   const file = formData.get(fieldName)
-  if (file instanceof File && file.size > 0) return saveHomeExperienceAsset(file, prefix)
+  if (file instanceof File && file.size > 0) {
+    return saveHomeExperienceAudio(file, prefix)
+  }
   return fallbackUrl
 }

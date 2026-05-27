@@ -6,14 +6,21 @@ import type {
   HomeExperienceConfig,
   HomeExperienceMenuItem,
   HomeExperienceScope,
-  HomeExperienceStaticPage,
 } from '@/lib/homeExperience'
+
+export type EntertainmentItemOption = {
+  id: number
+  title: string
+  subtitle: string | null
+  isActive: boolean
+}
 
 type HomeExperienceFormProps = {
   scope: HomeExperienceScope
   targetId: string
   config: HomeExperienceConfig
   currentScopeLabel: string
+  entertainmentItems: EntertainmentItemOption[]
   onSaveAction: (formData: FormData) => void | Promise<void>
   onResetAction: (formData: FormData) => void | Promise<void>
 }
@@ -24,7 +31,7 @@ const MENU_TYPE_OPTIONS = [
   { value: 'entertainment', label: 'Entertainment' },
   { value: 'settings', label: 'Settings' },
   { value: 'info_dialog', label: 'Info Dialog' },
-  { value: 'static_page', label: 'Static Page' },
+  { value: 'konten', label: 'Konten' },
   { value: 'recommendations', label: 'Recommendations' },
   { value: 'favorites', label: 'Favorites' },
   { value: 'search', label: 'Search' },
@@ -32,16 +39,25 @@ const MENU_TYPE_OPTIONS = [
 
 const ICON_OPTIONS = ['live_tv', 'menu_book', 'movie', 'settings', 'info', 'room_service', 'star', 'bookmark', 'search']
 
+// Mirrors src/lib/assetValidation.ts — kept here for accept attributes & UI hints.
+const IMAGE_ACCEPT = 'image/png,image/jpeg,image/webp,image/gif,image/avif,image/heic,image/heif,image/svg+xml'
+const IMAGE_ACCEPT_NO_SVG = 'image/png,image/jpeg,image/webp,image/gif,image/avif,image/heic,image/heif'
+const AUDIO_ACCEPT = 'audio/mpeg,audio/mp3,audio/ogg,audio/wav'
+
+const LOGO_HINT = 'PNG/JPEG/WebP/GIF/AVIF/HEIC/SVG • min 128×128 • max 1 MB • dikonversi ke PNG'
+const BACKGROUND_HINT = 'PNG/JPEG/WebP/GIF/AVIF/HEIC • min 320×180 • max 4 MB • dikonversi ke WebP'
+const AUDIO_HINT = 'MP3/OGG/WAV • max 1 MB'
+
 export default function HomeExperienceForm({
   scope,
   targetId,
   config,
   currentScopeLabel,
+  entertainmentItems,
   onSaveAction,
   onResetAction,
 }: HomeExperienceFormProps) {
   const [menus, setMenus] = useState<HomeExperienceMenuItem[]>(config.menus)
-  const [staticPages, setStaticPages] = useState<HomeExperienceStaticPage[]>(config.staticPages)
   const [logoUrl, setLogoUrl] = useState(config.logoUrl)
   const [homeBackgroundUrl, setHomeBackgroundUrl] = useState(config.homeBackgroundUrl)
   const [splashEnabled, setSplashEnabled] = useState(config.splash.enabled)
@@ -59,27 +75,24 @@ export default function HomeExperienceForm({
   const [expandedSections, setExpandedSections] = useState<Record<string, Record<string, boolean>>>({})
   const [enabledSections, setEnabledSections] = useState<Record<string, Record<string, boolean>>>({})
 
-  // Top-level section state (for main sections like Branding, Splash, etc.)
-  const [topLevelEnabled, setTopLevelEnabled] = useState<Record<string, boolean>>({
-    branding: true,
-    splash: true,
-    homeMenu: true,
-    staticPages: true,
-    sound: true,
-    livePreview: true,
-  })
+  // Top-level section expand/collapse state. Sections are always "enabled" —
+  // their values are part of the saved config (splash.enabled is the dedicated
+  // toggle for splash). Persisting a UI-only "section disabled" flag caused
+  // the previous bug where state reset on remount after save.
   const [topLevelExpanded, setTopLevelExpanded] = useState<Record<string, boolean>>({
     branding: false,
     splash: false,
     homeMenu: false,
-    staticPages: false,
     sound: false,
     livePreview: false,
   })
 
-  const staticPageOptions = useMemo(
-    () => staticPages.map((page) => ({ id: page.id, title: page.title || page.id })),
-    [staticPages]
+  const entertainmentItemOptions = useMemo(
+    () => entertainmentItems.map((item) => ({
+      id: item.id,
+      label: item.title + (item.subtitle ? ` — ${item.subtitle}` : '') + (item.isActive ? '' : ' (nonaktif)'),
+    })),
+    [entertainmentItems]
   )
 
   const isExpanded = (menuId: string, section: string) => {
@@ -141,30 +154,35 @@ export default function HomeExperienceForm({
         <input type="hidden" name="targetId" value={targetId} />
         <input type="hidden" name="revision" value={String(config.revision + 1)} />
         <input type="hidden" name="menusJson" value={JSON.stringify(menus)} />
-        <input type="hidden" name="staticPagesJson" value={JSON.stringify(staticPages)} />
 
         <CollapsibleSection
           id="branding"
           title="Branding & Background"
           description="Mengatur logo utama, background home default, dan asset splash."
-          enabled={topLevelEnabled.branding}
           expanded={topLevelExpanded.branding}
-          onToggleEnabled={(enabled) => setTopLevelEnabled(prev => ({ ...prev, branding: enabled }))}
           onToggleExpanded={(expanded) => setTopLevelExpanded(prev => ({ ...prev, branding: expanded }))}
         >
           <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-            <Field label="Logo URL">
-              <input type="url" name="logoUrl" value={logoUrl} onChange={(e) => setLogoUrl(e.target.value)} className="field-input font-mono" placeholder="https://..." />
-            </Field>
-            <Field label="Upload Logo">
-              <input type="file" name="logoFile" accept="image/*" className="field-input py-2" />
-            </Field>
-            <Field label="Home Background URL">
-              <input type="url" name="homeBackgroundUrl" value={homeBackgroundUrl} onChange={(e) => setHomeBackgroundUrl(e.target.value)} className="field-input font-mono" placeholder="https://..." />
-            </Field>
-            <Field label="Upload Home Background">
-              <input type="file" name="homeBackgroundFile" accept="image/*" className="field-input py-2" />
-            </Field>
+            <input type="hidden" name="logoUrl" value={logoUrl} />
+            <AssetUpload
+              label="Logo Aplikasi"
+              fileFieldName="logoFile"
+              currentUrl={logoUrl}
+              onClear={() => setLogoUrl('')}
+              accept={IMAGE_ACCEPT}
+              hint={LOGO_HINT}
+              kind="image"
+            />
+            <input type="hidden" name="homeBackgroundUrl" value={homeBackgroundUrl} />
+            <AssetUpload
+              label="Home Background"
+              fileFieldName="homeBackgroundFile"
+              currentUrl={homeBackgroundUrl}
+              onClear={() => setHomeBackgroundUrl('')}
+              accept={IMAGE_ACCEPT_NO_SVG}
+              hint={BACKGROUND_HINT}
+              kind="image"
+            />
           </div>
         </CollapsibleSection>
 
@@ -172,32 +190,42 @@ export default function HomeExperienceForm({
           id="splash"
           title="Splash Screen"
           description="Asset dan teks splash yang ditampilkan saat startup aplikasi."
-          enabled={topLevelEnabled.splash}
           expanded={topLevelExpanded.splash}
-          onToggleEnabled={(enabled) => setTopLevelEnabled(prev => ({ ...prev, splash: enabled }))}
           onToggleExpanded={(expanded) => setTopLevelExpanded(prev => ({ ...prev, splash: expanded }))}
         >
           <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
             <Toggle name="splashEnabled" checked={splashEnabled} onChange={setSplashEnabled} title="Enable Splash Profile" description="Jika aktif, splash akan mengikuti profile ini." />
             <Toggle name="splashShowSound" checked={splashShowSound} onChange={setSplashShowSound} title="Play Splash Sound" description="Mengontrol bunyi splash saat startup." />
-            <Field label="Splash Background URL">
-              <input type="url" name="splashBackgroundUrl" value={splashBackgroundUrl} onChange={(e) => setSplashBackgroundUrl(e.target.value)} className="field-input font-mono" placeholder="https://..." />
-            </Field>
-            <Field label="Upload Splash Background">
-              <input type="file" name="splashBackgroundFile" accept="image/*" className="field-input py-2" />
-            </Field>
-            <Field label="Splash Logo URL">
-              <input type="url" name="splashLogoUrl" value={splashLogoUrl} onChange={(e) => setSplashLogoUrl(e.target.value)} className="field-input font-mono" placeholder="https://..." />
-            </Field>
-            <Field label="Upload Splash Logo">
-              <input type="file" name="splashLogoFile" accept="image/*" className="field-input py-2" />
-            </Field>
-            <Field label="Splash Sound URL">
-              <input type="url" name="splashSoundUrl" value={splashSoundUrl} onChange={(e) => setSplashSoundUrl(e.target.value)} className="field-input font-mono" placeholder="https://..." />
-            </Field>
-            <Field label="Upload Splash Sound">
-              <input type="file" name="splashSoundFile" accept="audio/*" className="field-input py-2" />
-            </Field>
+            <input type="hidden" name="splashBackgroundUrl" value={splashBackgroundUrl} />
+            <AssetUpload
+              label="Splash Background"
+              fileFieldName="splashBackgroundFile"
+              currentUrl={splashBackgroundUrl}
+              onClear={() => setSplashBackgroundUrl('')}
+              accept={IMAGE_ACCEPT_NO_SVG}
+              hint={BACKGROUND_HINT}
+              kind="image"
+            />
+            <input type="hidden" name="splashLogoUrl" value={splashLogoUrl} />
+            <AssetUpload
+              label="Splash Logo"
+              fileFieldName="splashLogoFile"
+              currentUrl={splashLogoUrl}
+              onClear={() => setSplashLogoUrl('')}
+              accept={IMAGE_ACCEPT}
+              hint={LOGO_HINT}
+              kind="image"
+            />
+            <input type="hidden" name="splashSoundUrl" value={splashSoundUrl} />
+            <AssetUpload
+              label="Splash Sound"
+              fileFieldName="splashSoundFile"
+              currentUrl={splashSoundUrl}
+              onClear={() => setSplashSoundUrl('')}
+              accept={AUDIO_ACCEPT}
+              hint={AUDIO_HINT}
+              kind="audio"
+            />
             <Field label="Splash Title">
               <input type="text" name="splashTitle" value={splashTitle} onChange={(e) => setSplashTitle(e.target.value)} className="field-input" />
             </Field>
@@ -217,9 +245,7 @@ export default function HomeExperienceForm({
           id="homeMenu"
           title="Home Menu"
           description="Atur hide/show, nama, subtitle, warna, border, icon, dan aksi menu."
-          enabled={topLevelEnabled.homeMenu}
           expanded={topLevelExpanded.homeMenu}
-          onToggleEnabled={(enabled) => setTopLevelEnabled(prev => ({ ...prev, homeMenu: enabled }))}
           onToggleExpanded={(expanded) => setTopLevelExpanded(prev => ({ ...prev, homeMenu: expanded }))}
         >
           <div className="flex items-center justify-end gap-4 mb-4">
@@ -230,7 +256,7 @@ export default function HomeExperienceForm({
                 {
                   id: `menu_${Date.now()}`,
                   enabled: true,
-                  type: 'static_page',
+                  type: 'info_dialog',
                   title: 'MENU BARU',
                   subtitle: 'Subtitle',
                   icon: 'info',
@@ -238,7 +264,7 @@ export default function HomeExperienceForm({
                   borderColor: '#FFFFFF',
                   accentColor: '#FFFFFF',
                   backgroundUrl: '',
-                  staticPageId: staticPageOptions[0]?.id || '',
+                  entertainmentItemId: 0,
                   sortOrder: (current.at(-1)?.sortOrder || 0) + 10,
                 },
               ])}
@@ -249,25 +275,56 @@ export default function HomeExperienceForm({
           </div>
           <div className="space-y-4">
             {menus.map((menu, index) => (
-              <div key={menu.id} className="rounded-2xl border border-border bg-accent/20 p-5 space-y-5">
+              <div
+                key={menu.id}
+                className={`rounded-2xl border p-5 space-y-5 transition-colors ${
+                  menu.enabled
+                    ? 'border-border bg-accent/20'
+                    : 'border-rose-500/30 bg-rose-500/5'
+                }`}
+              >
                 {/* Header */}
                 <div className="flex items-center justify-between gap-3">
                   <div className="flex items-center gap-3">
-                    <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10 text-primary font-bold text-sm">
+                    <div className={`flex h-10 w-10 items-center justify-center rounded-xl font-bold text-sm ${
+                      menu.enabled ? 'bg-primary/10 text-primary' : 'bg-muted/40 text-muted-foreground'
+                    }`}>
                       {menu.icon || '📋'}
                     </div>
                     <div>
-                      <div className="text-sm font-semibold text-foreground">{menu.title || `Menu ${index + 1}`}</div>
-                      <div className="text-[10px] text-muted-foreground font-mono">{menu.id}</div>
+                      <div className={`text-sm font-semibold ${menu.enabled ? 'text-foreground' : 'text-muted-foreground line-through decoration-rose-500/60'}`}>
+                        {menu.title || `Menu ${index + 1}`}
+                      </div>
+                      <div className="text-[10px] text-muted-foreground font-mono">
+                        {menu.id}
+                        {!menu.enabled && (
+                          <span className="ml-2 inline-block rounded bg-rose-500/15 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider text-rose-400 not-italic">
+                            Disabled
+                          </span>
+                        )}
+                      </div>
                     </div>
                   </div>
-                  <button
-                    type="button"
-                    onClick={() => setMenus((current) => current.filter((item) => item.id !== menu.id))}
-                    className="rounded-lg border border-rose-500/20 px-3 py-2 text-[11px] font-semibold text-rose-400 hover:bg-rose-500/10 transition-colors"
-                  >
-                    Hapus Menu
-                  </button>
+                  <div className="flex items-center gap-2">
+                    <label className="flex cursor-pointer items-center gap-2 rounded-lg border border-border bg-background/40 px-3 py-2 hover:bg-accent/50 transition-colors">
+                      <input
+                        type="checkbox"
+                        checked={menu.enabled}
+                        onChange={(e) => updateMenu(setMenus, menu.id, { enabled: e.target.checked })}
+                        className="h-4 w-4 rounded accent-primary"
+                      />
+                      <span className="text-[11px] font-semibold text-foreground select-none">
+                        {menu.enabled ? 'Visible' : 'Hidden'}
+                      </span>
+                    </label>
+                    <button
+                      type="button"
+                      onClick={() => setMenus((current) => current.filter((item) => item.id !== menu.id))}
+                      className="rounded-lg border border-rose-500/20 px-3 py-2 text-[11px] font-semibold text-rose-400 hover:bg-rose-500/10 transition-colors"
+                    >
+                      Hapus Menu
+                    </button>
+                  </div>
                 </div>
 
                 {/* Section 1: Basic Information - COLLAPSIBLE */}
@@ -352,14 +409,15 @@ export default function HomeExperienceForm({
                             <ColorField label="Border" value={menu.borderColor} onChange={(value) => updateMenu(setMenus, menu.id, { borderColor: value })} />
                             <ColorField label="Accent" value={menu.accentColor} onChange={(value) => updateMenu(setMenus, menu.id, { accentColor: value })} />
                           </div>
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <Field label="Background URL (Optional)">
-                              <input type="url" value={menu.backgroundUrl} onChange={(e) => updateMenu(setMenus, menu.id, { backgroundUrl: e.target.value })} className="field-input font-mono text-xs" placeholder="https://..." />
-                            </Field>
-                            <Field label="Upload Background Image">
-                              <input type="file" name={`menuBackgroundFile__${menu.id}`} accept="image/*" className="field-input py-2 text-xs" />
-                            </Field>
-                          </div>
+                          <AssetUpload
+                            label="Background Image"
+                            fileFieldName={`menuBackgroundFile__${menu.id}`}
+                            currentUrl={menu.backgroundUrl}
+                            onClear={() => updateMenu(setMenus, menu.id, { backgroundUrl: '' })}
+                            accept={IMAGE_ACCEPT_NO_SVG}
+                            hint={BACKGROUND_HINT}
+                            kind="image"
+                          />
                         </div>
                       )}
                     </>
@@ -400,16 +458,26 @@ export default function HomeExperienceForm({
                       </button>
                       {isExpanded(menu.id, 'advanced') && (
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 animate-in fade-in duration-200 pl-7">
-                          <Field label="Static Page Target (Jika type = static_page)">
-                            <select value={menu.staticPageId} onChange={(e) => updateMenu(setMenus, menu.id, { staticPageId: e.target.value })} className="field-input py-2">
-                              <option value="">-- Pilih halaman --</option>
-                              {staticPageOptions.map((option) => (
-                                <option key={option.id} value={option.id}>{option.title}</option>
-                              ))}
-                            </select>
-                          </Field>
+                          {menu.type === 'konten' && (
+                            <Field label="Pilih Konten (untuk type = konten)">
+                              <select
+                                value={menu.entertainmentItemId || 0}
+                                onChange={(e) => updateMenu(setMenus, menu.id, { entertainmentItemId: Number.parseInt(e.target.value, 10) || 0 })}
+                                className="field-input py-2"
+                              >
+                                <option value={0}>-- Pilih konten --</option>
+                                {entertainmentItemOptions.map((option) => (
+                                  <option key={option.id} value={option.id}>{option.label}</option>
+                                ))}
+                              </select>
+                              {entertainmentItemOptions.length === 0 && (
+                                <p className="mt-1 text-[10px] text-amber-400">
+                                  Belum ada konten. Tambahkan dulu di menu <a href="/dashboard/entertainment" className="underline">Konten</a>.
+                                </p>
+                              )}
+                            </Field>
+                          )}
                           <div className="space-y-3">
-                            <ToggleInline checked={menu.enabled} onChange={(checked) => updateMenu(setMenus, menu.id, { enabled: checked })} title="Visible" description="Tampilkan menu di home screen" />
                             <ToggleInline checked={menu.isPinned || false} onChange={(checked) => updateMenu(setMenus, menu.id, { isPinned: checked })} title="Pinned ⭐" description="Pin menu ke posisi teratas" />
                           </div>
                         </div>
@@ -482,77 +550,25 @@ export default function HomeExperienceForm({
         </CollapsibleSection>
 
         <CollapsibleSection
-          id="staticPages"
-          title="Static Pages"
-          description="Dipakai oleh menu type static_page untuk menampilkan halaman informasi."
-          enabled={topLevelEnabled.staticPages}
-          expanded={topLevelExpanded.staticPages}
-          onToggleEnabled={(enabled) => setTopLevelEnabled(prev => ({ ...prev, staticPages: enabled }))}
-          onToggleExpanded={(expanded) => setTopLevelExpanded(prev => ({ ...prev, staticPages: expanded }))}
-        >
-          <div className="flex items-center justify-end gap-4 mb-4">
-            <button
-              type="button"
-              onClick={() => setStaticPages((current) => [
-                ...current,
-                {
-                  id: `page_${Date.now()}`,
-                  title: 'Halaman Baru',
-                  content: 'Isi konten halaman statis.',
-                },
-              ])}
-              className="rounded-xl border border-primary/20 px-3 py-2 text-xs font-semibold text-primary hover:bg-primary/10"
-            >
-              Tambah Halaman
-            </button>
-          </div>
-          <div className="space-y-4">
-            {staticPages.map((page) => (
-              <div key={page.id} className="rounded-2xl border border-border bg-accent/20 p-4 space-y-3">
-                <div className="flex items-center justify-between gap-3">
-                  <div className="text-xs font-semibold text-foreground">{page.title || page.id}</div>
-                  <button
-                    type="button"
-                    onClick={() => setStaticPages((current) => current.filter((item) => item.id !== page.id))}
-                    className="rounded-lg border border-rose-500/20 px-2.5 py-1.5 text-[10px] font-semibold text-rose-400 hover:bg-rose-500/10"
-                  >
-                    Hapus
-                  </button>
-                </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <Field label="Page ID">
-                    <input type="text" value={page.id} onChange={(e) => updateStaticPage(setStaticPages, page.id, { id: e.target.value })} className="field-input font-mono" />
-                  </Field>
-                  <Field label="Judul">
-                    <input type="text" value={page.title} onChange={(e) => updateStaticPage(setStaticPages, page.id, { title: e.target.value })} className="field-input" />
-                  </Field>
-                  <Field label="Konten" wide>
-                    <textarea value={page.content} onChange={(e) => updateStaticPage(setStaticPages, page.id, { content: e.target.value })} className="field-input min-h-[140px]" />
-                  </Field>
-                </div>
-              </div>
-            ))}
-          </div>
-        </CollapsibleSection>
-
-        <CollapsibleSection
           id="sound"
           title="Sound Effect"
           description="Untuk saat ini profile mengatur enable / disable built-in splash dan selection sound di shell Android."
-          enabled={topLevelEnabled.sound}
           expanded={topLevelExpanded.sound}
-          onToggleEnabled={(enabled) => setTopLevelEnabled(prev => ({ ...prev, sound: enabled }))}
           onToggleExpanded={(expanded) => setTopLevelExpanded(prev => ({ ...prev, sound: expanded }))}
         >
           <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
             <Toggle name="enableSelectionSound" checked={enableSelectionSound} onChange={setEnableSelectionSound} title="Selection Sound" description="Bunyi ketika fokus menu home berpindah." />
             <Toggle name="enableSplashSound" checked={enableSplashSound} onChange={setEnableSplashSound} title="Splash Sound" description="Bunyi ketika splash screen tampil." />
-            <Field label="Selection Sound URL">
-              <input type="url" name="selectionSoundUrl" value={selectionSoundUrl} onChange={(e) => setSelectionSoundUrl(e.target.value)} className="field-input font-mono" placeholder="https://..." />
-            </Field>
-            <Field label="Upload Selection Sound">
-              <input type="file" name="selectionSoundFile" accept="audio/*" className="field-input py-2" />
-            </Field>
+            <input type="hidden" name="selectionSoundUrl" value={selectionSoundUrl} />
+            <AssetUpload
+              label="Selection Sound"
+              fileFieldName="selectionSoundFile"
+              currentUrl={selectionSoundUrl}
+              onClear={() => setSelectionSoundUrl('')}
+              accept={AUDIO_ACCEPT}
+              hint={AUDIO_HINT}
+              kind="audio"
+            />
           </div>
         </CollapsibleSection>
 
@@ -560,9 +576,7 @@ export default function HomeExperienceForm({
           id="livePreview"
           title="Live Preview"
           description="Preview cepat untuk splash dan menu berdasarkan state editor saat ini."
-          enabled={topLevelEnabled.livePreview}
           expanded={topLevelExpanded.livePreview}
-          onToggleEnabled={(enabled) => setTopLevelEnabled(prev => ({ ...prev, livePreview: enabled }))}
           onToggleExpanded={(expanded) => setTopLevelExpanded(prev => ({ ...prev, livePreview: expanded }))}
         >
           <HomeExperiencePreview
@@ -571,7 +585,6 @@ export default function HomeExperienceForm({
               logoUrl,
               homeBackgroundUrl,
               menus,
-              staticPages,
               splash: {
                 ...config.splash,
                 enabled: splashEnabled,
@@ -701,6 +714,79 @@ function ColorField({
   )
 }
 
+function AssetUpload({
+  label,
+  fileFieldName,
+  currentUrl,
+  onClear,
+  accept,
+  hint,
+  kind,
+}: {
+  label: string
+  fileFieldName: string
+  currentUrl: string
+  onClear: () => void
+  accept: string
+  hint: string
+  kind: 'image' | 'audio'
+}) {
+  const [pendingName, setPendingName] = useState<string | null>(null)
+  const hasCurrent = currentUrl.trim().length > 0
+
+  return (
+    <div className="rounded-xl border border-border bg-accent/20 p-3 space-y-2">
+      <div className="flex items-center justify-between gap-3">
+        <div className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">{label}</div>
+        {hasCurrent && (
+          <button
+            type="button"
+            onClick={() => {
+              onClear()
+              setPendingName(null)
+            }}
+            className="rounded-md border border-rose-500/20 px-2 py-1 text-[10px] font-semibold text-rose-400 hover:bg-rose-500/10"
+          >
+            Hapus
+          </button>
+        )}
+      </div>
+
+      {hasCurrent && (
+        <div className="rounded-lg border border-border bg-background/40 p-2">
+          {kind === 'image' ? (
+            <div className="flex items-center gap-3">
+              <img src={currentUrl} alt={label} className="h-12 w-12 rounded-md object-cover border border-border" />
+              <div className="text-[10px] font-mono text-muted-foreground break-all">{currentUrl}</div>
+            </div>
+          ) : (
+            <div className="flex items-center gap-3">
+              <span className="text-lg">🔊</span>
+              <audio controls src={currentUrl} className="h-8 flex-1 min-w-0" />
+            </div>
+          )}
+        </div>
+      )}
+
+      <input
+        type="file"
+        name={fileFieldName}
+        accept={accept}
+        onChange={(e) => setPendingName(e.target.files?.[0]?.name ?? null)}
+        className="block w-full text-xs text-muted-foreground file:mr-3 file:rounded-md file:border-0 file:bg-primary/10 file:px-3 file:py-1.5 file:text-xs file:font-semibold file:text-primary hover:file:bg-primary/20 cursor-pointer"
+      />
+
+      {pendingName && (
+        <div className="text-[10px] text-emerald-400">
+          Akan diupload: <span className="font-mono">{pendingName}</span>
+        </div>
+      )}
+
+      <div className="text-[10px] text-muted-foreground/80">{hint}</div>
+    </div>
+  )
+}
+
 function updateMenu(
   setMenus: Dispatch<SetStateAction<HomeExperienceMenuItem[]>>,
   id: string,
@@ -709,79 +795,48 @@ function updateMenu(
   setMenus((current) => current.map((item) => (item.id === id ? { ...item, ...patch } : item)))
 }
 
-function updateStaticPage(
-  setPages: Dispatch<SetStateAction<HomeExperienceStaticPage[]>>,
-  id: string,
-  patch: Partial<HomeExperienceStaticPage>
-) {
-  setPages((current) => current.map((item) => (item.id === id ? { ...item, ...patch } : item)))
-}
-
 function CollapsibleSection({
-  id,
   title,
   description,
-  enabled,
   expanded,
-  onToggleEnabled,
   onToggleExpanded,
   children,
 }: {
-  id: string
+  id?: string
   title: string
   description: string
-  enabled: boolean
   expanded: boolean
-  onToggleEnabled: (enabled: boolean) => void
   onToggleExpanded: (expanded: boolean) => void
   children: React.ReactNode
 }) {
+  // Children are always rendered into the DOM — even when the section is
+  // collapsed — so that controlled form inputs inside (Toggle, AssetUpload's
+  // hidden URL inputs, etc.) keep submitting their state. We only hide them
+  // visually. Tearing them out of the DOM caused server-side fields to
+  // silently default back to `false` / empty on save.
   return (
     <div className="rounded-2xl border border-border bg-accent/10 p-5 space-y-4">
-      {/* Header with Enable/Disable Toggle */}
-      <div className="flex items-start justify-between gap-4">
-        <div className="flex items-start gap-3 flex-1">
-          <input
-            type="checkbox"
-            checked={enabled}
-            onChange={(e) => {
-              onToggleEnabled(e.target.checked)
-              if (e.target.checked) {
-                onToggleExpanded(true)
-              }
-            }}
-            className="h-5 w-5 rounded accent-primary cursor-pointer mt-0.5"
-            id={`enable-${id}`}
-          />
-          <label htmlFor={`enable-${id}`} className="cursor-pointer flex-1">
-            <h3 className="text-sm font-semibold text-foreground">{title}</h3>
-            <p className="mt-1 text-[10px] text-muted-foreground">{description}</p>
-          </label>
+      <button
+        type="button"
+        onClick={() => onToggleExpanded(!expanded)}
+        className="flex w-full items-start justify-between gap-4 text-left"
+      >
+        <div className="flex-1">
+          <h3 className="text-sm font-semibold text-foreground">{title}</h3>
+          <p className="mt-1 text-[10px] text-muted-foreground">{description}</p>
         </div>
-        {enabled && (
-          <button
-            type="button"
-            onClick={() => onToggleExpanded(!expanded)}
-            className="rounded-lg border border-border px-3 py-1.5 text-[11px] font-semibold text-muted-foreground hover:bg-accent/50 transition-colors"
-          >
-            {expanded ? '▼ Collapse' : '▶ Expand'}
-          </button>
-        )}
+        <span className="rounded-lg border border-border px-3 py-1.5 text-[11px] font-semibold text-muted-foreground hover:bg-accent/50 transition-colors">
+          {expanded ? '▼ Collapse' : '▶ Expand'}
+        </span>
+      </button>
+
+      {/* Content: always present in the DOM, hidden visually when collapsed */}
+      <div
+        className={`space-y-4 ${expanded ? 'animate-in fade-in duration-200' : 'hidden'}`}
+        aria-hidden={!expanded}
+      >
+        {children}
       </div>
-
-      {/* Disabled State Message */}
-      {!enabled && (
-        <div className="pl-8 text-xs text-muted-foreground italic">
-          💡 Section disabled - default values will be used
-        </div>
-      )}
-
-      {/* Content (only shown when enabled and expanded) */}
-      {enabled && expanded && (
-        <div className="pl-8 space-y-4 animate-in fade-in duration-200">
-          {children}
-        </div>
-      )}
     </div>
   )
 }
@@ -792,64 +847,150 @@ export function HomeExperiencePreview({ config }: { config: HomeExperienceConfig
     return a.sortOrder - b.sortOrder
   })
 
+  const homeBackground = config.homeBackgroundUrl?.trim()
+    ? config.homeBackgroundUrl
+    : '/global_home_bg.webp'
+
+  const splashBackground = config.splash.backgroundUrl?.trim()
+    ? config.splash.backgroundUrl
+    : '/global_home_bg.webp'
+
+  const splashLogo = config.splash.logoUrl?.trim() || '/ic_global_iptv.png'
+  const homeLogo = config.logoUrl?.trim() || '/ic_global_iptv.png'
+
   return (
     <div className="grid grid-cols-1 2xl:grid-cols-[380px_minmax(0,1fr)] gap-6">
-      <div className="rounded-3xl border border-border bg-[radial-gradient(circle_at_top,rgba(46,230,198,0.12),transparent_60%),linear-gradient(180deg,rgba(8,14,24,0.98),rgba(5,10,19,0.98))] p-5 space-y-4">
+      <div className="space-y-2">
         <div className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Splash Preview</div>
-        <div className="rounded-2xl border border-white/10 bg-black/30 p-5 text-center space-y-4">
-          <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-full border border-white/15 bg-white/5 text-[10px] text-muted-foreground overflow-hidden">
-            {config.splash.logoUrl ? <img src={config.splash.logoUrl} alt="Splash Logo" className="h-full w-full object-contain" /> : 'Logo'}
+        <div
+          className="relative overflow-hidden rounded-3xl border border-border aspect-[9/16] sm:aspect-[3/4] 2xl:aspect-[9/16]"
+          style={{ background: `url(${splashBackground}) center/cover` }}
+        >
+          {/* Overlay gradient: top dark → mid teal-tinted → bottom dark, mirrors SplashScreen.kt:117-126 */}
+          <div
+            className="absolute inset-0"
+            style={{
+              background:
+                'linear-gradient(180deg, rgba(0,0,0,0.42) 0%, rgba(9,42,42,0.24) 50%, rgba(0,0,0,0.84) 100%)',
+            }}
+          />
+
+          {/* Centered logo + title + subtitle + spinner */}
+          <div className="absolute inset-0 flex flex-col items-center justify-center px-8 text-center">
+            <div
+              className="flex h-28 w-28 items-center justify-center rounded-full border-2 p-3 shadow-2xl"
+              style={{
+                backgroundColor: '#071217',
+                borderColor: 'rgba(255,255,255,0.24)',
+                boxShadow:
+                  '0 28px 60px -10px rgba(46,230,198,0.34), 0 28px 60px -10px rgba(255,209,102,0.30)',
+              }}
+            >
+              <img src={splashLogo} alt="Splash Logo" className="h-full w-full object-contain" />
+            </div>
+
+            <div className="mt-6 text-2xl font-extrabold tracking-wide text-white">
+              {config.splash.title}
+            </div>
+            <div className="mt-2 text-[13px] font-semibold tracking-wider" style={{ color: '#E9F7F6' }}>
+              {config.splash.subtitle}
+            </div>
+
+            <div className="mt-10 flex items-center justify-center">
+              <div
+                className="h-9 w-9 rounded-full border-[3px] border-white/15 animate-spin"
+                style={{ borderTopColor: '#2EE6C6' }}
+              />
+            </div>
+            <div className="mt-3 text-[12px] text-white/60">{config.splash.loadingText}</div>
           </div>
-          <div>
-            <div className="text-lg font-bold text-white">{config.splash.title}</div>
-            <div className="mt-1 text-xs text-white/70">{config.splash.subtitle}</div>
+
+          {/* Footer */}
+          <div className="absolute bottom-6 left-0 right-0 text-center">
+            <div className="text-[12px] font-bold tracking-[0.2em] text-white/70">
+              {config.splash.footerText}
+            </div>
           </div>
-          <div className="text-[11px] text-primary">{config.splash.loadingText}</div>
-          <div className="text-[10px] uppercase tracking-[0.2em] text-white/45">{config.splash.footerText}</div>
         </div>
       </div>
 
-      <div className="rounded-3xl border border-border bg-[linear-gradient(180deg,rgba(10,16,28,0.98),rgba(6,11,20,0.98))] p-5 space-y-4">
+      <div className="space-y-2">
         <div className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Home Preview</div>
-        <div className="rounded-2xl border border-white/10 bg-black/20 p-4 space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-            {visibleMenus.map((menu) => (
-              <div
-                key={menu.id}
-                className="rounded-2xl border p-4 shadow-[0_12px_30px_rgba(0,0,0,0.2)] relative"
-                style={{
-                  borderColor: menu.borderColor,
-                  background: menu.backgroundUrl
-                    ? `linear-gradient(rgba(5,10,19,0.65), rgba(5,10,19,0.82)), url(${menu.backgroundUrl}) center/cover`
-                    : 'linear-gradient(180deg, rgba(20,35,49,1), rgba(12,18,28,1))',
-                }}
-              >
-                {menu.badge && (
+        <div
+          className="rounded-3xl border border-border p-5 space-y-4"
+          style={{
+            background: `linear-gradient(180deg, rgba(6,11,20,0.85), rgba(6,11,20,0.95)), url(${homeBackground}) center/cover`,
+          }}
+        >
+          <div className="flex items-center justify-between">
+            <img src={homeLogo} alt="Logo" className="h-10 object-contain" />
+            <div className="text-[10px] font-semibold uppercase tracking-wider text-white/60">Home Carousel</div>
+          </div>
+          <div className="rounded-2xl border border-white/10 bg-black/30 p-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+              {visibleMenus.map((menu) => {
+                const background = menu.backgroundUrl?.trim()
+                  ? menu.backgroundUrl
+                  : defaultMenuBackgroundForType(menu.type)
+                return (
                   <div
-                    className={`absolute px-2 py-1 rounded text-white text-[10px] font-bold ${
-                      menu.badge.position === 'top-right' ? 'top-2 right-2' :
-                      menu.badge.position === 'top-left' ? 'top-2 left-2' :
-                      'bottom-2 right-2'
-                    }`}
-                    style={{ backgroundColor: menu.badge.color }}
+                    key={menu.id}
+                    className="rounded-2xl border p-4 shadow-[0_12px_30px_rgba(0,0,0,0.2)] relative overflow-hidden"
+                    style={{
+                      borderColor: menu.borderColor,
+                      background: `linear-gradient(rgba(5,10,19,0.55), rgba(5,10,19,0.85)), url(${background}) center/cover`,
+                    }}
                   >
-                    {menu.badge.text}
+                    {menu.badge && (
+                      <div
+                        className={`absolute px-2 py-1 rounded text-white text-[10px] font-bold ${
+                          menu.badge.position === 'top-right' ? 'top-2 right-2' :
+                          menu.badge.position === 'top-left' ? 'top-2 left-2' :
+                          'bottom-2 right-2'
+                        }`}
+                        style={{ backgroundColor: menu.badge.color }}
+                      >
+                        {menu.badge.text}
+                      </div>
+                    )}
+                    {menu.isPinned && (
+                      <div className="absolute top-2 left-2 text-yellow-400 text-sm">⭐</div>
+                    )}
+                    <div className="text-[10px] font-semibold uppercase tracking-[0.18em]" style={{ color: menu.borderColor }}>
+                      {menu.icon}
+                    </div>
+                    <div className="mt-6 text-base font-bold" style={{ color: menu.textColor }}>{menu.title}</div>
+                    <div className="mt-1 text-xs text-white/75">{menu.subtitle}</div>
+                    <div className="mt-5 h-1 rounded-full" style={{ backgroundColor: menu.accentColor }} />
                   </div>
-                )}
-                {menu.isPinned && (
-                  <div className="absolute top-2 left-2 text-yellow-400 text-sm">⭐</div>
-                )}
-                <div className="text-[10px] font-semibold uppercase tracking-[0.18em]" style={{ color: menu.borderColor }}>
-                  {menu.icon}
-                </div>
-                <div className="mt-6 text-base font-bold" style={{ color: menu.textColor }}>{menu.title}</div>
-                <div className="mt-1 text-xs text-white/75">{menu.subtitle}</div>
-                <div className="mt-5 h-1 rounded-full" style={{ backgroundColor: menu.accentColor }} />
-              </div>
-            ))}
+                )
+              })}
+            </div>
           </div>
         </div>
       </div>
     </div>
   )
+}
+
+/**
+ * Mirrors `defaultBackgroundForMenuType` in HomeScreen.kt — provides a
+ * sensible fallback image per menu type using assets that ship in `public/`.
+ */
+function defaultMenuBackgroundForType(type: HomeExperienceMenuItem['type']): string {
+  switch (type) {
+    case 'tv':
+      return '/home_bg_tv.webp'
+    case 'education':
+      return '/home_bg_education.webp'
+    case 'entertainment':
+    case 'konten':
+      return '/home_bg_youtube.webp'
+    case 'settings':
+      return '/home_bg_settings.webp'
+    case 'info_dialog':
+      return '/home_bg_info.webp'
+    default:
+      return '/home_bg_services.webp'
+  }
 }

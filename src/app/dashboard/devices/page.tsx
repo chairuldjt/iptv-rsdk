@@ -16,6 +16,7 @@ import {
 } from '@/lib/settings'
 import { DEFAULT_CUSTOM_M3U_URL, DEFAULT_SYNC_MODE, normalizeSyncMode } from '@/lib/defaults'
 import { getDeviceGroupAssignments, getDeviceGroups } from '@/lib/deviceGroups'
+import { pushCommand } from '@/lib/remoteQueue'
 
 export const revalidate = 0
 type DeviceStatusFilter = 'all' | 'online' | 'offline' | 'disabled'
@@ -55,6 +56,9 @@ async function toggleDeviceActiveAction(formData: FormData) {
         create: { deviceId, lockSettings: true, forceSync: true },
       }),
     ])
+    // Realtime push: ask the device to reload its config immediately instead of
+    // waiting for the next heartbeat / sync interval.
+    pushCommand(deviceId, 'RELOAD_CONFIG')
     revalidatePath('/dashboard/devices')
     revalidatePath('/dashboard')
   } catch (error) {
@@ -85,6 +89,9 @@ async function clearDeviceCacheAction(formData: FormData) {
       where: { deviceId },
       data: { clearCacheTrigger: true, forceSync: true },
     })
+    // Realtime push: trigger the device to reload config (which clears cache &
+    // re-syncs channels) immediately instead of waiting for the heartbeat.
+    pushCommand(deviceId, 'RELOAD_CONFIG')
     revalidatePath('/dashboard/devices')
   } catch (error) {
     console.error('Clear cache trigger error:', error)
@@ -143,6 +150,9 @@ async function saveDeviceConfigAction(formData: FormData) {
   } catch (error) {
     console.error('Save config error:', error)
   }
+  // Realtime push: tell the device to reload config immediately. The DB flags
+  // (forceSync / educationForceSync) remain as fallback for offline devices.
+  pushCommand(deviceId, 'RELOAD_CONFIG')
   redirect(`/dashboard/devices?edit=${deviceId}&success=1`)
 }
 

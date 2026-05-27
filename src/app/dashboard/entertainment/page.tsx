@@ -48,9 +48,9 @@ export default async function EntertainmentPage({
   return (
     <div className="space-y-6 animate-fade-in">
       <PageHeader
-        badge="Entertainment Library"
-        title="Konten Hiburan"
-        description="Atur item menu Hiburan Android. Item disembunyikan otomatis bila nonaktif atau URL kosong."
+        badge="Konten Library"
+        title="Konten"
+        description="Atur item menu Konten pada Android. Item disembunyikan otomatis bila nonaktif atau URL kosong."
       />
 
       {showSaved && (

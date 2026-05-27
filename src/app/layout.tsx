@@ -22,23 +22,26 @@ export const metadata: Metadata = {
   applicationName: "RSDK IPTV Admin",
   icons: {
     icon: [
-      { url: "/rsdk-icon.png", type: "image/png" },
-      { url: "/rsdk-app-logo.png", type: "image/png", sizes: "512x512" },
+      { url: "/favicon.ico", type: "image/x-icon", sizes: "any" },
+      { url: "/ic_global_iptv.png", type: "image/png", sizes: "32x32" },
+      { url: "/ic_global_iptv.png", type: "image/png", sizes: "192x192" },
+      { url: "/ic_global_iptv.png", type: "image/png", sizes: "512x512" },
     ],
-    apple: [{ url: "/rsdk-app-logo.png", type: "image/png" }],
+    apple: [{ url: "/ic_global_iptv.png", type: "image/png", sizes: "180x180" }],
+    shortcut: [{ url: "/ic_global_iptv.png", type: "image/png" }],
   },
   openGraph: {
     title: "RSDK IPTV Admin",
     description: "Dashboard administrasi RSDK IPTV untuk manajemen playlist, channel, dan perangkat STB.",
     siteName: "RSDK IPTV Admin",
-    images: [{ url: "/rsdk-app-logo.png", width: 512, height: 512, alt: "RSDK IPTV Admin" }],
+    images: [{ url: "/ic_global_iptv.png", width: 512, height: 512, alt: "RSDK IPTV Admin" }],
     type: "website",
   },
   twitter: {
     card: "summary",
     title: "RSDK IPTV Admin",
     description: "Dashboard administrasi RSDK IPTV untuk manajemen playlist, channel, dan perangkat STB.",
-    images: ["/rsdk-app-logo.png"],
+    images: ["/ic_global_iptv.png"],
   },
 };
 

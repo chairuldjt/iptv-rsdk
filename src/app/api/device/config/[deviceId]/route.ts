@@ -3,8 +3,9 @@ import prisma from '@/lib/db'
 import { getErrorMessage } from '@/lib/errors'
 import { DEFAULT_CUSTOM_M3U_URL, DEFAULT_SYNC_MODE, normalizeSyncMode } from '@/lib/defaults'
 import { createDeviceConfigData, getDefaultDeviceConfig } from '@/lib/defaultDeviceConfig'
-import { resolveEffectiveHomeExperience } from '@/lib/homeExperience'
+import { absolutizeHomeExperienceUrls, resolveEffectiveHomeExperience } from '@/lib/homeExperience'
 import { resolveEffectiveRunningText } from '@/lib/runningText'
+import { resolvePublicOrigin } from '@/lib/publicOrigin'
 import { getPrimaryNtpServer } from '@/lib/settings'
 import { resolveEffectiveVideoBroadcast } from '@/lib/videoBroadcast'
 
@@ -65,11 +66,17 @@ export async function GET(
       where: { isGlobal: true }
     })
     const primaryNtpServer = await getPrimaryNtpServer()
-    const [homeExperience, runningText, videoBroadcast] = await Promise.all([
+    const [homeExperienceRaw, runningText, videoBroadcast, publicOrigin] = await Promise.all([
       resolveEffectiveHomeExperience(device.deviceId),
       resolveEffectiveRunningText(device.deviceId),
       resolveEffectiveVideoBroadcast(device.deviceId),
+      resolvePublicOrigin(request),
     ])
+
+    // Rewrite relative `/uploads/...` URLs to absolute URLs so the Android
+    // client (Coil's AsyncImage) can actually load uploaded backgrounds, logos
+    // and sounds. Without this the device renders a blank/white background.
+    const homeExperience = absolutizeHomeExperienceUrls(homeExperienceRaw, publicOrigin)
 
 
     return NextResponse.json({
