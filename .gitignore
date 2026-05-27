@@ -56,3 +56,20 @@ public/uploads/*
 !public/uploads/channel-logos/
 !public/uploads/channel-logos/**
 android-client/replay_pid*.log
+
+# auto-generated exploration/summary docs (not part of source)
+COMPLETION_SUMMARY.txt
+DEVELOPMENT_GUIDE.md
+EXECUTIVE_SUMMARY.md
+EXPLORATION_INDEX.md
+EXPLORATION_SUMMARY.txt
+FINAL_REPORT.txt
+HOME_EXPERIENCE_OVERVIEW.md
+INDEX.md
+MENU_IMPLEMENTATION_GUIDE.md
+MENU_IMPROVEMENT_SUGGESTIONS.md
+PHASE1_IMPLEMENTATION_SUMMARY.md
+README_EXPLORATION.md
+
+# temp favicon source copy
+public/ic_global_iptv_favicon.png
