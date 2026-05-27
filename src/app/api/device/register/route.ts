@@ -35,7 +35,7 @@ export async function POST(request: Request) {
             where: { id: existingDeviceByMac.id },
             data: {
               deviceId: device_id,
-              deviceName: device_name || existingDeviceByMac.deviceName,
+              ...(device_name ? { deviceName: device_name, deviceNameUpdatedAt: new Date() } : {}),
               appVersion: app_version || existingDeviceByMac.appVersion,
               androidVersion: android_version || existingDeviceByMac.androidVersion,
               lastIp: local_ip || existingDeviceByMac.lastIp,
@@ -77,6 +77,7 @@ export async function POST(request: Request) {
         message: 'Device registered and active',
         data: {
           device_id: device.deviceId,
+          device_name: device.deviceName,
           active: device.isActive,
           sync_interval: device.config?.syncInterval ?? 1800,
         },
@@ -86,7 +87,7 @@ export async function POST(request: Request) {
       const updatedDevice = await prisma.device.update({
         where: { deviceId: device_id },
         data: {
-          deviceName: device_name || device.deviceName,
+          ...(device_name ? { deviceName: device_name, deviceNameUpdatedAt: new Date() } : {}),
           appVersion: app_version || device.appVersion,
           androidVersion: android_version || device.androidVersion,
           lastIp: local_ip || device.lastIp,
@@ -101,6 +102,7 @@ export async function POST(request: Request) {
         message: updatedDevice.isActive ? 'Device registered and active' : 'Device registered but inactive',
         data: {
           device_id: updatedDevice.deviceId,
+          device_name: updatedDevice.deviceName,
           active: updatedDevice.isActive,
           sync_interval: updatedDevice.config?.syncInterval ?? 1800,
         },

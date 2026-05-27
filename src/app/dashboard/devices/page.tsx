@@ -123,7 +123,7 @@ async function saveDeviceConfigAction(formData: FormData) {
   const apiBaseUrl = (formData.get('apiBaseUrl') as string || '').trim()
 
   try {
-    await prisma.device.update({ where: { deviceId }, data: { deviceName } })
+    await prisma.device.update({ where: { deviceId }, data: { deviceName, deviceNameUpdatedAt: new Date() } })
     await prisma.deviceConfig.update({
       where: { deviceId },
       data: {
