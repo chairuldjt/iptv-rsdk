@@ -156,6 +156,15 @@ data class LogResponse(
     val message: String
 )
 
+data class GoodbyeRequest(
+    val device_id: String
+)
+
+data class GoodbyeResponse(
+    val status: Boolean,
+    val message: String
+)
+
 // --- RETROFIT INTERFACE ---
 
 interface IptvApiService {
@@ -170,6 +179,9 @@ interface IptvApiService {
 
     @POST("api/device/status")
     suspend fun sendHeartbeat(@Body request: StatusRequest): Response<StatusResponse>
+
+    @POST("api/device/goodbye")
+    suspend fun goodbye(@Body request: GoodbyeRequest): Response<GoodbyeResponse>
 
     @POST("api/device/log")
     suspend fun sendErrorLog(@Body request: LogRequest): Response<LogResponse>

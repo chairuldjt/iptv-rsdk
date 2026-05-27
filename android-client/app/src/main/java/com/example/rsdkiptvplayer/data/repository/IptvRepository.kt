@@ -145,6 +145,14 @@ class IptvRepository(
                             }
                             if (testSuccess) {
                                 dataStoreManager.addLog("Config Sync: API base URL updated to $newApiBaseUrl")
+                                // Kirim goodbye ke server lama agar device langsung offline di dashboard
+                                try {
+                                    val oldService = com.example.rsdkiptvplayer.data.api.RetrofitClient.getService(previousUrl)
+                                    oldService.goodbye(com.example.rsdkiptvplayer.data.api.GoodbyeRequest(device_id = dataStoreManager.getDeviceId()))
+                                    dataStoreManager.addLog("Config Sync: Goodbye sent to old server $previousUrl")
+                                } catch (e: Exception) {
+                                    dataStoreManager.addLog("Config Sync: Failed to send goodbye to old server: ${e.message}")
+                                }
                                 // Konfirmasi ke server baru bahwa device sudah pindah
                                 // Server akan reset apiBaseUrl = null agar tidak dikirim lagi
                                 try {
