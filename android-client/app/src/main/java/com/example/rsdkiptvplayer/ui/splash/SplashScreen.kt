@@ -27,12 +27,16 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
+import coil.request.ImageRequest
 import com.example.rsdkiptvplayer.R
 import com.example.rsdkiptvplayer.IptvApplication
 import com.example.rsdkiptvplayer.util.UpdateManager
 import com.example.rsdkiptvplayer.util.HomeExperienceParser
 import com.example.rsdkiptvplayer.util.RemoteAudioPlayer
+import kotlinx.coroutines.async
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.withTimeoutOrNull
 
 @Composable
 fun SplashScreen(
@@ -59,6 +63,7 @@ fun SplashScreen(
     var currentVersionName by remember { mutableStateOf("") }
     var currentVersionCode by remember { mutableIntStateOf(0) }
     var splashSoundId by remember { mutableIntStateOf(0) }
+    var loadingStatus by remember { mutableStateOf("") }
 
     DisposableEffect(homeExperience.sounds.enableSplashSound, homeExperience.splash.showSound) {
         soundPool.setOnLoadCompleteListener { _, sampleId, status ->
@@ -80,17 +85,68 @@ fun SplashScreen(
         currentVersionCode = UpdateManager.getCurrentVersionCode(context)
         currentVersionName = UpdateManager.getCurrentVersionName(context)
 
-        // Animate splash in
-        alpha.animateTo(
-            targetValue = 1f,
-            animationSpec = tween(durationMillis = 850)
-        )
-        scale.animateTo(
-            targetValue = 1f,
-            animationSpec = tween(durationMillis = 750)
-        )
-        
-        delay(1200) // Delay before transitioning to home screen
+        // Animate splash in (parallel with network work)
+        val animJob = async {
+            alpha.animateTo(targetValue = 1f, animationSpec = tween(durationMillis = 850))
+            scale.animateTo(targetValue = 1f, animationSpec = tween(durationMillis = 750))
+        }
+
+        // Sync config + channels with 8s timeout so offline devices are not stuck
+        loadingStatus = "Memuat konfigurasi..."
+        val syncJob = async {
+            withTimeoutOrNull(8_000L) {
+                try {
+                    app.repository.syncConfig()
+                } catch (_: Exception) {}
+            }
+            withTimeoutOrNull(8_000L) {
+                try {
+                    app.repository.syncChannels()
+                } catch (_: Exception) {}
+            }
+        }
+
+        // Wait for both animation and sync to finish
+        animJob.await()
+        syncJob.await()
+
+        // After sync, homeExperienceJson in DataStore is now fresh.
+        // Re-read it and preload all remote image URLs into Coil cache.
+        loadingStatus = "Memuat aset tampilan..."
+        val freshJson = app.dataStoreManager.homeExperienceJsonFlow.first()
+        val freshExp = HomeExperienceParser.parse(freshJson)
+        val imageLoader = coil.Coil.imageLoader(context)
+        val urlsToPreload = buildList {
+            if (freshExp.splash.backgroundUrl.isNotBlank()) add(freshExp.splash.backgroundUrl)
+            if (freshExp.splash.logoUrl.isNotBlank()) add(freshExp.splash.logoUrl)
+            if (freshExp.homeBackgroundUrl.isNotBlank()) add(freshExp.homeBackgroundUrl)
+            if (freshExp.logoUrl.isNotBlank()) add(freshExp.logoUrl)
+            freshExp.menus.forEach { menu ->
+                if (menu.backgroundUrl.isNotBlank()) add(menu.backgroundUrl)
+            }
+        }.distinct()
+
+        if (urlsToPreload.isNotEmpty()) {
+            withTimeoutOrNull(6_000L) {
+                val preloadJobs = urlsToPreload.map { url ->
+                    async {
+                        try {
+                            val req = ImageRequest.Builder(context)
+                                .data(url)
+                                .memoryCacheKey(url)
+                                .diskCacheKey(url)
+                                .build()
+                            imageLoader.execute(req)
+                        } catch (_: Exception) {}
+                    }
+                }
+                preloadJobs.forEach { it.await() }
+            }
+        }
+
+        loadingStatus = ""
+        // Small pause so the UI doesn't flash immediately after loading
+        delay(300)
         onSplashComplete()
     }
 
@@ -194,7 +250,10 @@ fun SplashScreen(
             )
             Spacer(modifier = Modifier.height(12.dp))
             Text(
-                text = if (homeExperience.splash.enabled) homeExperience.splash.loadingText else "Preparing your experience...",
+                text = loadingStatus.ifBlank {
+                    if (homeExperience.splash.enabled) homeExperience.splash.loadingText
+                    else "Preparing your experience..."
+                },
                 color = Color.White.copy(alpha = 0.6f),
                 fontSize = 12.sp
             )
