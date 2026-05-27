@@ -450,7 +450,7 @@ private fun HospitalityHeader(
     val screenHeight = configuration.screenHeightDp
     val isSmallScreen = screenWidth < 760 || screenHeight < 500
     val isUltraCompact = screenWidth < 600 || screenHeight < 400
-    val showCenterHeader = screenWidth >= 920 && screenHeight >= 520
+    val showCenterHeader = screenWidth >= 600 && screenHeight >= 400
 
     Row(
         modifier = Modifier.fillMaxWidth(),
