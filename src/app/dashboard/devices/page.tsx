@@ -120,6 +120,7 @@ async function saveDeviceConfigAction(formData: FormData) {
   const lockSettings = formData.get('lockSettings') === 'on'
   const forceSync = true
   const autoStartOnBoot = formData.get('autoStartOnBoot') === 'on'
+  const apiBaseUrl = (formData.get('apiBaseUrl') as string || '').trim()
 
   try {
     await prisma.device.update({ where: { deviceId }, data: { deviceName } })
@@ -143,6 +144,7 @@ async function saveDeviceConfigAction(formData: FormData) {
         educationSource: educationSource || 'smb',
         educationPlaybackMode: educationPlaybackMode || 'copy',
         ...(educationForceSyncTrigger ? { educationForceSync: true } : {}),
+        apiBaseUrl: apiBaseUrl || null,
       },
     })
     revalidatePath('/dashboard/devices')

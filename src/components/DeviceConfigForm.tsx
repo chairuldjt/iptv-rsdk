@@ -27,6 +27,11 @@ export default function DeviceConfigForm({ editingDevice, saveDeviceConfigAction
             <label className="block text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-1.5">Friendly Name</label>
             <input type="text" name="deviceName" defaultValue={editingDevice.deviceName} required className="field-input" />
           </div>
+          <div className="md:col-span-2">
+            <label className="block text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-1.5">API Server Base URL Override</label>
+            <input type="url" name="apiBaseUrl" defaultValue={editingDevice.config?.apiBaseUrl || ''}
+              placeholder="Kosongkan untuk pakai global setting (Setup > Runtime Relay)" className="field-input font-mono" />
+          </div>
           <div>
             <label className="block text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-1.5">Sync Mode (Playlist Source)</label>
             <select name="syncMode" value={syncMode} onChange={(e) => setSyncMode(normalizeSyncMode(e.target.value))} className="field-input py-2">

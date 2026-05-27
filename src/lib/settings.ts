@@ -2,9 +2,11 @@ import prisma from '@/lib/db'
 
 const OFFLINE_AUTO_DELETE_DAYS_KEY = 'device.offlineAutoDeleteDays'
 const APP_PUBLIC_ORIGIN_KEY = 'app.publicOrigin'
+const API_BASE_URL_KEY = 'app.apiBaseUrl'
 const ON_DEMAND_HLS_RELAY_CONFIG_KEY = 'stream.onDemandHlsRelayConfig'
 const PRIMARY_NTP_SERVER_KEY = 'app.primaryNtpServer'
 const DEFAULT_APP_PUBLIC_ORIGIN = ''
+const DEFAULT_API_BASE_URL = ''
 const DEFAULT_PRIMARY_NTP_SERVER = '0.id.pool.ntp.org'
 
 export type OnDemandHlsRelayConfig = {
@@ -93,11 +95,32 @@ export async function setPrimaryNtpServer(server: string): Promise<void> {
   })
 }
 
+export async function getApiBaseUrl(): Promise<string> {
+  const setting = await prisma.appSetting.findUnique({
+    where: { key: API_BASE_URL_KEY },
+  })
+
+  return normalizeApiBaseUrl(setting?.value || DEFAULT_API_BASE_URL)
+}
+
+export async function setApiBaseUrl(url: string): Promise<void> {
+  const safeUrl = normalizeApiBaseUrl(url || DEFAULT_API_BASE_URL)
+
+  await prisma.appSetting.upsert({
+    where: { key: API_BASE_URL_KEY },
+    update: { value: safeUrl },
+    create: {
+      key: API_BASE_URL_KEY,
+      value: safeUrl,
+    },
+  })
+}
+
 export async function resetRelayRuntimeSettings(): Promise<void> {
   await prisma.appSetting.deleteMany({
     where: {
       key: {
-        in: [APP_PUBLIC_ORIGIN_KEY, ON_DEMAND_HLS_RELAY_CONFIG_KEY, PRIMARY_NTP_SERVER_KEY],
+        in: [APP_PUBLIC_ORIGIN_KEY, API_BASE_URL_KEY, ON_DEMAND_HLS_RELAY_CONFIG_KEY, PRIMARY_NTP_SERVER_KEY],
       },
     },
   })
@@ -146,6 +169,21 @@ export async function cleanupOfflineDevices(days: number): Promise<number> {
   })
 
   return result.count
+}
+
+function normalizeApiBaseUrl(url: string): string {
+  const trimmed = url.trim()
+  if (!trimmed) return ''
+
+  try {
+    const parsed = new URL(trimmed)
+    if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+      return ''
+    }
+    return parsed.origin.replace(/\/$/, '')
+  } catch {
+    return ''
+  }
 }
 
 function normalizePublicOrigin(origin: string): string {

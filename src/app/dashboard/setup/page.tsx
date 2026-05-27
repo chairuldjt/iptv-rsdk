@@ -8,10 +8,12 @@ import {
 } from '@/lib/defaultDeviceConfig'
 import {
   getAppPublicOrigin,
+  getApiBaseUrl,
   getOnDemandHlsRelayConfig,
   getPrimaryNtpServer,
   resetRelayRuntimeSettings,
   setAppPublicOrigin,
+  setApiBaseUrl,
   setOnDemandHlsRelayConfig,
   setPrimaryNtpServer,
 } from '@/lib/settings'
@@ -40,6 +42,7 @@ async function resetDefaultSetupAction() {
 async function saveRelayRuntimeAction(formData: FormData) {
   'use server'
   await setAppPublicOrigin(formData.get('appPublicOrigin') as string)
+  await setApiBaseUrl(formData.get('apiBaseUrl') as string)
   await setPrimaryNtpServer(formData.get('primaryNtpServer') as string)
   await setOnDemandHlsRelayConfig({
     ffmpegBin: formData.get('ffmpegBin') as string,
@@ -71,6 +74,7 @@ export default async function SetupPage({
   const config = await getDefaultDeviceConfig()
   const relayConfig = await getOnDemandHlsRelayConfig()
   const appPublicOrigin = await getAppPublicOrigin()
+  const apiBaseUrl = await getApiBaseUrl()
   const primaryNtpServer = await getPrimaryNtpServer()
   const showSaved = resolvedSearchParams.saved === '1'
   const showReset = resolvedSearchParams.reset === '1'
@@ -98,6 +102,7 @@ export default async function SetupPage({
           <RuntimeRelaySection
             relayConfig={relayConfig}
             appPublicOrigin={appPublicOrigin}
+            apiBaseUrl={apiBaseUrl}
             primaryNtpServer={primaryNtpServer}
             saveRelayRuntimeAction={saveRelayRuntimeAction}
           />
@@ -193,10 +198,11 @@ function DefaultSetupSection({ config, saveDefaultSetupAction }: { config: Await
 
 /* ---- Runtime Relay Section ---- */
 function RuntimeRelaySection({
-  relayConfig, appPublicOrigin, primaryNtpServer, saveRelayRuntimeAction,
+  relayConfig, appPublicOrigin, apiBaseUrl, primaryNtpServer, saveRelayRuntimeAction,
 }: {
   relayConfig: Awaited<ReturnType<typeof getOnDemandHlsRelayConfig>>
   appPublicOrigin: string
+  apiBaseUrl: string
   primaryNtpServer: string
   saveRelayRuntimeAction: (fd: FormData) => Promise<void>
 }) {
@@ -206,6 +212,9 @@ function RuntimeRelaySection({
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <Field label="APP Public Origin" wide>
             <input type="url" name="appPublicOrigin" defaultValue={appPublicOrigin} placeholder="https://iptv.teknisirsdk.my.id" className="field-input font-mono" />
+          </Field>
+          <Field label="API Server Base URL" wide>
+            <input type="url" name="apiBaseUrl" defaultValue={apiBaseUrl} placeholder="https://iptv.teknisirsdk.my.id" className="field-input font-mono" />
           </Field>
           <Field label="Primary NTP Server">
             <input type="text" name="primaryNtpServer" defaultValue={primaryNtpServer} placeholder="0.id.pool.ntp.org" className="field-input font-mono" />

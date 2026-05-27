@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-APP_NAME="iptv-rsdk"
+APP_NAME="iptv-rsdk-new"
 BRANCH="${DEPLOY_BRANCH:-master}"
-HEALTH_URL="${HEALTH_URL:-http://127.0.0.1:9000/login}"
+HEALTH_URL="${HEALTH_URL:-http://127.0.0.1:9001/login}"
 FAILED_INDEX_MIGRATION="20260523021000_add_production_indexes"
 
 APP_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"

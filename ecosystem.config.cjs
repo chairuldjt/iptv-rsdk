@@ -1,7 +1,7 @@
 module.exports = {
   apps: [
     {
-      name: 'iptv-rsdk',
+      name: 'iptv-rsdk-new',
       cwd: __dirname,
       script: 'npm',
       args: 'run start',
