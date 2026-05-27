@@ -5,7 +5,6 @@ import { useMemo, useState } from 'react'
 import type {
   HomeExperienceConfig,
   HomeExperienceMenuItem,
-  HomeExperienceRunningTextItem,
   HomeExperienceScope,
   HomeExperienceStaticPage,
 } from '@/lib/homeExperience'
@@ -40,7 +39,6 @@ export default function HomeExperienceForm({
 }: HomeExperienceFormProps) {
   const [menus, setMenus] = useState<HomeExperienceMenuItem[]>(config.menus)
   const [staticPages, setStaticPages] = useState<HomeExperienceStaticPage[]>(config.staticPages)
-  const [runningTextItems, setRunningTextItems] = useState<HomeExperienceRunningTextItem[]>(config.runningText.items)
   const [logoUrl, setLogoUrl] = useState(config.logoUrl)
   const [homeBackgroundUrl, setHomeBackgroundUrl] = useState(config.homeBackgroundUrl)
   const [splashEnabled, setSplashEnabled] = useState(config.splash.enabled)
@@ -52,10 +50,6 @@ export default function HomeExperienceForm({
   const [splashSubtitle, setSplashSubtitle] = useState(config.splash.subtitle)
   const [splashFooterText, setSplashFooterText] = useState(config.splash.footerText)
   const [splashLoadingText, setSplashLoadingText] = useState(config.splash.loadingText)
-  const [runningTextEnabled, setRunningTextEnabled] = useState(config.runningText.enabled)
-  const [runningTextVisibleCount, setRunningTextVisibleCount] = useState(config.runningText.visibleCount)
-  const [runningTextRotationSeconds, setRunningTextRotationSeconds] = useState(config.runningText.rotationSeconds)
-  const [runningTextDisplaySeconds, setRunningTextDisplaySeconds] = useState(config.runningText.displaySeconds)
   const [enableSelectionSound, setEnableSelectionSound] = useState(config.sounds.enableSelectionSound)
   const [enableSplashSound, setEnableSplashSound] = useState(config.sounds.enableSplashSound)
   const [selectionSoundUrl, setSelectionSoundUrl] = useState(config.sounds.selectionSoundUrl)
@@ -81,7 +75,6 @@ export default function HomeExperienceForm({
         <input type="hidden" name="revision" value={String(config.revision + 1)} />
         <input type="hidden" name="menusJson" value={JSON.stringify(menus)} />
         <input type="hidden" name="staticPagesJson" value={JSON.stringify(staticPages)} />
-        <input type="hidden" name="runningTextItemsJson" value={JSON.stringify(runningTextItems)} />
 
         <section className="space-y-4">
           <SectionTitle title="Branding & Background" description="Mengatur logo utama, background home default, dan asset splash." />
@@ -280,12 +273,6 @@ export default function HomeExperienceForm({
           </div>
         </section>
 
-        <input type="hidden" name="runningTextEnabled" value={runningTextEnabled ? 'on' : 'off'} />
-        <input type="hidden" name="runningTextVisibleCount" value={runningTextVisibleCount} />
-        <input type="hidden" name="runningTextRotationSeconds" value={runningTextRotationSeconds} />
-        <input type="hidden" name="runningTextDisplaySeconds" value={runningTextDisplaySeconds} />
-        <input type="hidden" name="runningTextItemsJson" value={JSON.stringify(runningTextItems)} />
-
         <section className="space-y-4 border-t border-border pt-6">
           <SectionTitle title="Sound Effect" description="Untuk saat ini profile mengatur enable / disable built-in splash dan selection sound di shell Android." />
           <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
@@ -301,7 +288,7 @@ export default function HomeExperienceForm({
         </section>
 
         <section className="space-y-4 border-t border-border pt-6">
-          <SectionTitle title="Live Preview" description="Preview cepat untuk splash, menu, dan running text berdasarkan state editor saat ini." />
+          <SectionTitle title="Live Preview" description="Preview cepat untuk splash dan menu berdasarkan state editor saat ini." />
           <HomeExperiencePreview
             config={{
               ...config,
@@ -309,14 +296,6 @@ export default function HomeExperienceForm({
               homeBackgroundUrl,
               menus,
               staticPages,
-              runningText: {
-                ...config.runningText,
-                enabled: runningTextEnabled,
-                visibleCount: runningTextVisibleCount,
-                rotationSeconds: runningTextRotationSeconds,
-                displaySeconds: runningTextDisplaySeconds,
-                items: runningTextItems,
-              },
               splash: {
                 ...config.splash,
                 enabled: splashEnabled,
@@ -462,17 +441,8 @@ function updateStaticPage(
   setPages((current) => current.map((item) => (item.id === id ? { ...item, ...patch } : item)))
 }
 
-function updateTicker(
-  setItems: Dispatch<SetStateAction<HomeExperienceRunningTextItem[]>>,
-  id: string,
-  patch: Partial<HomeExperienceRunningTextItem>
-) {
-  setItems((current) => current.map((item) => (item.id === id ? { ...item, ...patch } : item)))
-}
-
-function HomeExperiencePreview({ config }: { config: HomeExperienceConfig }) {
+export function HomeExperiencePreview({ config }: { config: HomeExperienceConfig }) {
   const visibleMenus = [...config.menus].filter((menu) => menu.enabled).sort((a, b) => a.sortOrder - b.sortOrder)
-  const visibleTickers = config.runningText.items.filter((item) => item.enabled && item.text.trim())
 
   return (
     <div className="grid grid-cols-1 2xl:grid-cols-[380px_minmax(0,1fr)] gap-6">
@@ -494,11 +464,6 @@ function HomeExperiencePreview({ config }: { config: HomeExperienceConfig }) {
       <div className="rounded-3xl border border-border bg-[linear-gradient(180deg,rgba(10,16,28,0.98),rgba(6,11,20,0.98))] p-5 space-y-4">
         <div className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Home Preview</div>
         <div className="rounded-2xl border border-white/10 bg-black/20 p-4 space-y-4">
-          {config.runningText.enabled && visibleTickers.length > 0 && (
-            <div className="rounded-xl border border-amber-400/20 bg-amber-400/5 px-3 py-2 text-[11px] text-amber-200">
-              {visibleTickers.slice(0, Math.max(1, config.runningText.visibleCount)).map((item) => item.text).join(' | ')}
-            </div>
-          )}
           <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
             {visibleMenus.map((menu) => (
               <div

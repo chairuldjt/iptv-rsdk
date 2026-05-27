@@ -1,8 +1,8 @@
 import prisma from '@/lib/db'
 import { getDeviceGroupForDevice } from '@/lib/deviceGroups'
-import { resolveEffectiveRunningText } from '@/lib/runningText'
 
 const GLOBAL_HOME_EXPERIENCE_KEY = 'homeExperience.global'
+const HOME_EXPERIENCE_MENU_TYPES = ['tv', 'education', 'entertainment', 'settings', 'info_dialog', 'static_page'] as const
 
 export type HomeExperienceScope = 'global' | 'group' | 'device' | 'profile'
 
@@ -41,19 +41,12 @@ export type HomeExperienceRunningTextItem = {
   text: string
 }
 
-export type HomeExperienceConfig = {
+export type HomeExperienceResolvedConfig = {
   revision: number
   logoUrl: string
   homeBackgroundUrl: string
   menus: HomeExperienceMenuItem[]
   staticPages: HomeExperienceStaticPage[]
-  runningText: {
-    enabled: boolean
-    visibleCount: number
-    rotationSeconds: number
-    displaySeconds: number
-    items: HomeExperienceRunningTextItem[]
-  }
   splash: {
     enabled: boolean
     backgroundUrl: string
@@ -70,14 +63,42 @@ export type HomeExperienceConfig = {
     enableSplashSound: boolean
     selectionSoundUrl: string
   }
-  videoBroadcast?: {
-    enabled: boolean
-    videoId: number | null
-    repeatCount: number
-  }
 }
 
-export const FALLBACK_HOME_EXPERIENCE_CONFIG: HomeExperienceConfig = {
+export type HomeExperienceMenuPatch = {
+  id: string
+  enabled?: boolean
+  type?: HomeExperienceMenuType
+  title?: string
+  subtitle?: string
+  icon?: string
+  textColor?: string
+  borderColor?: string
+  accentColor?: string
+  backgroundUrl?: string
+  staticPageId?: string
+  sortOrder?: number
+}
+
+export type HomeExperienceStaticPagePatch = {
+  id: string
+  title?: string
+  content?: string
+}
+
+export type HomeExperiencePatch = {
+  revision?: number
+  logoUrl?: string
+  homeBackgroundUrl?: string
+  menus?: HomeExperienceMenuPatch[]
+  staticPages?: HomeExperienceStaticPagePatch[]
+  splash?: Partial<HomeExperienceResolvedConfig['splash']>
+  sounds?: Partial<HomeExperienceResolvedConfig['sounds']>
+}
+
+export type HomeExperienceConfig = HomeExperienceResolvedConfig
+
+export const FALLBACK_HOME_EXPERIENCE_CONFIG: HomeExperienceResolvedConfig = {
   revision: 1,
   logoUrl: '',
   homeBackgroundUrl: '',
@@ -160,19 +181,6 @@ export const FALLBACK_HOME_EXPERIENCE_CONFIG: HomeExperienceConfig = {
       content: 'Selamat datang di IPTV RSDK. Halaman ini dapat diatur dari Web Admin.',
     },
   ],
-  runningText: {
-    enabled: false,
-    visibleCount: 1,
-    rotationSeconds: 10,
-    displaySeconds: 10,
-    items: [
-      {
-        id: 'ticker_welcome',
-        enabled: true,
-        text: 'Selamat datang. Running text ini dapat diubah dari Web Admin.',
-      },
-    ],
-  },
   splash: {
     enabled: true,
     backgroundUrl: '',
@@ -189,34 +197,29 @@ export const FALLBACK_HOME_EXPERIENCE_CONFIG: HomeExperienceConfig = {
     enableSplashSound: true,
     selectionSoundUrl: '',
   },
-  videoBroadcast: {
-    enabled: false,
-    videoId: null,
-    repeatCount: 1,
-  },
 }
 
-export async function getGlobalHomeExperience(): Promise<HomeExperienceConfig> {
+export async function getGlobalHomeExperience(): Promise<HomeExperienceResolvedConfig> {
   return getStoredHomeExperience(GLOBAL_HOME_EXPERIENCE_KEY)
 }
 
-export async function setGlobalHomeExperience(config: HomeExperienceConfig): Promise<void> {
+export async function setGlobalHomeExperience(config: HomeExperienceResolvedConfig): Promise<void> {
   await saveStoredHomeExperience(GLOBAL_HOME_EXPERIENCE_KEY, config)
 }
 
-export async function getGroupHomeExperience(groupId: string): Promise<HomeExperienceConfig | null> {
+export async function getGroupHomeExperience(groupId: string): Promise<HomeExperienceResolvedConfig | null> {
   return getStoredHomeExperienceOptional(groupKey(groupId))
 }
 
-export async function setGroupHomeExperience(groupId: string, config: HomeExperienceConfig): Promise<void> {
+export async function setGroupHomeExperience(groupId: string, config: HomeExperienceResolvedConfig): Promise<void> {
   await saveStoredHomeExperience(groupKey(groupId), config)
 }
 
-export async function getDeviceHomeExperience(deviceId: string): Promise<HomeExperienceConfig | null> {
+export async function getDeviceHomeExperience(deviceId: string): Promise<HomeExperienceResolvedConfig | null> {
   return getStoredHomeExperienceOptional(deviceKey(deviceId))
 }
 
-export async function setDeviceHomeExperience(deviceId: string, config: HomeExperienceConfig): Promise<void> {
+export async function setDeviceHomeExperience(deviceId: string, config: HomeExperienceResolvedConfig): Promise<void> {
   await saveStoredHomeExperience(deviceKey(deviceId), config)
 }
 
@@ -235,63 +238,44 @@ export async function clearScopedHomeExperience(scope: HomeExperienceScope, id?:
   })
 }
 
-export async function resolveEffectiveHomeExperience(deviceId: string): Promise<HomeExperienceConfig> {
-  // 1. Global: prefer profile-based global, fallback to legacy
+export async function resolveEffectiveHomeExperience(deviceId: string): Promise<HomeExperienceResolvedConfig> {
   const globalProfileId = await getGlobalProfileId()
-  const globalConfig = globalProfileId
-    ? ((await getHomeExperienceProfileConfig(globalProfileId)) ?? await getGlobalHomeExperience())
-    : await getGlobalHomeExperience()
+  const globalPatch = globalProfileId
+    ? ((await getHomeExperienceProfilePatch(globalProfileId)) ?? await getGlobalHomeExperiencePatch())
+    : await getGlobalHomeExperiencePatch()
 
-  // 2. Group: prefer profile-based group config, fallback to legacy per-group config
   const groupId = await getDeviceGroupForDevice(deviceId)
-  let groupConfig: HomeExperienceConfig | null = null
+  let groupPatch: HomeExperiencePatch | null = null
   if (groupId) {
     const groupProfileMap = await getGroupProfileMap()
     const groupProfileId = groupProfileMap[groupId]
-    groupConfig = groupProfileId
-      ? await getHomeExperienceProfileConfig(groupProfileId)
-      : await getGroupHomeExperience(groupId)
+    groupPatch = groupProfileId
+      ? await getHomeExperienceProfilePatch(groupProfileId)
+      : await getGroupHomeExperiencePatch(groupId)
   }
 
-  // 3. Device: prefer profile-based device config, fallback to legacy per-device override
   const deviceProfileMap = await getDeviceProfileMap()
   const deviceProfileId = deviceProfileMap[deviceId]
-  const deviceConfig = deviceProfileId
-    ? await getHomeExperienceProfileConfig(deviceProfileId)
-    : await getDeviceHomeExperience(deviceId)
+  const devicePatch = deviceProfileId
+    ? await getHomeExperienceProfilePatch(deviceProfileId)
+    : await getDeviceHomeExperiencePatch(deviceId)
 
-  const merged = deepMergeHomeExperience(
-    deepMergeHomeExperience(globalConfig, groupConfig),
-    deviceConfig
+  return applyHomeExperiencePatch(
+    applyHomeExperiencePatch(
+      applyHomeExperiencePatch(FALLBACK_HOME_EXPERIENCE_CONFIG, globalPatch),
+      groupPatch
+    ),
+    devicePatch
   )
-
-  // Override runningText with the resolved Running Text profile settings
-  const effectiveRunningText = await resolveEffectiveRunningText(deviceId)
-  merged.runningText = {
-    enabled: false,
-    visibleCount: effectiveRunningText.visibleCount,
-    rotationSeconds: effectiveRunningText.rotationSeconds,
-    displaySeconds: effectiveRunningText.displaySeconds,
-    items: effectiveRunningText.items,
-  }
-
-  return merged
 }
 
-export function homeExperienceFromFormData(formData: FormData): HomeExperienceConfig {
+export function homeExperienceFromFormData(formData: FormData): HomeExperienceResolvedConfig {
   return normalizeHomeExperienceConfig({
     revision: Number.parseInt(String(formData.get('revision') || FALLBACK_HOME_EXPERIENCE_CONFIG.revision), 10),
     logoUrl: formData.get('logoUrl'),
     homeBackgroundUrl: formData.get('homeBackgroundUrl'),
     menus: parseJsonArray(formData.get('menusJson'), FALLBACK_HOME_EXPERIENCE_CONFIG.menus),
     staticPages: parseJsonArray(formData.get('staticPagesJson'), FALLBACK_HOME_EXPERIENCE_CONFIG.staticPages),
-    runningText: {
-      enabled: formData.get('runningTextEnabled') === 'on',
-      visibleCount: Number.parseInt(String(formData.get('runningTextVisibleCount') || 1), 10),
-      rotationSeconds: Number.parseInt(String(formData.get('runningTextRotationSeconds') || 10), 10),
-      displaySeconds: Number.parseInt(String(formData.get('runningTextDisplaySeconds') || 10), 10),
-      items: parseJsonArray(formData.get('runningTextItemsJson'), FALLBACK_HOME_EXPERIENCE_CONFIG.runningText.items),
-    },
     splash: {
       enabled: formData.get('splashEnabled') === 'on',
       backgroundUrl: formData.get('splashBackgroundUrl'),
@@ -308,15 +292,10 @@ export function homeExperienceFromFormData(formData: FormData): HomeExperienceCo
       enableSplashSound: formData.get('enableSplashSound') === 'on',
       selectionSoundUrl: formData.get('selectionSoundUrl'),
     },
-    videoBroadcast: {
-      enabled: formData.get('videoBroadcastEnabled') === 'on',
-      videoId: formData.get('videoBroadcastVideoId') ? Number.parseInt(String(formData.get('videoBroadcastVideoId')), 10) : null,
-      repeatCount: Number.parseInt(String(formData.get('videoBroadcastRepeatCount') || 1), 10),
-    },
   })
 }
 
-export function normalizeHomeExperienceConfig(value: unknown): HomeExperienceConfig {
+export function normalizeHomeExperienceConfig(value: unknown): HomeExperienceResolvedConfig {
   const source = isRecord(value) ? value : {}
 
   return {
@@ -325,47 +304,56 @@ export function normalizeHomeExperienceConfig(value: unknown): HomeExperienceCon
     homeBackgroundUrl: safeString(source.homeBackgroundUrl, ''),
     menus: normalizeMenus(source.menus),
     staticPages: normalizeStaticPages(source.staticPages),
-    runningText: normalizeRunningText(source.runningText),
     splash: normalizeSplash(source.splash),
     sounds: normalizeSounds(source.sounds),
-    videoBroadcast: normalizeVideoBroadcast(source.videoBroadcast),
   }
 }
 
-export function deepMergeHomeExperience(
-  base: HomeExperienceConfig,
-  overrideConfig: HomeExperienceConfig | null
-): HomeExperienceConfig {
-  if (!overrideConfig) return base
+export function normalizeHomeExperiencePatch(value: unknown): HomeExperiencePatch {
+  const source = isRecord(value) ? value : {}
+  const patch: HomeExperiencePatch = {}
+
+  if (hasOwn(source, 'revision')) patch.revision = clampInt(source.revision, 1, 100_000, FALLBACK_HOME_EXPERIENCE_CONFIG.revision)
+  if (hasOwn(source, 'logoUrl')) patch.logoUrl = safeString(source.logoUrl, '')
+  if (hasOwn(source, 'homeBackgroundUrl')) patch.homeBackgroundUrl = safeString(source.homeBackgroundUrl, '')
+  if (hasOwn(source, 'menus')) patch.menus = normalizeMenuPatches(source.menus)
+  if (hasOwn(source, 'staticPages')) patch.staticPages = normalizeStaticPagePatches(source.staticPages)
+  if (hasOwn(source, 'splash')) patch.splash = normalizeSplashPatch(source.splash)
+  if (hasOwn(source, 'sounds')) patch.sounds = normalizeSoundsPatch(source.sounds)
+
+  return patch
+}
+
+export function applyHomeExperiencePatch(
+  base: HomeExperienceResolvedConfig,
+  patch: HomeExperiencePatch | null
+): HomeExperienceResolvedConfig {
+  if (!patch) return base
 
   return normalizeHomeExperienceConfig({
     ...base,
-    ...overrideConfig,
-    runningText: {
-      ...base.runningText,
-      ...overrideConfig.runningText,
-      items: overrideConfig.runningText.items,
-    },
+    revision: patch.revision ?? base.revision,
+    logoUrl: patch.logoUrl ?? base.logoUrl,
+    homeBackgroundUrl: patch.homeBackgroundUrl ?? base.homeBackgroundUrl,
     splash: {
       ...base.splash,
-      ...overrideConfig.splash,
+      ...(patch.splash ?? {}),
     },
     sounds: {
       ...base.sounds,
-      ...overrideConfig.sounds,
+      ...(patch.sounds ?? {}),
     },
-    videoBroadcast: {
-      ...base.videoBroadcast,
-      ...overrideConfig.videoBroadcast,
-    },
-    menus: overrideConfig.menus,
-    staticPages: overrideConfig.staticPages,
+    menus: mergeMenuPatches(base.menus, patch.menus),
+    staticPages: mergeStaticPagePatches(base.staticPages, patch.staticPages),
   })
 }
 
-// ===== Profile System =====
-// Profiles are named, reusable config objects (like GPOs in GPMC).
-// One profile can be assigned to multiple groups and/or multiple devices.
+export function deepMergeHomeExperience(
+  base: HomeExperienceResolvedConfig,
+  overrideConfig: HomeExperiencePatch | null
+): HomeExperienceResolvedConfig {
+  return applyHomeExperiencePatch(base, overrideConfig)
+}
 
 export type HomeExperienceProfile = {
   id: string
@@ -402,8 +390,12 @@ async function saveHomeExperienceProfiles(profiles: HomeExperienceProfile[]): Pr
   })
 }
 
-export async function getHomeExperienceProfileConfig(profileId: string): Promise<HomeExperienceConfig | null> {
+export async function getHomeExperienceProfileConfig(profileId: string): Promise<HomeExperienceResolvedConfig | null> {
   return getStoredHomeExperienceOptional(profileDataKey(profileId))
+}
+
+export async function getHomeExperienceProfilePatch(profileId: string): Promise<HomeExperiencePatch | null> {
+  return getStoredHomeExperiencePatchOptional(profileDataKey(profileId))
 }
 
 export async function createHomeExperienceProfile(input: {
@@ -439,31 +431,26 @@ export async function updateHomeExperienceProfileMeta(
 
 export async function saveHomeExperienceProfileConfig(
   profileId: string,
-  config: HomeExperienceConfig
+  config: HomeExperienceResolvedConfig
 ): Promise<void> {
   await saveStoredHomeExperience(profileDataKey(profileId), config)
 }
 
 export async function deleteHomeExperienceProfile(profileId: string): Promise<void> {
-  // Remove from metadata list
   const profiles = await getHomeExperienceProfiles()
   await saveHomeExperienceProfiles(profiles.filter((p) => p.id !== profileId))
 
-  // Remove config data
   await prisma.appSetting.deleteMany({ where: { key: profileDataKey(profileId) } })
 
-  // Clear global if it was this profile
   const globalId = await getGlobalProfileId()
   if (globalId === profileId) await setGlobalProfileId(null)
 
-  // Clear group assignments pointing to this profile
   const groupMap = await getGroupProfileMap()
   await saveProfileMap(
     GROUP_PROFILE_MAP_KEY,
     Object.fromEntries(Object.entries(groupMap).filter(([, pid]) => pid !== profileId))
   )
 
-  // Clear device assignments pointing to this profile
   const deviceMap = await getDeviceProfileMap()
   await saveProfileMap(
     DEVICE_PROFILE_MAP_KEY,
@@ -535,15 +522,17 @@ export async function assignProfileToDevice(deviceId: string, profileId: string 
   await saveProfileMap(DEVICE_PROFILE_MAP_KEY, map)
 }
 
-// ===== END Profile System =====
-
-async function getStoredHomeExperience(key: string): Promise<HomeExperienceConfig> {
+async function getStoredHomeExperience(key: string): Promise<HomeExperienceResolvedConfig> {
   const config = await getStoredHomeExperienceOptional(key)
   return config ?? FALLBACK_HOME_EXPERIENCE_CONFIG
 }
 
-async function getStoredHomeExperienceOptional(key: string): Promise<HomeExperienceConfig | null> {
+async function getStoredHomeExperienceOptional(key: string): Promise<HomeExperienceResolvedConfig | null> {
+  const patch = await getStoredHomeExperiencePatchOptional(key)
+  return patch ? applyHomeExperiencePatch(FALLBACK_HOME_EXPERIENCE_CONFIG, patch) : null
+}
 
+async function getStoredHomeExperiencePatchOptional(key: string): Promise<HomeExperiencePatch | null> {
   const setting = await prisma.appSetting.findUnique({
     where: { key },
   })
@@ -551,21 +540,33 @@ async function getStoredHomeExperienceOptional(key: string): Promise<HomeExperie
   if (!setting?.value) return null
 
   try {
-    return normalizeHomeExperienceConfig(JSON.parse(setting.value))
+    return compactHomeExperiencePatch(normalizeHomeExperiencePatch(JSON.parse(setting.value)))
   } catch {
     return null
   }
 }
 
-async function saveStoredHomeExperience(key: string, config: HomeExperienceConfig): Promise<void> {
-  const safeConfig = normalizeHomeExperienceConfig(config)
+async function getGlobalHomeExperiencePatch(): Promise<HomeExperiencePatch | null> {
+  return getStoredHomeExperiencePatchOptional(GLOBAL_HOME_EXPERIENCE_KEY)
+}
+
+async function getGroupHomeExperiencePatch(groupId: string): Promise<HomeExperiencePatch | null> {
+  return getStoredHomeExperiencePatchOptional(groupKey(groupId))
+}
+
+async function getDeviceHomeExperiencePatch(deviceId: string): Promise<HomeExperiencePatch | null> {
+  return getStoredHomeExperiencePatchOptional(deviceKey(deviceId))
+}
+
+async function saveStoredHomeExperience(key: string, config: HomeExperienceResolvedConfig): Promise<void> {
+  const safePatch = compactHomeExperiencePatch(normalizeHomeExperiencePatch(config))
 
   await prisma.appSetting.upsert({
     where: { key },
-    update: { value: JSON.stringify(safeConfig) },
+    update: { value: JSON.stringify(safePatch) },
     create: {
       key,
-      value: JSON.stringify(safeConfig),
+      value: JSON.stringify(safePatch),
     },
   })
 }
@@ -592,7 +593,7 @@ function normalizeMenus(value: unknown): HomeExperienceMenuItem[] {
     .map((entry, index) => ({
       id: safeString(entry.id, `menu_${index}`),
       enabled: safeBoolean(entry.enabled, true),
-      type: oneOf(entry.type, ['tv', 'education', 'entertainment', 'settings', 'info_dialog', 'static_page'], 'info_dialog'),
+      type: oneOf(entry.type, HOME_EXPERIENCE_MENU_TYPES, 'info_dialog'),
       title: safeString(entry.title, `MENU ${index + 1}`),
       subtitle: safeString(entry.subtitle, ''),
       icon: safeString(entry.icon, 'info'),
@@ -618,29 +619,7 @@ function normalizeStaticPages(value: unknown): HomeExperienceStaticPage[] {
     }))
 }
 
-function normalizeRunningText(value: unknown): HomeExperienceConfig['runningText'] {
-  const source = isRecord(value) ? value : {}
-  const itemsSource = Array.isArray(source.items)
-    ? source.items
-    : FALLBACK_HOME_EXPERIENCE_CONFIG.runningText.items
-
-  return {
-    enabled: safeBoolean(source.enabled, FALLBACK_HOME_EXPERIENCE_CONFIG.runningText.enabled),
-    visibleCount: clampInt(source.visibleCount, 1, 10, FALLBACK_HOME_EXPERIENCE_CONFIG.runningText.visibleCount),
-    rotationSeconds: clampInt(source.rotationSeconds, 1, 600, FALLBACK_HOME_EXPERIENCE_CONFIG.runningText.rotationSeconds),
-    displaySeconds: clampInt(source.displaySeconds, 0, 600, FALLBACK_HOME_EXPERIENCE_CONFIG.runningText.displaySeconds),
-    items: itemsSource
-      .filter((entry): entry is Record<string, unknown> => isRecord(entry))
-      .map((entry, index) => ({
-        id: safeString(entry.id, `ticker_${index}`),
-        enabled: safeBoolean(entry.enabled, true),
-        text: safeString(entry.text, ''),
-      }))
-      .filter((entry) => entry.text.length > 0),
-  }
-}
-
-function normalizeSplash(value: unknown): HomeExperienceConfig['splash'] {
+function normalizeSplash(value: unknown): HomeExperienceResolvedConfig['splash'] {
   const source = isRecord(value) ? value : {}
   return {
     enabled: safeBoolean(source.enabled, FALLBACK_HOME_EXPERIENCE_CONFIG.splash.enabled),
@@ -655,7 +634,7 @@ function normalizeSplash(value: unknown): HomeExperienceConfig['splash'] {
   }
 }
 
-function normalizeSounds(value: unknown): HomeExperienceConfig['sounds'] {
+function normalizeSounds(value: unknown): HomeExperienceResolvedConfig['sounds'] {
   const source = isRecord(value) ? value : {}
   return {
     enableSelectionSound: safeBoolean(source.enableSelectionSound, FALLBACK_HOME_EXPERIENCE_CONFIG.sounds.enableSelectionSound),
@@ -664,20 +643,181 @@ function normalizeSounds(value: unknown): HomeExperienceConfig['sounds'] {
   }
 }
 
-function normalizeVideoBroadcast(value: unknown): HomeExperienceConfig['videoBroadcast'] {
+function normalizeSplashPatch(value: unknown): Partial<HomeExperienceResolvedConfig['splash']> {
   const source = isRecord(value) ? value : {}
-  const fallback = FALLBACK_HOME_EXPERIENCE_CONFIG.videoBroadcast || { enabled: false, videoId: null, repeatCount: 1 }
-  return {
-    enabled: safeBoolean(source.enabled, fallback.enabled),
-    videoId: nullableNumber(source.videoId),
-    repeatCount: clampInt(source.repeatCount, 1, 100, fallback.repeatCount),
-  }
+  const patch: Partial<HomeExperienceResolvedConfig['splash']> = {}
+  if (hasOwn(source, 'enabled')) patch.enabled = safeBoolean(source.enabled, FALLBACK_HOME_EXPERIENCE_CONFIG.splash.enabled)
+  if (hasOwn(source, 'backgroundUrl')) patch.backgroundUrl = safeString(source.backgroundUrl, '')
+  if (hasOwn(source, 'logoUrl')) patch.logoUrl = safeString(source.logoUrl, '')
+  if (hasOwn(source, 'soundUrl')) patch.soundUrl = safeString(source.soundUrl, '')
+  if (hasOwn(source, 'title')) patch.title = safeString(source.title, FALLBACK_HOME_EXPERIENCE_CONFIG.splash.title)
+  if (hasOwn(source, 'subtitle')) patch.subtitle = safeString(source.subtitle, FALLBACK_HOME_EXPERIENCE_CONFIG.splash.subtitle)
+  if (hasOwn(source, 'footerText')) patch.footerText = safeString(source.footerText, FALLBACK_HOME_EXPERIENCE_CONFIG.splash.footerText)
+  if (hasOwn(source, 'loadingText')) patch.loadingText = safeString(source.loadingText, FALLBACK_HOME_EXPERIENCE_CONFIG.splash.loadingText)
+  if (hasOwn(source, 'showSound')) patch.showSound = safeBoolean(source.showSound, FALLBACK_HOME_EXPERIENCE_CONFIG.splash.showSound)
+  return patch
 }
 
-function nullableNumber(value: unknown): number | null {
-  if (typeof value === 'number' && Number.isFinite(value) && value > 0) return Math.floor(value)
-  const parsed = Number.parseInt(String(value ?? ''), 10)
-  return Number.isFinite(parsed) && parsed > 0 ? parsed : null
+function normalizeSoundsPatch(value: unknown): Partial<HomeExperienceResolvedConfig['sounds']> {
+  const source = isRecord(value) ? value : {}
+  const patch: Partial<HomeExperienceResolvedConfig['sounds']> = {}
+  if (hasOwn(source, 'enableSelectionSound')) patch.enableSelectionSound = safeBoolean(source.enableSelectionSound, FALLBACK_HOME_EXPERIENCE_CONFIG.sounds.enableSelectionSound)
+  if (hasOwn(source, 'enableSplashSound')) patch.enableSplashSound = safeBoolean(source.enableSplashSound, FALLBACK_HOME_EXPERIENCE_CONFIG.sounds.enableSplashSound)
+  if (hasOwn(source, 'selectionSoundUrl')) patch.selectionSoundUrl = safeString(source.selectionSoundUrl, '')
+  return patch
+}
+
+function normalizeMenuPatches(value: unknown): HomeExperienceMenuPatch[] {
+  const source = Array.isArray(value) ? value : []
+  return source
+    .filter((entry): entry is Record<string, unknown> => isRecord(entry))
+    .map((entry, index) => {
+      const patch: HomeExperienceMenuPatch = {
+        id: safeString(entry.id, `menu_${index}`),
+      }
+      if (hasOwn(entry, 'enabled')) patch.enabled = safeBoolean(entry.enabled, true)
+      if (hasOwn(entry, 'type')) patch.type = oneOf(entry.type, HOME_EXPERIENCE_MENU_TYPES, 'info_dialog')
+      if (hasOwn(entry, 'title')) patch.title = safeString(entry.title, `MENU ${index + 1}`)
+      if (hasOwn(entry, 'subtitle')) patch.subtitle = safeString(entry.subtitle, '')
+      if (hasOwn(entry, 'icon')) patch.icon = safeString(entry.icon, 'info')
+      if (hasOwn(entry, 'textColor')) patch.textColor = normalizeHexColor(entry.textColor, '#FFFFFF')
+      if (hasOwn(entry, 'borderColor')) patch.borderColor = normalizeHexColor(entry.borderColor, '#FFFFFF')
+      if (hasOwn(entry, 'accentColor')) patch.accentColor = normalizeHexColor(entry.accentColor, '#FFFFFF')
+      if (hasOwn(entry, 'backgroundUrl')) patch.backgroundUrl = safeString(entry.backgroundUrl, '')
+      if (hasOwn(entry, 'staticPageId')) patch.staticPageId = safeString(entry.staticPageId, '')
+      if (hasOwn(entry, 'sortOrder')) patch.sortOrder = clampInt(entry.sortOrder, 0, 9999, index * 10)
+      return patch
+    })
+}
+
+function normalizeStaticPagePatches(value: unknown): HomeExperienceStaticPagePatch[] {
+  const source = Array.isArray(value) ? value : []
+  return source
+    .filter((entry): entry is Record<string, unknown> => isRecord(entry))
+    .map((entry, index) => {
+      const patch: HomeExperienceStaticPagePatch = {
+        id: safeString(entry.id, `page_${index}`),
+      }
+      if (hasOwn(entry, 'title')) patch.title = safeString(entry.title, `Halaman ${index + 1}`)
+      if (hasOwn(entry, 'content')) patch.content = safeString(entry.content, '')
+      return patch
+    })
+}
+
+function mergeMenuPatches(baseMenus: HomeExperienceMenuItem[], patches?: HomeExperienceMenuPatch[]): HomeExperienceMenuItem[] {
+  if (!patches || patches.length === 0) return baseMenus
+
+  const baseMap = new Map(baseMenus.map((menu) => [menu.id, menu]))
+  for (const patch of patches) {
+    const existing = baseMap.get(patch.id)
+    const fallback = FALLBACK_HOME_EXPERIENCE_CONFIG.menus.find((menu) => menu.id === patch.id)
+    const seed = existing ?? fallback ?? createDefaultMenu(patch.id, baseMap.size)
+    const merged = normalizeMenus([{ ...seed, ...patch }])[0]
+    if (merged) baseMap.set(patch.id, merged)
+  }
+  return Array.from(baseMap.values()).sort((a, b) => a.sortOrder - b.sortOrder)
+}
+
+function mergeStaticPagePatches(basePages: HomeExperienceStaticPage[], patches?: HomeExperienceStaticPagePatch[]): HomeExperienceStaticPage[] {
+  if (!patches || patches.length === 0) return basePages
+
+  const baseMap = new Map(basePages.map((page) => [page.id, page]))
+  for (const patch of patches) {
+    const existing = baseMap.get(patch.id)
+    const fallback = FALLBACK_HOME_EXPERIENCE_CONFIG.staticPages.find((page) => page.id === patch.id)
+    const seed = existing ?? fallback ?? { id: patch.id, title: patch.id, content: '' }
+    const merged = normalizeStaticPages([{ ...seed, ...patch }])[0]
+    if (merged) baseMap.set(patch.id, merged)
+  }
+  return Array.from(baseMap.values())
+}
+
+function compactHomeExperiencePatch(patch: HomeExperiencePatch): HomeExperiencePatch {
+  const compacted: HomeExperiencePatch = {}
+
+  if (patch.revision !== undefined && patch.revision !== FALLBACK_HOME_EXPERIENCE_CONFIG.revision) compacted.revision = patch.revision
+  if (patch.logoUrl !== undefined && patch.logoUrl !== FALLBACK_HOME_EXPERIENCE_CONFIG.logoUrl) compacted.logoUrl = patch.logoUrl
+  if (patch.homeBackgroundUrl !== undefined && patch.homeBackgroundUrl !== FALLBACK_HOME_EXPERIENCE_CONFIG.homeBackgroundUrl) {
+    compacted.homeBackgroundUrl = patch.homeBackgroundUrl
+  }
+
+  const compactMenus = compactMenuPatches(patch.menus)
+  if (compactMenus.length > 0) compacted.menus = compactMenus
+
+  const compactPages = compactStaticPagePatches(patch.staticPages)
+  if (compactPages.length > 0) compacted.staticPages = compactPages
+
+  const compactSplash = compactObjectPatch(patch.splash, FALLBACK_HOME_EXPERIENCE_CONFIG.splash)
+  if (Object.keys(compactSplash).length > 0) compacted.splash = compactSplash
+
+  const compactSounds = compactObjectPatch(patch.sounds, FALLBACK_HOME_EXPERIENCE_CONFIG.sounds)
+  if (Object.keys(compactSounds).length > 0) compacted.sounds = compactSounds
+
+  return compacted
+}
+
+function compactMenuPatches(patches?: HomeExperienceMenuPatch[]): HomeExperienceMenuPatch[] {
+  if (!patches) return []
+
+  return patches
+    .map((patch, index) => {
+      const fallback = FALLBACK_HOME_EXPERIENCE_CONFIG.menus.find((menu) => menu.id === patch.id) ?? createDefaultMenu(patch.id, index)
+      const compact: HomeExperienceMenuPatch = { id: patch.id }
+      if (patch.enabled !== undefined && patch.enabled !== fallback.enabled) compact.enabled = patch.enabled
+      if (patch.type !== undefined && patch.type !== fallback.type) compact.type = patch.type
+      if (patch.title !== undefined && patch.title !== fallback.title) compact.title = patch.title
+      if (patch.subtitle !== undefined && patch.subtitle !== fallback.subtitle) compact.subtitle = patch.subtitle
+      if (patch.icon !== undefined && patch.icon !== fallback.icon) compact.icon = patch.icon
+      if (patch.textColor !== undefined && patch.textColor !== fallback.textColor) compact.textColor = patch.textColor
+      if (patch.borderColor !== undefined && patch.borderColor !== fallback.borderColor) compact.borderColor = patch.borderColor
+      if (patch.accentColor !== undefined && patch.accentColor !== fallback.accentColor) compact.accentColor = patch.accentColor
+      if (patch.backgroundUrl !== undefined && patch.backgroundUrl !== fallback.backgroundUrl) compact.backgroundUrl = patch.backgroundUrl
+      if (patch.staticPageId !== undefined && patch.staticPageId !== fallback.staticPageId) compact.staticPageId = patch.staticPageId
+      if (patch.sortOrder !== undefined && patch.sortOrder !== fallback.sortOrder) compact.sortOrder = patch.sortOrder
+      return compact
+    })
+    .filter((patch) => Object.keys(patch).length > 1)
+}
+
+function compactStaticPagePatches(patches?: HomeExperienceStaticPagePatch[]): HomeExperienceStaticPagePatch[] {
+  if (!patches) return []
+
+  return patches
+    .map((patch, index) => {
+      const fallback = FALLBACK_HOME_EXPERIENCE_CONFIG.staticPages.find((page) => page.id === patch.id)
+        ?? { id: patch.id, title: `Halaman ${index + 1}`, content: '' }
+      const compact: HomeExperienceStaticPagePatch = { id: patch.id }
+      if (patch.title !== undefined && patch.title !== fallback.title) compact.title = patch.title
+      if (patch.content !== undefined && patch.content !== fallback.content) compact.content = patch.content
+      return compact
+    })
+    .filter((patch) => Object.keys(patch).length > 1)
+}
+
+function compactObjectPatch<T extends Record<string, unknown>>(patch: Partial<T> | undefined, fallback: T): Partial<T> {
+  if (!patch) return {}
+  const compact: Partial<T> = {}
+  for (const key of Object.keys(patch) as Array<keyof T>) {
+    if (patch[key] !== fallback[key]) compact[key] = patch[key]
+  }
+  return compact
+}
+
+function createDefaultMenu(id: string, index: number): HomeExperienceMenuItem {
+  return {
+    id,
+    enabled: true,
+    type: 'info_dialog',
+    title: `MENU ${index + 1}`,
+    subtitle: '',
+    icon: 'info',
+    textColor: '#FFFFFF',
+    borderColor: '#FFFFFF',
+    accentColor: '#FFFFFF',
+    backgroundUrl: '',
+    staticPageId: '',
+    sortOrder: index * 10,
+  }
 }
 
 function parseJsonArray<T>(value: FormDataEntryValue | null, fallback: T[]): T[] {
@@ -688,6 +828,10 @@ function parseJsonArray<T>(value: FormDataEntryValue | null, fallback: T[]): T[]
   } catch {
     return fallback
   }
+}
+
+function hasOwn(record: Record<string, unknown>, key: string): boolean {
+  return Object.prototype.hasOwnProperty.call(record, key)
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

@@ -9,7 +9,6 @@ data class HomeExperienceProfile(
     val homeBackgroundUrl: String = "",
     val menus: List<HomeExperienceMenu> = emptyList(),
     val staticPages: List<HomeExperienceStaticPage> = emptyList(),
-    val runningText: HomeExperienceRunningText = HomeExperienceRunningText(),
     val splash: HomeExperienceSplash = HomeExperienceSplash(),
     val sounds: HomeExperienceSounds = HomeExperienceSounds()
 )
@@ -78,7 +77,6 @@ object HomeExperienceParser {
                 homeBackgroundUrl = root.optString("homeBackgroundUrl"),
                 menus = parseMenus(root.optJSONArray("menus")),
                 staticPages = parseStaticPages(root.optJSONArray("staticPages")),
-                runningText = parseRunningText(root.optJSONObject("runningText")),
                 splash = parseSplash(root.optJSONObject("splash")),
                 sounds = parseSounds(root.optJSONObject("sounds"))
             )

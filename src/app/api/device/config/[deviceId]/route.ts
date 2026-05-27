@@ -4,6 +4,7 @@ import { getErrorMessage } from '@/lib/errors'
 import { DEFAULT_CUSTOM_M3U_URL, DEFAULT_SYNC_MODE, normalizeSyncMode } from '@/lib/defaults'
 import { createDeviceConfigData, getDefaultDeviceConfig } from '@/lib/defaultDeviceConfig'
 import { resolveEffectiveHomeExperience } from '@/lib/homeExperience'
+import { resolveEffectiveRunningText } from '@/lib/runningText'
 import { getPrimaryNtpServer } from '@/lib/settings'
 import { resolveEffectiveVideoBroadcast } from '@/lib/videoBroadcast'
 
@@ -64,8 +65,9 @@ export async function GET(
       where: { isGlobal: true }
     })
     const primaryNtpServer = await getPrimaryNtpServer()
-    const [homeExperience, videoBroadcast] = await Promise.all([
+    const [homeExperience, runningText, videoBroadcast] = await Promise.all([
       resolveEffectiveHomeExperience(device.deviceId),
+      resolveEffectiveRunningText(device.deviceId),
       resolveEffectiveVideoBroadcast(device.deviceId),
     ])
 
@@ -101,6 +103,7 @@ export async function GET(
         education_force_sync: currentEducationForceSync,
         ntp_server: primaryNtpServer,
         home_experience_json: JSON.stringify(homeExperience),
+        running_text_json: JSON.stringify(runningText),
         video_broadcast_json: JSON.stringify(videoBroadcast),
       },
     })

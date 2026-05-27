@@ -140,6 +140,7 @@ class IptvRepository(
                         dataStoreManager.setHomeExperienceJson(it)
                         dataStoreManager.clearRunningTextOverride()
                     }
+                    config.running_text_json?.let { dataStoreManager.setRunningTextJson(it) }
                     config.video_broadcast_json?.let { dataStoreManager.setVideoBroadcastJson(it) }
 
                     if (config.force_sync == true) {

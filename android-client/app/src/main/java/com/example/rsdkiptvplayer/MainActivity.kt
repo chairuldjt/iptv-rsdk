@@ -87,6 +87,7 @@ class MainActivity : ComponentActivity() {
                     val confirmNoFocusRequester = remember { FocusRequester() }
                     val serverUrl by dataStoreManager.serverUrlFlow.collectAsState(initial = "")
                     val homeExperienceJson by dataStoreManager.homeExperienceJsonFlow.collectAsState(initial = "")
+                    val runningTextJson by dataStoreManager.runningTextJsonFlow.collectAsState(initial = "")
                     val runningTextOverrideJson by dataStoreManager.runningTextOverrideJsonFlow.collectAsState(initial = "")
                     val runningTextOverrideExpiresAt by dataStoreManager.runningTextOverrideExpiresAtFlow.collectAsState(initial = 0L)
                     val homeExperience = remember(homeExperienceJson) { HomeExperienceParser.parse(homeExperienceJson) }
@@ -94,9 +95,9 @@ class MainActivity : ComponentActivity() {
                         runningTextOverrideJson.isNotBlank() &&
                             (runningTextOverrideExpiresAt <= 0L || System.currentTimeMillis() < runningTextOverrideExpiresAt)
                     }
-                    val effectiveRunningText = remember(homeExperienceJson, runningTextOverrideJson, runningTextOverrideExpiresAt) {
+                    val effectiveRunningText = remember(runningTextJson, runningTextOverrideJson, runningTextOverrideExpiresAt) {
                         val runtimeOverride = HomeExperienceParser.parseRunningTextJson(runningTextOverrideJson)
-                        if (isRunningTextOverrideActive) runtimeOverride else homeExperience.runningText
+                        if (isRunningTextOverrideActive) runtimeOverride else HomeExperienceParser.parseRunningTextJson(runningTextJson)
                     }
 
                     LaunchedEffect(runningTextOverrideJson, runningTextOverrideExpiresAt) {

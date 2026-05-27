@@ -2,10 +2,11 @@ import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 import prisma from '@/lib/db'
 import PageHeader from '@/components/PageHeader'
-import HomeExperienceForm from '@/components/HomeExperienceForm'
+import HomeExperienceForm, { HomeExperiencePreview } from '@/components/HomeExperienceForm'
 import ConfirmForm from '@/components/ConfirmForm'
 import {
   FALLBACK_HOME_EXPERIENCE_CONFIG,
+  applyHomeExperiencePatch,
   assignProfileToDevice,
   assignProfileToGroup,
   createHomeExperienceProfile,
@@ -14,16 +15,17 @@ import {
   getGlobalProfileId,
   getGroupProfileMap,
   getHomeExperienceProfileConfig,
+  getHomeExperienceProfilePatch,
   getHomeExperienceProfiles,
   homeExperienceFromFormData,
   saveHomeExperienceProfileConfig,
   setGlobalProfileId,
-  updateHomeExperienceProfileMeta,
-  type HomeExperienceConfig,
+  type HomeExperiencePatch,
+  type HomeExperienceResolvedConfig,
   type HomeExperienceProfile,
 } from '@/lib/homeExperience'
 import { saveHomeExperienceAsset } from '@/lib/uploadedAssets'
-import { getDeviceGroupAssignments, getDeviceGroups } from '@/lib/deviceGroups'
+import { getDeviceGroupAssignments, getDeviceGroups, type DeviceGroup } from '@/lib/deviceGroups'
 
 export const revalidate = 0
 
@@ -42,11 +44,7 @@ async function saveProfileConfigAction(formData: FormData) {
   'use server'
   const profileId = (formData.get('targetId') as string) || ''
   if (!profileId) return
-  const existingConfig = (await getHomeExperienceProfileConfig(profileId)) ?? FALLBACK_HOME_EXPERIENCE_CONFIG
   const config = homeExperienceFromFormData(formData)
-  
-  // Preserve video broadcast config when saving home experience profile
-  config.videoBroadcast = existingConfig.videoBroadcast
 
   config.logoUrl = await resolveAsset(formData, 'logoFile', 'logo', config.logoUrl)
   config.homeBackgroundUrl = await resolveAsset(formData, 'homeBackgroundFile', 'home-bg', config.homeBackgroundUrl)
@@ -72,16 +70,6 @@ async function resetProfileConfigAction(formData: FormData) {
   await saveHomeExperienceProfileConfig(profileId, FALLBACK_HOME_EXPERIENCE_CONFIG)
   revalidatePath('/dashboard/experience')
   redirect(`/dashboard/experience?edit=${encodeURIComponent(profileId)}&reset=1`)
-}
-
-async function updateProfileMetaAction(formData: FormData) {
-  'use server'
-  const profileId = (formData.get('profileId') as string) || ''
-  const name = (formData.get('profileName') as string) || ''
-  const description = (formData.get('profileDescription') as string) || ''
-  if (profileId) await updateHomeExperienceProfileMeta(profileId, { name, description })
-  revalidatePath('/dashboard/experience')
-  redirect(`/dashboard/experience?updated=1`)
 }
 
 async function deleteProfileAction(formData: FormData) {
@@ -163,6 +151,17 @@ export default async function ExperiencePage({
     const profile = profiles.find((p) => p.id === editProfileId)
     if (!profile) redirect('/dashboard/experience')
     const config = (await getHomeExperienceProfileConfig(editProfileId)) ?? FALLBACK_HOME_EXPERIENCE_CONFIG
+    const previewContexts = await buildEffectivePreviewContexts({
+      profileId: editProfileId,
+      profileName: profile.name,
+      profileDescription: profile.description,
+      globalProfileId,
+      groupProfileMap,
+      deviceProfileMap,
+      groups,
+      groupAssignments,
+      allDevices,
+    })
 
     return (
       <div className="space-y-6 animate-fade-in">
@@ -198,6 +197,8 @@ export default async function ExperiencePage({
           onSaveAction={saveProfileConfigAction}
           onResetAction={resetProfileConfigAction}
         />
+
+        <EffectivePreviewSection contexts={previewContexts} />
       </div>
     )
   }
@@ -469,7 +470,6 @@ export default async function ExperiencePage({
                   isGlobal={isGlobal}
                   assignedGroups={assignedGroups as NonNullable<(typeof groups)[number]>[]}
                   assignedDeviceCount={assignedDeviceIds2.length}
-                  updateProfileMetaAction={updateProfileMetaAction}
                   deleteProfileAction={deleteProfileAction}
                   setGlobalAction={setGlobalAction}
                 />
@@ -489,7 +489,6 @@ function ProfileCard({
   isGlobal,
   assignedGroups,
   assignedDeviceCount,
-  updateProfileMetaAction,
   deleteProfileAction,
   setGlobalAction,
 }: {
@@ -497,7 +496,6 @@ function ProfileCard({
   isGlobal: boolean
   assignedGroups: Array<{ id: string; name: string; color: string }>
   assignedDeviceCount: number
-  updateProfileMetaAction: (fd: FormData) => Promise<void>
   deleteProfileAction: (fd: FormData) => Promise<void>
   setGlobalAction: (fd: FormData) => Promise<void>
 }) {
@@ -610,6 +608,223 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
       <span className="mb-1.5 block text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">{label}</span>
       {children}
     </label>
+  )
+}
+
+type PreviewSourceLabel = 'fallback' | 'global' | 'group' | 'device'
+
+type EffectivePreviewContext = {
+  id: string
+  title: string
+  description: string
+  config: HomeExperienceResolvedConfig
+  fieldSources: Record<'logoUrl' | 'homeBackgroundUrl' | 'menus' | 'staticPages' | 'splash' | 'sounds', PreviewSourceLabel>
+}
+
+async function buildEffectivePreviewContexts(input: {
+  profileId: string
+  profileName: string
+  profileDescription: string
+  globalProfileId: string | null
+  groupProfileMap: Record<string, string>
+  deviceProfileMap: Record<string, string>
+  groups: DeviceGroup[]
+  groupAssignments: Record<string, string>
+  allDevices: Array<{ deviceId: string; deviceName: string; isActive: boolean }>
+}): Promise<EffectivePreviewContext[]> {
+  const currentPatch = (await getHomeExperienceProfilePatch(input.profileId)) ?? {}
+  const globalPatch = input.globalProfileId && input.globalProfileId !== input.profileId
+    ? ((await getHomeExperienceProfilePatch(input.globalProfileId)) ?? {})
+    : null
+
+  const contexts: EffectivePreviewContext[] = []
+
+  const standaloneLayers = [
+    { label: 'fallback' as const, patch: null },
+    { label: 'device' as const, patch: currentPatch },
+  ]
+  contexts.push({
+    id: 'standalone',
+    title: 'Profile Only',
+    description: 'Simulasi profile ini di atas fallback bawaan tanpa global/group/device lain.',
+    config: applyLayerStack(standaloneLayers),
+    fieldSources: buildFieldSourceMap(standaloneLayers),
+  })
+
+  const groupIds = Object.entries(input.groupProfileMap)
+    .filter(([, profileId]) => profileId === input.profileId)
+    .map(([groupId]) => groupId)
+  const firstGroup = input.groups.find((group) => groupIds.includes(group.id))
+
+  if (firstGroup) {
+    const groupLayers = [
+      { label: 'fallback' as const, patch: null },
+      { label: 'global' as const, patch: globalPatch },
+      { label: 'group' as const, patch: currentPatch },
+    ]
+    const memberCount = Object.values(input.groupAssignments).filter((groupId) => groupId === firstGroup.id).length
+    contexts.push({
+      id: `group-${firstGroup.id}`,
+      title: `Sample Group: ${firstGroup.name}`,
+      description: `${memberCount} device di grup ini akan mewarisi hasil merge global base lalu override group dari profile ini.`,
+      config: applyLayerStack(groupLayers),
+      fieldSources: buildFieldSourceMap(groupLayers),
+    })
+  }
+
+  const deviceIds = Object.entries(input.deviceProfileMap)
+    .filter(([, profileId]) => profileId === input.profileId)
+    .map(([deviceId]) => deviceId)
+  const firstDevice = input.allDevices.find((device) => deviceIds.includes(device.deviceId))
+
+  if (firstDevice) {
+    const deviceGroupId = input.groupAssignments[firstDevice.deviceId]
+    const deviceGroupProfileId = deviceGroupId ? input.groupProfileMap[deviceGroupId] : null
+    const groupPatch = deviceGroupProfileId && deviceGroupProfileId !== input.profileId
+      ? ((await getHomeExperienceProfilePatch(deviceGroupProfileId)) ?? {})
+      : null
+    const deviceLayers = [
+      { label: 'fallback' as const, patch: null },
+      { label: 'global' as const, patch: globalPatch },
+      { label: 'group' as const, patch: groupPatch },
+      { label: 'device' as const, patch: currentPatch },
+    ]
+    const groupName = input.groups.find((group) => group.id === deviceGroupId)?.name || 'Tanpa grup'
+    contexts.push({
+      id: `device-${firstDevice.deviceId}`,
+      title: `Sample Device: ${firstDevice.deviceName}`,
+      description: `Device ini menerima base global, policy grup (${groupName}), lalu diakhiri override device dari profile ini.`,
+      config: applyLayerStack(deviceLayers),
+      fieldSources: buildFieldSourceMap(deviceLayers),
+    })
+  }
+
+  if (input.globalProfileId === input.profileId) {
+    const globalLayers = [
+      { label: 'fallback' as const, patch: null },
+      { label: 'global' as const, patch: currentPatch },
+    ]
+    contexts.unshift({
+      id: 'global-live',
+      title: 'Live Global Base',
+      description: 'Ini adalah hasil efektif untuk device yang tidak memiliki override group maupun device.',
+      config: applyLayerStack(globalLayers),
+      fieldSources: buildFieldSourceMap(globalLayers),
+    })
+  } else if (globalPatch) {
+    const inheritedLayers = [
+      { label: 'fallback' as const, patch: null },
+      { label: 'global' as const, patch: globalPatch },
+      { label: 'device' as const, patch: currentPatch },
+    ]
+    contexts.splice(1, 0, {
+      id: 'with-global-base',
+      title: 'With Current Global Base',
+      description: 'Simulasi profile ini saat diwariskan di atas global base yang sedang aktif sekarang.',
+      config: applyLayerStack(inheritedLayers),
+      fieldSources: buildFieldSourceMap(inheritedLayers),
+    })
+  }
+
+  return contexts
+}
+
+function applyLayerStack(
+  layers: Array<{ label: PreviewSourceLabel; patch: HomeExperiencePatch | null }>
+): HomeExperienceResolvedConfig {
+  return layers.reduce(
+    (config, layer) => applyHomeExperiencePatch(config, layer.patch),
+    FALLBACK_HOME_EXPERIENCE_CONFIG
+  )
+}
+
+function buildFieldSourceMap(
+  layers: Array<{ label: PreviewSourceLabel; patch: HomeExperiencePatch | null }>
+): EffectivePreviewContext['fieldSources'] {
+  return {
+    logoUrl: resolvePatchSource(layers, 'logoUrl'),
+    homeBackgroundUrl: resolvePatchSource(layers, 'homeBackgroundUrl'),
+    menus: resolvePatchSource(layers, 'menus'),
+    staticPages: resolvePatchSource(layers, 'staticPages'),
+    splash: resolvePatchSource(layers, 'splash'),
+    sounds: resolvePatchSource(layers, 'sounds'),
+  }
+}
+
+function resolvePatchSource(
+  layers: Array<{ label: PreviewSourceLabel; patch: HomeExperiencePatch | null }>,
+  key: keyof HomeExperiencePatch
+): PreviewSourceLabel {
+  for (let index = layers.length - 1; index >= 0; index -= 1) {
+    const layer = layers[index]
+    if (layer.patch && key in layer.patch) return layer.label
+  }
+  return 'fallback'
+}
+
+function EffectivePreviewSection({ contexts }: { contexts: EffectivePreviewContext[] }) {
+  if (contexts.length === 0) return null
+
+  return (
+    <div className="card rounded-2xl p-5 space-y-6">
+      <div className="space-y-2 border-b border-border pb-4">
+        <div className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Effective Preview</div>
+        <div className="text-sm font-semibold text-foreground">Simulasi Hasil Merge Nyata</div>
+        <p className="text-[11px] text-muted-foreground">
+          Panel ini menampilkan hasil config final setelah inheritance diterapkan pada beberapa skenario assignment yang relevan.
+        </p>
+      </div>
+
+      <div className="space-y-6">
+        {contexts.map((context) => (
+          <div key={context.id} className="space-y-4 rounded-2xl border border-border bg-accent/10 p-4">
+            <div className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
+              <div>
+                <div className="text-sm font-semibold text-foreground">{context.title}</div>
+                <p className="mt-1 text-[11px] text-muted-foreground">{context.description}</p>
+              </div>
+              <div className="grid grid-cols-2 gap-2 text-[10px] md:grid-cols-3">
+                <SourceBadge label="Logo" source={context.fieldSources.logoUrl} />
+                <SourceBadge label="Background" source={context.fieldSources.homeBackgroundUrl} />
+                <SourceBadge label="Menus" source={context.fieldSources.menus} />
+                <SourceBadge label="Pages" source={context.fieldSources.staticPages} />
+                <SourceBadge label="Splash" source={context.fieldSources.splash} />
+                <SourceBadge label="Sounds" source={context.fieldSources.sounds} />
+              </div>
+            </div>
+
+            <HomeExperiencePreview config={context.config} />
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+function SourceBadge({ label, source }: { label: string; source: PreviewSourceLabel }) {
+  const tone =
+    source === 'device'
+      ? 'border-rose-500/20 bg-rose-500/10 text-rose-300'
+      : source === 'group'
+        ? 'border-sky-500/20 bg-sky-500/10 text-sky-300'
+        : source === 'global'
+          ? 'border-emerald-500/20 bg-emerald-500/10 text-emerald-300'
+          : 'border-border bg-background/40 text-muted-foreground'
+
+  const sourceLabel =
+    source === 'device'
+      ? 'Device'
+      : source === 'group'
+        ? 'Group'
+        : source === 'global'
+          ? 'Global'
+          : 'Fallback'
+
+  return (
+    <div className={`rounded-xl border px-2.5 py-2 ${tone}`}>
+      <div className="font-semibold">{label}</div>
+      <div className="mt-0.5 uppercase tracking-wider">{sourceLabel}</div>
+    </div>
   )
 }
 

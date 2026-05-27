@@ -40,6 +40,7 @@ class DataStoreManager(private val context: Context) {
         val TECHNICIAN_PIN = stringPreferencesKey("technician_pin")
         val NTP_SERVER = stringPreferencesKey("ntp_server")
         val HOME_EXPERIENCE_JSON = stringPreferencesKey("home_experience_json")
+        val RUNNING_TEXT_JSON = stringPreferencesKey("running_text_json")
         val VIDEO_BROADCAST_JSON = stringPreferencesKey("video_broadcast_json")
         val RUNNING_TEXT_OVERRIDE_JSON = stringPreferencesKey("running_text_override_json")
         val RUNNING_TEXT_OVERRIDE_EXPIRES_AT = longPreferencesKey("running_text_override_expires_at")
@@ -376,6 +377,26 @@ class DataStoreManager(private val context: Context) {
                 prefs[HOME_EXPERIENCE_JSON] = normalized
             }
             addLog("Home experience profile updated from server.")
+        }
+    }
+
+    val runningTextJsonFlow: Flow<String> = context.dataStore.data.map { prefs ->
+        prefs[RUNNING_TEXT_JSON] ?: ""
+    }
+
+    suspend fun getRunningTextJson(): String {
+        val prefs = context.dataStore.data.first()
+        return prefs[RUNNING_TEXT_JSON] ?: ""
+    }
+
+    suspend fun setRunningTextJson(json: String) {
+        val normalized = json.trim()
+        val current = getRunningTextJson()
+        if (current != normalized) {
+            context.dataStore.edit { prefs ->
+                prefs[RUNNING_TEXT_JSON] = normalized
+            }
+            addLog("Running text profile updated from server.")
         }
     }
 
