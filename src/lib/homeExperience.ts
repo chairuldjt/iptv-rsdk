@@ -2,7 +2,7 @@ import prisma from '@/lib/db'
 import { getDeviceGroupForDevice } from '@/lib/deviceGroups'
 
 const GLOBAL_HOME_EXPERIENCE_KEY = 'homeExperience.global'
-const HOME_EXPERIENCE_MENU_TYPES = ['tv', 'education', 'entertainment', 'settings', 'info_dialog', 'static_page'] as const
+const HOME_EXPERIENCE_MENU_TYPES = ['tv', 'education', 'entertainment', 'settings', 'info_dialog', 'static_page', 'recommendations', 'favorites', 'search'] as const
 
 export type HomeExperienceScope = 'global' | 'group' | 'device' | 'profile'
 
@@ -13,6 +13,9 @@ export type HomeExperienceMenuType =
   | 'settings'
   | 'info_dialog'
   | 'static_page'
+  | 'recommendations'
+  | 'favorites'
+  | 'search'
 
 export type HomeExperienceMenuItem = {
   id: string
@@ -27,6 +30,12 @@ export type HomeExperienceMenuItem = {
   backgroundUrl: string
   staticPageId: string
   sortOrder: number
+  isPinned?: boolean
+  badge?: {
+    text: string
+    color: string
+    position: 'top-right' | 'top-left' | 'bottom-right'
+  }
 }
 
 export type HomeExperienceStaticPage = {
@@ -78,6 +87,12 @@ export type HomeExperienceMenuPatch = {
   backgroundUrl?: string
   staticPageId?: string
   sortOrder?: number
+  isPinned?: boolean
+  badge?: {
+    text: string
+    color: string
+    position: 'top-right' | 'top-left' | 'bottom-right'
+  }
 }
 
 export type HomeExperienceStaticPagePatch = {
@@ -104,20 +119,6 @@ export const FALLBACK_HOME_EXPERIENCE_CONFIG: HomeExperienceResolvedConfig = {
   homeBackgroundUrl: '',
   menus: [
     {
-      id: 'education',
-      enabled: true,
-      type: 'education',
-      title: 'EDUKASI',
-      subtitle: 'Video RS',
-      icon: 'menu_book',
-      textColor: '#FFFFFF',
-      borderColor: '#86EFAC',
-      accentColor: '#86EFAC',
-      backgroundUrl: '',
-      staticPageId: '',
-      sortOrder: 10,
-    },
-    {
       id: 'tv',
       enabled: true,
       type: 'tv',
@@ -129,7 +130,49 @@ export const FALLBACK_HOME_EXPERIENCE_CONFIG: HomeExperienceResolvedConfig = {
       accentColor: '#FFE9A6',
       backgroundUrl: '',
       staticPageId: '',
+      sortOrder: 10,
+    },
+    {
+      id: 'recommendations',
+      enabled: true,
+      type: 'recommendations',
+      title: 'REKOMENDASI',
+      subtitle: 'Konten Pilihan',
+      icon: 'star',
+      textColor: '#FFFFFF',
+      borderColor: '#FFD700',
+      accentColor: '#FFD700',
+      backgroundUrl: '',
+      staticPageId: '',
+      sortOrder: 15,
+    },
+    {
+      id: 'favorites',
+      enabled: true,
+      type: 'favorites',
+      title: 'FAVORIT',
+      subtitle: 'Konten Tersimpan',
+      icon: 'bookmark',
+      textColor: '#FFFFFF',
+      borderColor: '#EF4444',
+      accentColor: '#EF4444',
+      backgroundUrl: '',
+      staticPageId: '',
       sortOrder: 20,
+    },
+    {
+      id: 'education',
+      enabled: true,
+      type: 'education',
+      title: 'EDUKASI',
+      subtitle: 'Video RS',
+      icon: 'menu_book',
+      textColor: '#FFFFFF',
+      borderColor: '#86EFAC',
+      accentColor: '#86EFAC',
+      backgroundUrl: '',
+      staticPageId: '',
+      sortOrder: 30,
     },
     {
       id: 'entertainment',
@@ -143,7 +186,21 @@ export const FALLBACK_HOME_EXPERIENCE_CONFIG: HomeExperienceResolvedConfig = {
       accentColor: '#FF9A76',
       backgroundUrl: '',
       staticPageId: '',
-      sortOrder: 30,
+      sortOrder: 40,
+    },
+    {
+      id: 'search',
+      enabled: true,
+      type: 'search',
+      title: 'PENCARIAN',
+      subtitle: 'Cari Konten',
+      icon: 'search',
+      textColor: '#FFFFFF',
+      borderColor: '#3B82F6',
+      accentColor: '#3B82F6',
+      backgroundUrl: '',
+      staticPageId: '',
+      sortOrder: 45,
     },
     {
       id: 'info',
@@ -157,7 +214,7 @@ export const FALLBACK_HOME_EXPERIENCE_CONFIG: HomeExperienceResolvedConfig = {
       accentColor: '#C084FC',
       backgroundUrl: '',
       staticPageId: '',
-      sortOrder: 40,
+      sortOrder: 50,
     },
     {
       id: 'settings',
@@ -171,7 +228,7 @@ export const FALLBACK_HOME_EXPERIENCE_CONFIG: HomeExperienceResolvedConfig = {
       accentColor: '#7DD3FC',
       backgroundUrl: '',
       staticPageId: '',
-      sortOrder: 50,
+      sortOrder: 60,
     },
   ],
   staticPages: [

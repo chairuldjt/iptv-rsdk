@@ -25,9 +25,12 @@ const MENU_TYPE_OPTIONS = [
   { value: 'settings', label: 'Settings' },
   { value: 'info_dialog', label: 'Info Dialog' },
   { value: 'static_page', label: 'Static Page' },
+  { value: 'recommendations', label: 'Recommendations' },
+  { value: 'favorites', label: 'Favorites' },
+  { value: 'search', label: 'Search' },
 ] as const
 
-const ICON_OPTIONS = ['live_tv', 'menu_book', 'movie', 'settings', 'info', 'room_service']
+const ICON_OPTIONS = ['live_tv', 'menu_book', 'movie', 'settings', 'info', 'room_service', 'star', 'bookmark', 'search']
 
 export default function HomeExperienceForm({
   scope,
@@ -53,11 +56,75 @@ export default function HomeExperienceForm({
   const [enableSelectionSound, setEnableSelectionSound] = useState(config.sounds.enableSelectionSound)
   const [enableSplashSound, setEnableSplashSound] = useState(config.sounds.enableSplashSound)
   const [selectionSoundUrl, setSelectionSoundUrl] = useState(config.sounds.selectionSoundUrl)
+  const [expandedSections, setExpandedSections] = useState<Record<string, Record<string, boolean>>>({})
+  const [enabledSections, setEnabledSections] = useState<Record<string, Record<string, boolean>>>({})
+
+  // Top-level section state (for main sections like Branding, Splash, etc.)
+  const [topLevelEnabled, setTopLevelEnabled] = useState<Record<string, boolean>>({
+    branding: true,
+    splash: true,
+    homeMenu: true,
+    staticPages: true,
+    sound: true,
+    livePreview: true,
+  })
+  const [topLevelExpanded, setTopLevelExpanded] = useState<Record<string, boolean>>({
+    branding: false,
+    splash: false,
+    homeMenu: false,
+    staticPages: false,
+    sound: false,
+    livePreview: false,
+  })
 
   const staticPageOptions = useMemo(
     () => staticPages.map((page) => ({ id: page.id, title: page.title || page.id })),
     [staticPages]
   )
+
+  const isExpanded = (menuId: string, section: string) => {
+    if (!expandedSections[menuId]) {
+      return section === 'basic' || section === 'appearance'
+    }
+    return expandedSections[menuId][section] ?? false
+  }
+
+  const toggleSection = (menuId: string, section: string) => {
+    setExpandedSections(prev => ({
+      ...prev,
+      [menuId]: {
+        ...prev[menuId],
+        [section]: !isExpanded(menuId, section)
+      }
+    }))
+  }
+
+  const isEnabled = (menuId: string, section: string) => {
+    if (!enabledSections[menuId]) {
+      return section === 'basic'
+    }
+    return enabledSections[menuId][section] ?? false
+  }
+
+  const toggleEnabled = (menuId: string, section: string) => {
+    const newEnabledState = !isEnabled(menuId, section)
+    setEnabledSections(prev => ({
+      ...prev,
+      [menuId]: {
+        ...prev[menuId],
+        [section]: newEnabledState
+      }
+    }))
+    if (newEnabledState) {
+      setExpandedSections(prev => ({
+        ...prev,
+        [menuId]: {
+          ...prev[menuId],
+          [section]: true
+        }
+      }))
+    }
+  }
 
   return (
     <div className="card rounded-2xl p-5 space-y-6">
@@ -76,8 +143,15 @@ export default function HomeExperienceForm({
         <input type="hidden" name="menusJson" value={JSON.stringify(menus)} />
         <input type="hidden" name="staticPagesJson" value={JSON.stringify(staticPages)} />
 
-        <section className="space-y-4">
-          <SectionTitle title="Branding & Background" description="Mengatur logo utama, background home default, dan asset splash." />
+        <CollapsibleSection
+          id="branding"
+          title="Branding & Background"
+          description="Mengatur logo utama, background home default, dan asset splash."
+          enabled={topLevelEnabled.branding}
+          expanded={topLevelExpanded.branding}
+          onToggleEnabled={(enabled) => setTopLevelEnabled(prev => ({ ...prev, branding: enabled }))}
+          onToggleExpanded={(expanded) => setTopLevelExpanded(prev => ({ ...prev, branding: expanded }))}
+        >
           <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
             <Field label="Logo URL">
               <input type="url" name="logoUrl" value={logoUrl} onChange={(e) => setLogoUrl(e.target.value)} className="field-input font-mono" placeholder="https://..." />
@@ -92,10 +166,17 @@ export default function HomeExperienceForm({
               <input type="file" name="homeBackgroundFile" accept="image/*" className="field-input py-2" />
             </Field>
           </div>
-        </section>
+        </CollapsibleSection>
 
-        <section className="space-y-4 border-t border-border pt-6">
-          <SectionTitle title="Splash Screen" description="Asset dan teks splash yang ditampilkan saat startup aplikasi." />
+        <CollapsibleSection
+          id="splash"
+          title="Splash Screen"
+          description="Asset dan teks splash yang ditampilkan saat startup aplikasi."
+          enabled={topLevelEnabled.splash}
+          expanded={topLevelExpanded.splash}
+          onToggleEnabled={(enabled) => setTopLevelEnabled(prev => ({ ...prev, splash: enabled }))}
+          onToggleExpanded={(expanded) => setTopLevelExpanded(prev => ({ ...prev, splash: expanded }))}
+        >
           <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
             <Toggle name="splashEnabled" checked={splashEnabled} onChange={setSplashEnabled} title="Enable Splash Profile" description="Jika aktif, splash akan mengikuti profile ini." />
             <Toggle name="splashShowSound" checked={splashShowSound} onChange={setSplashShowSound} title="Play Splash Sound" description="Mengontrol bunyi splash saat startup." />
@@ -130,11 +211,18 @@ export default function HomeExperienceForm({
               <input type="text" name="splashLoadingText" value={splashLoadingText} onChange={(e) => setSplashLoadingText(e.target.value)} className="field-input" />
             </Field>
           </div>
-        </section>
+        </CollapsibleSection>
 
-        <section className="space-y-4 border-t border-border pt-6">
-          <div className="flex items-center justify-between gap-4">
-            <SectionTitle title="Home Menu" description="Atur hide/show, nama, subtitle, warna, border, icon, dan aksi menu." />
+        <CollapsibleSection
+          id="homeMenu"
+          title="Home Menu"
+          description="Atur hide/show, nama, subtitle, warna, border, icon, dan aksi menu."
+          enabled={topLevelEnabled.homeMenu}
+          expanded={topLevelExpanded.homeMenu}
+          onToggleEnabled={(enabled) => setTopLevelEnabled(prev => ({ ...prev, homeMenu: enabled }))}
+          onToggleExpanded={(expanded) => setTopLevelExpanded(prev => ({ ...prev, homeMenu: expanded }))}
+        >
+          <div className="flex items-center justify-end gap-4 mb-4">
             <button
               type="button"
               onClick={() => setMenus((current) => [
@@ -161,74 +249,248 @@ export default function HomeExperienceForm({
           </div>
           <div className="space-y-4">
             {menus.map((menu, index) => (
-              <div key={menu.id} className="rounded-2xl border border-border bg-accent/20 p-4 space-y-4">
+              <div key={menu.id} className="rounded-2xl border border-border bg-accent/20 p-5 space-y-5">
+                {/* Header */}
                 <div className="flex items-center justify-between gap-3">
-                  <div>
-                    <div className="text-xs font-semibold text-foreground">{menu.title || `Menu ${index + 1}`}</div>
-                    <div className="text-[10px] text-muted-foreground">{menu.id}</div>
+                  <div className="flex items-center gap-3">
+                    <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10 text-primary font-bold text-sm">
+                      {menu.icon || '📋'}
+                    </div>
+                    <div>
+                      <div className="text-sm font-semibold text-foreground">{menu.title || `Menu ${index + 1}`}</div>
+                      <div className="text-[10px] text-muted-foreground font-mono">{menu.id}</div>
+                    </div>
                   </div>
                   <button
                     type="button"
                     onClick={() => setMenus((current) => current.filter((item) => item.id !== menu.id))}
-                    className="rounded-lg border border-rose-500/20 px-2.5 py-1.5 text-[10px] font-semibold text-rose-400 hover:bg-rose-500/10"
+                    className="rounded-lg border border-rose-500/20 px-3 py-2 text-[11px] font-semibold text-rose-400 hover:bg-rose-500/10 transition-colors"
                   >
-                    Hapus
+                    Hapus Menu
                   </button>
                 </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
-                  <Field label="ID">
-                    <input type="text" value={menu.id} onChange={(e) => updateMenu(setMenus, menu.id, { id: e.target.value })} className="field-input font-mono" />
-                  </Field>
-                  <Field label="Type">
-                    <select value={menu.type} onChange={(e) => updateMenu(setMenus, menu.id, { type: e.target.value as HomeExperienceMenuItem['type'] })} className="field-input py-2">
-                      {MENU_TYPE_OPTIONS.map((option) => (
-                        <option key={option.value} value={option.value}>{option.label}</option>
-                      ))}
-                    </select>
-                  </Field>
-                  <Field label="Icon">
-                    <select value={menu.icon} onChange={(e) => updateMenu(setMenus, menu.id, { icon: e.target.value })} className="field-input py-2">
-                      {ICON_OPTIONS.map((option) => (
-                        <option key={option} value={option}>{option}</option>
-                      ))}
-                    </select>
-                  </Field>
-                  <Field label="Sort Order">
-                    <input type="number" value={menu.sortOrder} onChange={(e) => updateMenu(setMenus, menu.id, { sortOrder: Number.parseInt(e.target.value || '0', 10) || 0 })} className="field-input" />
-                  </Field>
-                  <Field label="Title">
-                    <input type="text" value={menu.title} onChange={(e) => updateMenu(setMenus, menu.id, { title: e.target.value })} className="field-input" />
-                  </Field>
-                  <Field label="Subtitle">
-                    <input type="text" value={menu.subtitle} onChange={(e) => updateMenu(setMenus, menu.id, { subtitle: e.target.value })} className="field-input" />
-                  </Field>
-                  <Field label="Background URL">
-                    <input type="url" value={menu.backgroundUrl} onChange={(e) => updateMenu(setMenus, menu.id, { backgroundUrl: e.target.value })} className="field-input font-mono" placeholder="https://..." />
-                  </Field>
-                  <Field label="Upload Background">
-                    <input type="file" name={`menuBackgroundFile__${menu.id}`} accept="image/*" className="field-input py-2" />
-                  </Field>
-                  <Field label="Static Page Target">
-                    <select value={menu.staticPageId} onChange={(e) => updateMenu(setMenus, menu.id, { staticPageId: e.target.value })} className="field-input py-2">
-                      <option value="">Pilih page</option>
-                      {staticPageOptions.map((option) => (
-                        <option key={option.id} value={option.id}>{option.title}</option>
-                      ))}
-                    </select>
-                  </Field>
-                  <ColorField label="Text" value={menu.textColor} onChange={(value) => updateMenu(setMenus, menu.id, { textColor: value })} />
-                  <ColorField label="Border" value={menu.borderColor} onChange={(value) => updateMenu(setMenus, menu.id, { borderColor: value })} />
-                  <ColorField label="Accent" value={menu.accentColor} onChange={(value) => updateMenu(setMenus, menu.id, { accentColor: value })} />
-                  <ToggleInline checked={menu.enabled} onChange={(checked) => updateMenu(setMenus, menu.id, { enabled: checked })} title="Visible" description="Hide / show menu" />
+
+                {/* Section 1: Basic Information - COLLAPSIBLE */}
+                <div className="space-y-3">
+                  <button
+                    type="button"
+                    onClick={() => toggleSection(menu.id, 'basic')}
+                    className="flex items-center gap-2 w-full text-left cursor-pointer hover:opacity-70 transition-opacity"
+                  >
+                    <span className={`text-sm transition-transform duration-200 ${isExpanded(menu.id, 'basic') ? 'rotate-90' : ''}`}>▶</span>
+                    <div className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Informasi Dasar</div>
+                    <div className="flex-1 h-px bg-border"></div>
+                  </button>
+                  {isExpanded(menu.id, 'basic') && (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 animate-in fade-in duration-200">
+                      <Field label="Menu ID">
+                        <input type="text" value={menu.id} onChange={(e) => updateMenu(setMenus, menu.id, { id: e.target.value })} className="field-input font-mono text-sm" placeholder="menu_id" />
+                      </Field>
+                      <Field label="Menu Type">
+                        <select value={menu.type} onChange={(e) => updateMenu(setMenus, menu.id, { type: e.target.value as HomeExperienceMenuItem['type'] })} className="field-input py-2">
+                          {MENU_TYPE_OPTIONS.map((option) => (
+                            <option key={option.value} value={option.value}>{option.label}</option>
+                          ))}
+                        </select>
+                      </Field>
+                      <Field label="Title (Judul Menu)">
+                        <input type="text" value={menu.title} onChange={(e) => updateMenu(setMenus, menu.id, { title: e.target.value })} className="field-input" placeholder="e.g., TV CHANNEL" />
+                      </Field>
+                      <Field label="Subtitle (Deskripsi)">
+                        <input type="text" value={menu.subtitle} onChange={(e) => updateMenu(setMenus, menu.id, { subtitle: e.target.value })} className="field-input" placeholder="e.g., Live TV" />
+                      </Field>
+                      <Field label="Icon">
+                        <select value={menu.icon} onChange={(e) => updateMenu(setMenus, menu.id, { icon: e.target.value })} className="field-input py-2">
+                          {ICON_OPTIONS.map((option) => (
+                            <option key={option} value={option}>{option}</option>
+                          ))}
+                        </select>
+                      </Field>
+                      <Field label="Sort Order (Urutan)">
+                        <input type="number" value={menu.sortOrder} onChange={(e) => updateMenu(setMenus, menu.id, { sortOrder: Number.parseInt(e.target.value || '0', 10) || 0 })} className="field-input" placeholder="10, 20, 30..." />
+                      </Field>
+                    </div>
+                  )}
+                </div>
+
+                {/* Section 2: Appearance - ENABLE/DISABLE + COLLAPSIBLE */}
+                <div className="space-y-3 pt-4 border-t border-border/50">
+                  <div className="flex items-center gap-3">
+                    <input
+                      type="checkbox"
+                      checked={isEnabled(menu.id, 'appearance')}
+                      onChange={() => toggleEnabled(menu.id, 'appearance')}
+                      className="h-4 w-4 rounded accent-primary cursor-pointer"
+                      id={`enable-appearance-${menu.id}`}
+                    />
+                    <label htmlFor={`enable-appearance-${menu.id}`} className="text-xs font-semibold text-foreground cursor-pointer select-none">
+                      Enable Tampilan & Warna Customization
+                    </label>
+                  </div>
+                  
+                  {!isEnabled(menu.id, 'appearance') && (
+                    <div className="pl-7 text-xs text-muted-foreground italic">
+                      💡 Using default colors (white text, default borders)
+                    </div>
+                  )}
+                  
+                  {isEnabled(menu.id, 'appearance') && (
+                    <>
+                      <button
+                        type="button"
+                        onClick={() => toggleSection(menu.id, 'appearance')}
+                        className="flex items-center gap-2 w-full text-left cursor-pointer hover:opacity-70 transition-opacity pl-7"
+                      >
+                        <span className={`text-sm transition-transform duration-200 ${isExpanded(menu.id, 'appearance') ? 'rotate-90' : ''}`}>▶</span>
+                        <div className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Tampilan & Warna</div>
+                        <div className="flex-1 h-px bg-border"></div>
+                      </button>
+                      {isExpanded(menu.id, 'appearance') && (
+                        <div className="space-y-4 animate-in fade-in duration-200 pl-7">
+                          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                            <ColorField label="Text" value={menu.textColor} onChange={(value) => updateMenu(setMenus, menu.id, { textColor: value })} />
+                            <ColorField label="Border" value={menu.borderColor} onChange={(value) => updateMenu(setMenus, menu.id, { borderColor: value })} />
+                            <ColorField label="Accent" value={menu.accentColor} onChange={(value) => updateMenu(setMenus, menu.id, { accentColor: value })} />
+                          </div>
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <Field label="Background URL (Optional)">
+                              <input type="url" value={menu.backgroundUrl} onChange={(e) => updateMenu(setMenus, menu.id, { backgroundUrl: e.target.value })} className="field-input font-mono text-xs" placeholder="https://..." />
+                            </Field>
+                            <Field label="Upload Background Image">
+                              <input type="file" name={`menuBackgroundFile__${menu.id}`} accept="image/*" className="field-input py-2 text-xs" />
+                            </Field>
+                          </div>
+                        </div>
+                      )}
+                    </>
+                  )}
+                </div>
+
+                {/* Section 3: Advanced Settings - ENABLE/DISABLE + COLLAPSIBLE */}
+                <div className="space-y-3 pt-4 border-t border-border/50">
+                  <div className="flex items-center gap-3">
+                    <input
+                      type="checkbox"
+                      checked={isEnabled(menu.id, 'advanced')}
+                      onChange={() => toggleEnabled(menu.id, 'advanced')}
+                      className="h-4 w-4 rounded accent-primary cursor-pointer"
+                      id={`enable-advanced-${menu.id}`}
+                    />
+                    <label htmlFor={`enable-advanced-${menu.id}`} className="text-xs font-semibold text-foreground cursor-pointer select-none">
+                      Enable Pengaturan Lanjutan Customization
+                    </label>
+                  </div>
+                  
+                  {!isEnabled(menu.id, 'advanced') && (
+                    <div className="pl-7 text-xs text-muted-foreground italic">
+                      💡 Using default settings (visible, not pinned, no static page)
+                    </div>
+                  )}
+                  
+                  {isEnabled(menu.id, 'advanced') && (
+                    <>
+                      <button
+                        type="button"
+                        onClick={() => toggleSection(menu.id, 'advanced')}
+                        className="flex items-center gap-2 w-full text-left cursor-pointer hover:opacity-70 transition-opacity pl-7"
+                      >
+                        <span className={`text-sm transition-transform duration-200 ${isExpanded(menu.id, 'advanced') ? 'rotate-90' : ''}`}>▶</span>
+                        <div className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Pengaturan Lanjutan</div>
+                        <div className="flex-1 h-px bg-border"></div>
+                      </button>
+                      {isExpanded(menu.id, 'advanced') && (
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 animate-in fade-in duration-200 pl-7">
+                          <Field label="Static Page Target (Jika type = static_page)">
+                            <select value={menu.staticPageId} onChange={(e) => updateMenu(setMenus, menu.id, { staticPageId: e.target.value })} className="field-input py-2">
+                              <option value="">-- Pilih halaman --</option>
+                              {staticPageOptions.map((option) => (
+                                <option key={option.id} value={option.id}>{option.title}</option>
+                              ))}
+                            </select>
+                          </Field>
+                          <div className="space-y-3">
+                            <ToggleInline checked={menu.enabled} onChange={(checked) => updateMenu(setMenus, menu.id, { enabled: checked })} title="Visible" description="Tampilkan menu di home screen" />
+                            <ToggleInline checked={menu.isPinned || false} onChange={(checked) => updateMenu(setMenus, menu.id, { isPinned: checked })} title="Pinned ⭐" description="Pin menu ke posisi teratas" />
+                          </div>
+                        </div>
+                      )}
+                    </>
+                  )}
+                </div>
+
+                {/* Section 4: Badge Configuration - ENABLE/DISABLE + COLLAPSIBLE */}
+                <div className="space-y-3 pt-4 border-t border-border/50">
+                  <div className="flex items-center gap-3">
+                    <input
+                      type="checkbox"
+                      checked={isEnabled(menu.id, 'badge')}
+                      onChange={() => toggleEnabled(menu.id, 'badge')}
+                      className="h-4 w-4 rounded accent-primary cursor-pointer"
+                      id={`enable-badge-${menu.id}`}
+                    />
+                    <label htmlFor={`enable-badge-${menu.id}`} className="text-xs font-semibold text-foreground cursor-pointer select-none">
+                      Enable Badge Customization
+                    </label>
+                    <div className="text-[10px] text-muted-foreground">(Label seperti "LIVE", "NEW", "HOT")</div>
+                  </div>
+                  
+                  {!isEnabled(menu.id, 'badge') && (
+                    <div className="pl-7 text-xs text-muted-foreground italic">
+                      💡 No badge (default)
+                    </div>
+                  )}
+                  
+                  {isEnabled(menu.id, 'badge') && (
+                    <>
+                      <button
+                        type="button"
+                        onClick={() => toggleSection(menu.id, 'badge')}
+                        className="flex items-center gap-2 w-full text-left cursor-pointer hover:opacity-70 transition-opacity pl-7"
+                      >
+                        <span className={`text-sm transition-transform duration-200 ${isExpanded(menu.id, 'badge') ? 'rotate-90' : ''}`}>▶</span>
+                        <div className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Badge (Opsional)</div>
+                        <div className="flex-1 h-px bg-border"></div>
+                      </button>
+                      {isExpanded(menu.id, 'badge') && (
+                        <div className="space-y-4 animate-in fade-in duration-200 pl-7">
+                          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                            <Field label="Badge Text">
+                              <input type="text" value={menu.badge?.text || ''} onChange={(e) => updateMenu(setMenus, menu.id, { badge: e.target.value ? { text: e.target.value, color: menu.badge?.color || '#FFD700', position: menu.badge?.position || 'top-right' } : undefined })} className="field-input" placeholder="e.g., NEW, LIVE, HOT" />
+                            </Field>
+                            <ColorField label="Badge" value={menu.badge?.color || '#FFD700'} onChange={(value) => updateMenu(setMenus, menu.id, { badge: menu.badge?.text ? { text: menu.badge.text, color: value, position: menu.badge?.position || 'top-right' } : undefined })} />
+                            <Field label="Badge Position">
+                              <select value={menu.badge?.position || 'top-right'} onChange={(e) => updateMenu(setMenus, menu.id, { badge: menu.badge?.text ? { text: menu.badge.text, color: menu.badge?.color || '#FFD700', position: e.target.value as 'top-right' | 'top-left' | 'bottom-right' } : undefined })} className="field-input py-2">
+                                <option value="top-right">Top Right</option>
+                                <option value="top-left">Top Left</option>
+                                <option value="bottom-right">Bottom Right</option>
+                              </select>
+                            </Field>
+                          </div>
+                          {menu.badge?.text && (
+                            <div className="rounded-lg bg-primary/5 border border-primary/20 p-3 text-xs text-muted-foreground">
+                              <span className="font-semibold text-foreground">Preview:</span> Badge "{menu.badge.text}" akan muncul di posisi {menu.badge.position} dengan warna {menu.badge.color}
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </>
+                  )}
                 </div>
               </div>
             ))}
           </div>
-        </section>
+        </CollapsibleSection>
 
-        <section className="space-y-4 border-t border-border pt-6">
-          <div className="flex items-center justify-between gap-4">
-            <SectionTitle title="Static Pages" description="Dipakai oleh menu type static_page untuk menampilkan halaman informasi." />
+        <CollapsibleSection
+          id="staticPages"
+          title="Static Pages"
+          description="Dipakai oleh menu type static_page untuk menampilkan halaman informasi."
+          enabled={topLevelEnabled.staticPages}
+          expanded={topLevelExpanded.staticPages}
+          onToggleEnabled={(enabled) => setTopLevelEnabled(prev => ({ ...prev, staticPages: enabled }))}
+          onToggleExpanded={(expanded) => setTopLevelExpanded(prev => ({ ...prev, staticPages: expanded }))}
+        >
+          <div className="flex items-center justify-end gap-4 mb-4">
             <button
               type="button"
               onClick={() => setStaticPages((current) => [
@@ -271,10 +533,17 @@ export default function HomeExperienceForm({
               </div>
             ))}
           </div>
-        </section>
+        </CollapsibleSection>
 
-        <section className="space-y-4 border-t border-border pt-6">
-          <SectionTitle title="Sound Effect" description="Untuk saat ini profile mengatur enable / disable built-in splash dan selection sound di shell Android." />
+        <CollapsibleSection
+          id="sound"
+          title="Sound Effect"
+          description="Untuk saat ini profile mengatur enable / disable built-in splash dan selection sound di shell Android."
+          enabled={topLevelEnabled.sound}
+          expanded={topLevelExpanded.sound}
+          onToggleEnabled={(enabled) => setTopLevelEnabled(prev => ({ ...prev, sound: enabled }))}
+          onToggleExpanded={(expanded) => setTopLevelExpanded(prev => ({ ...prev, sound: expanded }))}
+        >
           <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
             <Toggle name="enableSelectionSound" checked={enableSelectionSound} onChange={setEnableSelectionSound} title="Selection Sound" description="Bunyi ketika fokus menu home berpindah." />
             <Toggle name="enableSplashSound" checked={enableSplashSound} onChange={setEnableSplashSound} title="Splash Sound" description="Bunyi ketika splash screen tampil." />
@@ -285,10 +554,17 @@ export default function HomeExperienceForm({
               <input type="file" name="selectionSoundFile" accept="audio/*" className="field-input py-2" />
             </Field>
           </div>
-        </section>
+        </CollapsibleSection>
 
-        <section className="space-y-4 border-t border-border pt-6">
-          <SectionTitle title="Live Preview" description="Preview cepat untuk splash dan menu berdasarkan state editor saat ini." />
+        <CollapsibleSection
+          id="livePreview"
+          title="Live Preview"
+          description="Preview cepat untuk splash dan menu berdasarkan state editor saat ini."
+          enabled={topLevelEnabled.livePreview}
+          expanded={topLevelExpanded.livePreview}
+          onToggleEnabled={(enabled) => setTopLevelEnabled(prev => ({ ...prev, livePreview: enabled }))}
+          onToggleExpanded={(expanded) => setTopLevelExpanded(prev => ({ ...prev, livePreview: expanded }))}
+        >
           <HomeExperiencePreview
             config={{
               ...config,
@@ -316,7 +592,7 @@ export default function HomeExperienceForm({
               },
             }}
           />
-        </section>
+        </CollapsibleSection>
 
         <div className="flex flex-col sm:flex-row gap-3 border-t border-border pt-6">
           <button type="submit" className="flex-1 btn btn-primary py-2.5">Save Home Experience Profile</button>
@@ -441,8 +717,80 @@ function updateStaticPage(
   setPages((current) => current.map((item) => (item.id === id ? { ...item, ...patch } : item)))
 }
 
+function CollapsibleSection({
+  id,
+  title,
+  description,
+  enabled,
+  expanded,
+  onToggleEnabled,
+  onToggleExpanded,
+  children,
+}: {
+  id: string
+  title: string
+  description: string
+  enabled: boolean
+  expanded: boolean
+  onToggleEnabled: (enabled: boolean) => void
+  onToggleExpanded: (expanded: boolean) => void
+  children: React.ReactNode
+}) {
+  return (
+    <div className="rounded-2xl border border-border bg-accent/10 p-5 space-y-4">
+      {/* Header with Enable/Disable Toggle */}
+      <div className="flex items-start justify-between gap-4">
+        <div className="flex items-start gap-3 flex-1">
+          <input
+            type="checkbox"
+            checked={enabled}
+            onChange={(e) => {
+              onToggleEnabled(e.target.checked)
+              if (e.target.checked) {
+                onToggleExpanded(true)
+              }
+            }}
+            className="h-5 w-5 rounded accent-primary cursor-pointer mt-0.5"
+            id={`enable-${id}`}
+          />
+          <label htmlFor={`enable-${id}`} className="cursor-pointer flex-1">
+            <h3 className="text-sm font-semibold text-foreground">{title}</h3>
+            <p className="mt-1 text-[10px] text-muted-foreground">{description}</p>
+          </label>
+        </div>
+        {enabled && (
+          <button
+            type="button"
+            onClick={() => onToggleExpanded(!expanded)}
+            className="rounded-lg border border-border px-3 py-1.5 text-[11px] font-semibold text-muted-foreground hover:bg-accent/50 transition-colors"
+          >
+            {expanded ? '▼ Collapse' : '▶ Expand'}
+          </button>
+        )}
+      </div>
+
+      {/* Disabled State Message */}
+      {!enabled && (
+        <div className="pl-8 text-xs text-muted-foreground italic">
+          💡 Section disabled - default values will be used
+        </div>
+      )}
+
+      {/* Content (only shown when enabled and expanded) */}
+      {enabled && expanded && (
+        <div className="pl-8 space-y-4 animate-in fade-in duration-200">
+          {children}
+        </div>
+      )}
+    </div>
+  )
+}
+
 export function HomeExperiencePreview({ config }: { config: HomeExperienceConfig }) {
-  const visibleMenus = [...config.menus].filter((menu) => menu.enabled).sort((a, b) => a.sortOrder - b.sortOrder)
+  const visibleMenus = [...config.menus].filter((menu) => menu.enabled).sort((a, b) => {
+    if (a.isPinned !== b.isPinned) return (b.isPinned ? 1 : 0) - (a.isPinned ? 1 : 0)
+    return a.sortOrder - b.sortOrder
+  })
 
   return (
     <div className="grid grid-cols-1 2xl:grid-cols-[380px_minmax(0,1fr)] gap-6">
@@ -468,7 +816,7 @@ export function HomeExperiencePreview({ config }: { config: HomeExperienceConfig
             {visibleMenus.map((menu) => (
               <div
                 key={menu.id}
-                className="rounded-2xl border p-4 shadow-[0_12px_30px_rgba(0,0,0,0.2)]"
+                className="rounded-2xl border p-4 shadow-[0_12px_30px_rgba(0,0,0,0.2)] relative"
                 style={{
                   borderColor: menu.borderColor,
                   background: menu.backgroundUrl
@@ -476,6 +824,21 @@ export function HomeExperiencePreview({ config }: { config: HomeExperienceConfig
                     : 'linear-gradient(180deg, rgba(20,35,49,1), rgba(12,18,28,1))',
                 }}
               >
+                {menu.badge && (
+                  <div
+                    className={`absolute px-2 py-1 rounded text-white text-[10px] font-bold ${
+                      menu.badge.position === 'top-right' ? 'top-2 right-2' :
+                      menu.badge.position === 'top-left' ? 'top-2 left-2' :
+                      'bottom-2 right-2'
+                    }`}
+                    style={{ backgroundColor: menu.badge.color }}
+                  >
+                    {menu.badge.text}
+                  </div>
+                )}
+                {menu.isPinned && (
+                  <div className="absolute top-2 left-2 text-yellow-400 text-sm">⭐</div>
+                )}
                 <div className="text-[10px] font-semibold uppercase tracking-[0.18em]" style={{ color: menu.borderColor }}>
                   {menu.icon}
                 </div>
