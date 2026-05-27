@@ -48,6 +48,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import android.widget.Toast
 import com.example.rsdkiptvplayer.R
 import com.example.rsdkiptvplayer.util.AutostartPermissionHelper
@@ -262,6 +264,11 @@ fun SettingsScreen(
 ) {
     val context = LocalContext.current
     val focusManager = LocalFocusManager.current
+
+    // Launcher untuk RoleManager.ROLE_HOME (Android 10+)
+    val roleRequestLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.StartActivityForResult()
+    ) { /* result diabaikan — user sudah memilih atau membatalkan di dialog sistem */ }
     val configuration = LocalConfiguration.current
     val screenWidth = configuration.screenWidthDp
     val screenHeight = configuration.screenHeightDp
@@ -862,6 +869,32 @@ fun SettingsScreen(
                                         AutostartPermissionHelper.requestAutostartPermission(context)
                                     }
                                 },
+                                onSetDefaultLauncher = {
+                                    if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q) {
+                                        // Android 10+ — gunakan RoleManager untuk dialog native
+                                        val roleManager = context.getSystemService(android.app.role.RoleManager::class.java)
+                                        if (roleManager != null && !roleManager.isRoleHeld(android.app.role.RoleManager.ROLE_HOME)) {
+                                            roleRequestLauncher.launch(
+                                                roleManager.createRequestRoleIntent(android.app.role.RoleManager.ROLE_HOME)
+                                            )
+                                        } else {
+                                            Toast.makeText(context, "Aplikasi ini sudah menjadi default launcher.", Toast.LENGTH_SHORT).show()
+                                        }
+                                    } else {
+                                        // Android 6–9 — buka halaman Home Settings
+                                        try {
+                                            val intent = android.content.Intent(android.provider.Settings.ACTION_HOME_SETTINGS)
+                                            context.startActivity(intent)
+                                        } catch (e: android.content.ActivityNotFoundException) {
+                                            try {
+                                                val fallback = android.content.Intent(android.provider.Settings.ACTION_MANAGE_DEFAULT_APPS_SETTINGS)
+                                                context.startActivity(fallback)
+                                            } catch (e2: android.content.ActivityNotFoundException) {
+                                                Toast.makeText(context, "Pengaturan launcher tidak tersedia di perangkat ini.", Toast.LENGTH_LONG).show()
+                                            }
+                                        }
+                                    }
+                                },
                             )
                             4 -> EducationContentPane(
                                 inputPath = inputEducationPathText,
@@ -1294,7 +1327,8 @@ fun DisplayBootPane(
     activeRatio: String,
     autoStart: Boolean,
     onRatioChange: (String) -> Unit,
-    onAutoStartChange: (Boolean) -> Unit
+    onAutoStartChange: (Boolean) -> Unit,
+    onSetDefaultLauncher: () -> Unit
 ) {
     Column(
         modifier = Modifier
@@ -1362,6 +1396,27 @@ fun DisplayBootPane(
                         shape = RoundedCornerShape(16.dp)
                     )
             )
+        }
+
+        HorizontalDivider(color = Color(0xFF334155))
+
+        // Item Set Default Launcher
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text("Set Sebagai Default Launcher", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                Text("Jadikan aplikasi ini sebagai launcher utama. Android akan menampilkan dialog pemilihan launcher.", color = Color.Gray, fontSize = 11.sp)
+            }
+            Button(
+                onClick = onSetDefaultLauncher,
+                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF6366F1)),
+                modifier = Modifier.settingsFocusGlow()
+            ) {
+                Text("Set Launcher")
+            }
         }
 
         HorizontalDivider(color = Color(0xFF334155))

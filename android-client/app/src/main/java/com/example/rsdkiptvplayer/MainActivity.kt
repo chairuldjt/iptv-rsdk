@@ -1,6 +1,7 @@
 package com.example.rsdkiptvplayer
 
 import android.os.Bundle
+import android.view.KeyEvent
 import android.view.View
 import android.view.WindowInsets
 import android.view.WindowInsetsController
@@ -433,6 +434,15 @@ class MainActivity : ComponentActivity() {
         if (hasFocus) {
             enterImmersiveMode()
         }
+    }
+
+    override fun onKeyDown(keyCode: Int, event: KeyEvent?): Boolean {
+        // Sebagai default launcher, tombol Home harus tetap di dalam app
+        // dan kembali ke home screen internal (bukan keluar ke launcher lain)
+        if (keyCode == KeyEvent.KEYCODE_HOME) {
+            return true // consume — sistem tidak akan memproses lebih lanjut
+        }
+        return super.onKeyDown(keyCode, event)
     }
 
     private fun enterImmersiveMode() {
