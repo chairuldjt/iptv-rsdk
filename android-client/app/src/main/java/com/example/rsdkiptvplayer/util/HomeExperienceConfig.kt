@@ -8,7 +8,6 @@ data class HomeExperienceProfile(
     val logoUrl: String = "",
     val homeBackgroundUrl: String = "",
     val menus: List<HomeExperienceMenu> = emptyList(),
-    val staticPages: List<HomeExperienceStaticPage> = emptyList(),
     val splash: HomeExperienceSplash = HomeExperienceSplash(),
     val sounds: HomeExperienceSounds = HomeExperienceSounds()
 )
@@ -24,14 +23,8 @@ data class HomeExperienceMenu(
     val borderColorHex: String,
     val accentColorHex: String,
     val backgroundUrl: String,
-    val staticPageId: String,
+    val entertainmentItemId: Int,
     val sortOrder: Int
-)
-
-data class HomeExperienceStaticPage(
-    val id: String,
-    val title: String,
-    val content: String
 )
 
 data class HomeExperienceRunningText(
@@ -68,22 +61,106 @@ data class HomeExperienceSounds(
 
 object HomeExperienceParser {
     fun parse(json: String?): HomeExperienceProfile {
-        if (json.isNullOrBlank()) return HomeExperienceProfile()
+        if (json.isNullOrBlank()) return defaultProfile()
 
         return try {
             val root = JSONObject(json)
-            HomeExperienceProfile(
+            val profile = HomeExperienceProfile(
                 logoUrl = root.optString("logoUrl"),
                 homeBackgroundUrl = root.optString("homeBackgroundUrl"),
                 menus = parseMenus(root.optJSONArray("menus")),
-                staticPages = parseStaticPages(root.optJSONArray("staticPages")),
                 splash = parseSplash(root.optJSONObject("splash")),
                 sounds = parseSounds(root.optJSONObject("sounds"))
             )
+            // Server may briefly return a config with no enabled menus (e.g. an
+            // admin disabled every entry in the assigned profile). Treat that as
+            // "use the built-in defaults" so the device is never stranded with a
+            // blank carousel.
+            if (profile.menus.isEmpty()) profile.copy(menus = defaultMenus()) else profile
         } catch (_: Exception) {
-            HomeExperienceProfile()
+            defaultProfile()
         }
     }
+
+    /**
+     * Built-in default menus that mirror `FALLBACK_HOME_EXPERIENCE_CONFIG` on
+     * the server (`src/lib/homeExperience.ts`). Used whenever the server
+     * response is missing, malformed, or has no enabled menus.
+     */
+    fun defaultMenus(): List<HomeExperienceMenu> = listOf(
+        HomeExperienceMenu(
+            id = "tv",
+            enabled = true,
+            type = "tv",
+            title = "TV CHANNEL",
+            subtitle = "Live TV",
+            icon = "live_tv",
+            textColorHex = "#FFFFFF",
+            borderColorHex = "#FFE9A6",
+            accentColorHex = "#FFE9A6",
+            backgroundUrl = "",
+            entertainmentItemId = 0,
+            sortOrder = 10
+        ),
+        HomeExperienceMenu(
+            id = "education",
+            enabled = true,
+            type = "education",
+            title = "EDUKASI",
+            subtitle = "Video RS",
+            icon = "menu_book",
+            textColorHex = "#FFFFFF",
+            borderColorHex = "#86EFAC",
+            accentColorHex = "#86EFAC",
+            backgroundUrl = "",
+            entertainmentItemId = 0,
+            sortOrder = 30
+        ),
+        HomeExperienceMenu(
+            id = "entertainment",
+            enabled = true,
+            type = "entertainment",
+            title = "HIBURAN",
+            subtitle = "Konten & Musik",
+            icon = "movie",
+            textColorHex = "#FFFFFF",
+            borderColorHex = "#FF9A76",
+            accentColorHex = "#FF9A76",
+            backgroundUrl = "",
+            entertainmentItemId = 0,
+            sortOrder = 40
+        ),
+        HomeExperienceMenu(
+            id = "info",
+            enabled = true,
+            type = "info_dialog",
+            title = "INFO APLIKASI",
+            subtitle = "Cek Pembaruan",
+            icon = "info",
+            textColorHex = "#FFFFFF",
+            borderColorHex = "#C084FC",
+            accentColorHex = "#C084FC",
+            backgroundUrl = "",
+            entertainmentItemId = 0,
+            sortOrder = 50
+        ),
+        HomeExperienceMenu(
+            id = "settings",
+            enabled = true,
+            type = "settings",
+            title = "SETTING",
+            subtitle = "Sistem",
+            icon = "settings",
+            textColorHex = "#FFFFFF",
+            borderColorHex = "#7DD3FC",
+            accentColorHex = "#7DD3FC",
+            backgroundUrl = "",
+            entertainmentItemId = 0,
+            sortOrder = 60
+        )
+    )
+
+    private fun defaultProfile(): HomeExperienceProfile = HomeExperienceProfile(menus = defaultMenus())
 
     fun parseRunningTextJson(json: String?): HomeExperienceRunningText {
         if (json.isNullOrBlank()) return HomeExperienceRunningText()
@@ -124,29 +201,12 @@ object HomeExperienceParser {
                         borderColorHex = item.optString("borderColor", "#FFFFFF"),
                         accentColorHex = item.optString("accentColor", "#FFFFFF"),
                         backgroundUrl = item.optString("backgroundUrl", ""),
-                        staticPageId = item.optString("staticPageId", ""),
+                        entertainmentItemId = item.optInt("entertainmentItemId", 0),
                         sortOrder = item.optInt("sortOrder", index * 10)
                     )
                 )
             }
         }.sortedBy { it.sortOrder }.filter { it.enabled }
-    }
-
-    private fun parseStaticPages(array: JSONArray?): List<HomeExperienceStaticPage> {
-        if (array == null) return emptyList()
-
-        return buildList {
-            for (index in 0 until array.length()) {
-                val item = array.optJSONObject(index) ?: continue
-                add(
-                    HomeExperienceStaticPage(
-                        id = item.optString("id", "page_$index"),
-                        title = item.optString("title", "Halaman ${index + 1}"),
-                        content = item.optString("content", "")
-                    )
-                )
-            }
-        }
     }
 
     private fun parseRunningText(obj: JSONObject?): HomeExperienceRunningText {

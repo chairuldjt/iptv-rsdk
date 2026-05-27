@@ -77,7 +77,6 @@ import java.util.*
 import android.widget.Toast
 import com.example.rsdkiptvplayer.util.UpdateManager
 import com.example.rsdkiptvplayer.util.HomeExperienceParser
-import com.example.rsdkiptvplayer.util.HomeExperienceStaticPage
 import com.example.rsdkiptvplayer.util.RemoteAudioPlayer
 import com.example.rsdkiptvplayer.data.api.RetrofitClient
 import com.example.rsdkiptvplayer.util.NtpTimeProvider
@@ -94,6 +93,7 @@ fun HomeScreen(
     onNavigateToPlayer: () -> Unit,
     onNavigateToEducation: () -> Unit,
     onNavigateToEntertainment: () -> Unit,
+    onNavigateToEntertainmentItem: (Int) -> Unit,
     onNavigateToSettings: (activeTab: Int) -> Unit,
     playerViewModel: PlayerViewModel = viewModel()
 ) {
@@ -124,7 +124,6 @@ fun HomeScreen(
     var currentVersionCode by remember { mutableIntStateOf(0) }
     var showInfoDialog by remember { mutableStateOf(false) }
     var showStbNameDialog by remember { mutableStateOf(false) }
-    var selectedStaticPage by remember { mutableStateOf<HomeExperienceStaticPage?>(null) }
     val menuFocusRequester = remember { FocusRequester() }
     val displayedStbName = storedStbName.ifBlank { "${Build.MANUFACTURER} ${Build.MODEL}".trim() }
     val indonesianLocale = remember { Locale.forLanguageTag("id-ID") }
@@ -386,6 +385,7 @@ fun HomeScreen(
                     Toast.makeText(context, "Layanan belum tersedia.", Toast.LENGTH_SHORT).show()
                 },
                 onEntertainmentClick = onNavigateToEntertainment,
+                onEntertainmentItemClick = onNavigateToEntertainmentItem,
                 onSettingsClick = { onNavigateToSettings(0) },
                 onInfoClick = { showInfoDialog = true },
                 onOpenStbNameMenu = { showStbNameDialog = true },
@@ -393,7 +393,6 @@ fun HomeScreen(
                 showFiveItems = showFiveItems,
                 isUltraCompact = isUltraCompact,
                 homeExperienceJson = homeExperienceJson,
-                onStaticPageRequested = { page -> selectedStaticPage = page },
                 onSelectionChanged = { item ->
                     selectedHomeBackground = item.backgroundRes
                     selectedHomeBackgroundUrl = item.backgroundUrl
@@ -429,13 +428,6 @@ fun HomeScreen(
                         ).show()
                     }
                 }
-            )
-        }
-
-        selectedStaticPage?.let { page ->
-            StaticInfoDialog(
-                page = page,
-                onDismiss = { selectedStaticPage = null }
             )
         }
     }
@@ -602,45 +594,6 @@ private fun InfoChip(text: String, isSmallScreen: Boolean = false) {
 
 
 @Composable
-private fun StaticInfoDialog(
-    page: HomeExperienceStaticPage,
-    onDismiss: () -> Unit
-) {
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        confirmButton = {
-            TextButton(onClick = onDismiss) {
-                Text("Tutup")
-            }
-        },
-        title = {
-            Text(
-                text = page.title,
-                fontWeight = FontWeight.Bold
-            )
-        },
-        text = {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .heightIn(max = 420.dp)
-                    .verticalScroll(rememberScrollState())
-            ) {
-                Text(
-                    text = page.content,
-                    color = Color.White.copy(alpha = 0.9f),
-                    fontSize = 14.sp,
-                    lineHeight = 20.sp
-                )
-            }
-        },
-        containerColor = Color(0xFF101A24),
-        titleContentColor = Color.White,
-        textContentColor = Color.White.copy(alpha = 0.9f)
-    )
-}
-
-@Composable
 private fun HospitalityMenuBar(
     channelsCount: Int,
     serverUrl: String,
@@ -651,6 +604,7 @@ private fun HospitalityMenuBar(
     onTvClick: () -> Unit,
     onServiceClick: () -> Unit,
     onEntertainmentClick: () -> Unit,
+    onEntertainmentItemClick: (Int) -> Unit,
     onSettingsClick: () -> Unit,
     onInfoClick: () -> Unit,
     onOpenStbNameMenu: () -> Unit,
@@ -658,7 +612,6 @@ private fun HospitalityMenuBar(
     showFiveItems: Boolean,
     isUltraCompact: Boolean,
     homeExperienceJson: String,
-    onStaticPageRequested: (HomeExperienceStaticPage) -> Unit,
     onSelectionChanged: (HospitalityCarouselItem) -> Unit
 ) {
     val context = LocalContext.current
@@ -690,12 +643,12 @@ private fun HospitalityMenuBar(
     val carouselFocusRequester = menuFocusRequester
     val menuItems = remember(homeExperienceJson, channelsCount, educationSource, educationPath, educationPlaybackMode) {
         val sourceMenus = if (homeExperience.menus.isEmpty()) {
-            HomeExperienceParser.parse("").menus
+            HomeExperienceParser.defaultMenus()
         } else {
             homeExperience.menus
         }
 
-        sourceMenus.mapNotNull { menu ->
+        val mapped = sourceMenus.mapNotNull { menu ->
             val subtitle = when (menu.type) {
                 "tv" -> if (menu.subtitle.isBlank()) "$channelsCount saluran" else menu.subtitle
                 "education" -> if (menu.subtitle.isNotBlank()) menu.subtitle else when {
@@ -714,9 +667,10 @@ private fun HospitalityMenuBar(
                 "entertainment" -> onEntertainmentClick
                 "settings" -> onSettingsClick
                 "info_dialog" -> onInfoClick
-                "static_page" -> {
-                    val page = homeExperience.staticPages.firstOrNull { it.id == menu.staticPageId } ?: return@mapNotNull null
-                    { onStaticPageRequested(page) }
+                "konten" -> {
+                    val itemId = menu.entertainmentItemId
+                    if (itemId <= 0) return@mapNotNull null
+                    ({ onEntertainmentItemClick(itemId) })
                 }
                 else -> onServiceClick
             }
@@ -731,19 +685,38 @@ private fun HospitalityMenuBar(
                 backgroundUrl = menu.backgroundUrl,
                 action = action
             )
-        }.ifEmpty {
-            listOf(
+        }
+
+        // If every menu got filtered out (e.g. all `konten` items reference a
+        // missing entertainmentItemId), rebuild from the built-in defaults so
+        // the carousel is never empty.
+        if (mapped.isNotEmpty()) {
+            mapped
+        } else {
+            HomeExperienceParser.defaultMenus().map { menu ->
+                val subtitle = when (menu.type) {
+                    "tv" -> if (menu.subtitle.isBlank()) "$channelsCount saluran" else menu.subtitle
+                    else -> menu.subtitle
+                }
+                val action = when (menu.type) {
+                    "tv" -> onTvClick
+                    "education" -> onEducationClick
+                    "entertainment" -> onEntertainmentClick
+                    "settings" -> onSettingsClick
+                    "info_dialog" -> onInfoClick
+                    else -> onServiceClick
+                }
                 HospitalityCarouselItem(
-                    icon = Icons.Rounded.LiveTv,
-                    title = "TV CHANNEL",
-                    subtitle = "$channelsCount saluran",
-                    accent = Color(0xFFFFE9A6),
-                    textColor = Color.White,
-                    backgroundRes = R.drawable.home_bg_tv,
-                    backgroundUrl = "",
-                    action = onTvClick
+                    icon = resolveHomeIcon(menu.icon),
+                    title = menu.title,
+                    subtitle = subtitle,
+                    accent = HomeExperienceParser.colorOrDefault(menu.accentColorHex, Color(0xFFFFE9A6)),
+                    textColor = HomeExperienceParser.colorOrDefault(menu.textColorHex, Color.White),
+                    backgroundRes = defaultBackgroundForMenuType(menu.type),
+                    backgroundUrl = menu.backgroundUrl,
+                    action = action
                 )
-            )
+            }
         }
     }
 
@@ -1000,9 +973,8 @@ private fun defaultBackgroundForMenuType(type: String): Int {
     return when (type) {
         "tv" -> R.drawable.home_bg_tv
         "education" -> R.drawable.home_bg_education
-        "entertainment" -> R.drawable.home_bg_youtube
+        "entertainment", "konten" -> R.drawable.home_bg_youtube
         "settings" -> R.drawable.home_bg_settings
-        "static_page" -> R.drawable.home_bg_info
         else -> R.drawable.home_bg_info
     }
 }

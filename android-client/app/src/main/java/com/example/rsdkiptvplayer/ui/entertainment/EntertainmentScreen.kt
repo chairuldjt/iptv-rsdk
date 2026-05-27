@@ -92,6 +92,23 @@ private data class EntertainmentOption(
     val thumbnailUrl: String?
 )
 
+// In-memory cache so direct-play mode (menu type "konten") can resolve the
+// item immediately without a network round-trip on every navigation.
+// Invalidated whenever the serverUrl changes.
+private object EntertainmentItemsCache {
+    private var cachedServerUrl: String = ""
+    private var cachedItems: List<EntertainmentOption> = emptyList()
+
+    fun get(serverUrl: String): List<EntertainmentOption>? {
+        return if (cachedServerUrl == serverUrl && cachedItems.isNotEmpty()) cachedItems else null
+    }
+
+    fun put(serverUrl: String, items: List<EntertainmentOption>) {
+        cachedServerUrl = serverUrl
+        cachedItems = items
+    }
+}
+
 private val fallbackItems = listOf(
     EntertainmentOption(
         id = -1,
@@ -112,13 +129,17 @@ private val fallbackItems = listOf(
 )
 
 @Composable
-fun EntertainmentScreen(onBack: () -> Unit) {
+fun EntertainmentScreen(onBack: () -> Unit, initialItemId: Int = 0) {
     val context = LocalContext.current
     val app = context.applicationContext as IptvApplication
     val serverUrl by app.dataStoreManager.serverUrlFlow.collectAsState(initial = "")
     var items by remember { mutableStateOf<List<EntertainmentOption>>(emptyList()) }
     var isLoading by remember { mutableStateOf(true) }
     var activeOption by remember { mutableStateOf<EntertainmentOption?>(null) }
+    // true once we have attempted to resolve the direct-play item
+    var directPlayResolved by remember(initialItemId) { mutableStateOf(initialItemId <= 0) }
+    // true when direct-play lookup finished but item was not found — fall through to carousel
+    var directPlayFailed by remember(initialItemId) { mutableStateOf(false) }
 
     val configuration = LocalConfiguration.current
     val screenWidth = configuration.screenWidthDp
@@ -132,11 +153,46 @@ fun EntertainmentScreen(onBack: () -> Unit) {
         isLoading = false
     }
 
+    // Direct-play mode: jump straight into the player as soon as the list is ready.
+    // Never show the carousel to the user — only fall back to it if the id is missing.
+    LaunchedEffect(items, initialItemId, isLoading) {
+        if (isLoading || directPlayResolved || initialItemId <= 0) return@LaunchedEffect
+        val match = items.firstOrNull { it.id == initialItemId }
+        if (match != null) {
+            activeOption = match
+        } else {
+            directPlayFailed = true
+        }
+        directPlayResolved = true
+    }
+
+    // While waiting for the list to load in direct-play mode, show a clean
+    // fullscreen spinner — no carousel flash, no header, nothing else.
+    if (initialItemId > 0 && !directPlayResolved && activeOption == null) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(Color(0xFF050914)),
+            contentAlignment = Alignment.Center
+        ) {
+            CircularProgressIndicator(
+                color = Color(0xFFFFE9A6),
+                strokeWidth = 3.dp,
+                modifier = Modifier.size(48.dp)
+            )
+        }
+        BackHandler { onBack() }
+        return
+    }
+
     activeOption?.let { option ->
+        // In direct-play mode, closing the player returns to the home screen
+        // instead of stranding the user on the carousel they never asked for.
+        val closePlayer: () -> Unit = if (initialItemId > 0) onBack else { { activeOption = null } }
         when (option.contentType) {
-            "media_player", "m3u_player" -> EntertainmentPlayer(option = option, onBack = { activeOption = null })
-            "m3u_playlist" -> EntertainmentM3uPlaylistScreen(option = option, serverUrl = serverUrl, onBack = { activeOption = null })
-            else -> EntertainmentWebView(option = option, onBack = { activeOption = null })
+            "media_player", "m3u_player" -> EntertainmentPlayer(option = option, onBack = closePlayer)
+            "m3u_playlist" -> EntertainmentM3uPlaylistScreen(option = option, serverUrl = serverUrl, onBack = closePlayer)
+            else -> EntertainmentWebView(option = option, onBack = closePlayer)
         }
         return
     }
@@ -850,12 +906,17 @@ private fun formatTime(ms: Long): String {
 
 private suspend fun loadEntertainmentItems(serverUrl: String): List<EntertainmentOption> = withContext(Dispatchers.IO) {
     if (serverUrl.isBlank()) return@withContext emptyList()
+    // Return cached result immediately if available — avoids network round-trip
+    // on every navigation and makes direct-play mode feel instant.
+    EntertainmentItemsCache.get(serverUrl)?.let { return@withContext it }
     runCatching {
         val response = RetrofitClient.getService(serverUrl).getEntertainmentItems()
         if (!response.isSuccessful || response.body()?.status != true) return@runCatching emptyList()
-        response.body()?.data.orEmpty()
+        val items = response.body()?.data.orEmpty()
             .filter { !it.url.isNullOrBlank() }
             .map { it.toOption(serverUrl) }
+        if (items.isNotEmpty()) EntertainmentItemsCache.put(serverUrl, items)
+        items
     }.getOrElse { emptyList() }
 }
 

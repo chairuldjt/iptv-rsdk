@@ -80,6 +80,7 @@ class MainActivity : ComponentActivity() {
                     var currentScreen by remember { mutableStateOf("splash") }
                     var activeSettingsTab by remember { mutableStateOf(0) }
                     var selectedChannelId by remember { mutableIntStateOf(-1) }
+                    var selectedEntertainmentItemId by remember { mutableIntStateOf(0) }
                     var showExitConfirmDialog by remember { mutableStateOf(false) }
                     var showVideoBroadcastOverlay by remember { mutableStateOf(false) }
                     var activeVideoBroadcast by remember { mutableStateOf(VideoBroadcastProfile()) }
@@ -120,6 +121,19 @@ class MainActivity : ComponentActivity() {
                                 "NAVIGATE_SETTINGS" -> {
                                     activeSettingsTab = value?.toIntOrNull() ?: 0
                                     currentScreen = "settings"
+                                }
+                                "RELOAD_CONFIG" -> {
+                                    // Realtime trigger from web admin: re-pull config + channels
+                                    // immediately. syncConfig() already consumes force_sync /
+                                    // clear_cache_trigger / education_force_sync from the server.
+                                    kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.IO).launch {
+                                        try {
+                                            app.repository.syncConfig()
+                                            app.repository.syncChannels()
+                                        } catch (e: Exception) {
+                                            e.printStackTrace()
+                                        }
+                                    }
                                 }
                                 "PLAY_CHANNEL" -> {
                                     val chId = value?.toIntOrNull()
@@ -183,7 +197,14 @@ class MainActivity : ComponentActivity() {
                                         currentScreen = "player"
                                     },
                                     onNavigateToEducation = { currentScreen = "education" },
-                                    onNavigateToEntertainment = { currentScreen = "entertainment" },
+                                    onNavigateToEntertainment = {
+                                        selectedEntertainmentItemId = 0
+                                        currentScreen = "entertainment"
+                                    },
+                                    onNavigateToEntertainmentItem = { itemId ->
+                                        selectedEntertainmentItemId = itemId
+                                        currentScreen = "entertainment"
+                                    },
                                     onNavigateToSettings = { tabIdx ->
                                         activeSettingsTab = tabIdx
                                         currentScreen = "settings"
@@ -220,10 +241,15 @@ class MainActivity : ComponentActivity() {
                             }
                             "entertainment" -> {
                                 BackHandler {
+                                    selectedEntertainmentItemId = 0
                                     currentScreen = "home"
                                 }
                                 EntertainmentScreen(
-                                    onBack = { currentScreen = "home" }
+                                    onBack = {
+                                        selectedEntertainmentItemId = 0
+                                        currentScreen = "home"
+                                    },
+                                    initialItemId = selectedEntertainmentItemId
                                 )
                             }
                             "player" -> {
