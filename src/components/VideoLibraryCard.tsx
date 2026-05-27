@@ -38,7 +38,7 @@ export default function VideoLibraryCard({
 
   return (
     <>
-      <article className="group overflow-hidden rounded-[24px] border border-white/8 bg-slate-900/40 backdrop-blur-xl transition-all duration-300 hover:border-primary/30 hover:shadow-[0_20px_50px_rgba(0,0,0,0.3)] flex flex-col md:flex-row">
+      <article className="group shrink-0 overflow-hidden rounded-[24px] border border-white/8 bg-slate-900/40 backdrop-blur-xl transition-all duration-300 hover:border-primary/30 hover:shadow-[0_20px_50px_rgba(0,0,0,0.3)] flex flex-col md:flex-row">
         {/* Left Side: Aspect Video Thumbnail */}
         <div className="relative aspect-video w-full md:w-[240px] shrink-0 bg-black/40 overflow-hidden">
           <AutoVideoThumbnail
