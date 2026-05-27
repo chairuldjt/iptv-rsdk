@@ -188,13 +188,15 @@ model AppSetting {
 
 
 model AppUpdate {
-  id           Int      @id @default(autoincrement())
-  versionCode  Int      @unique
-  versionName  String
-  apkFileName  String
-  changelog    String?  @db.Text
-  isMandatory  Boolean  @default(false)
-  isDeployed   Boolean  @default(false)
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  id            Int      @id @default(autoincrement())
+  versionCode   Int      @unique
+  versionName   String
+  apkFileName   String
+  packageName   String?
+  updateChannel String?
+  changelog     String?  @db.Text
+  isMandatory   Boolean  @default(false)
+  isDeployed    Boolean  @default(false)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
 }
