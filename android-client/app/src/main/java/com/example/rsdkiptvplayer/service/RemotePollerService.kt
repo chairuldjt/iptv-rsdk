@@ -7,10 +7,12 @@ import android.app.PendingIntent
 import android.app.Service
 import android.content.Context
 import android.content.Intent
+import android.content.pm.ServiceInfo
 import android.os.Build
 import android.os.IBinder
 import android.util.Log
 import androidx.core.app.NotificationCompat
+import androidx.core.app.ServiceCompat
 import com.example.rsdkiptvplayer.IptvApplication
 import com.example.rsdkiptvplayer.MainActivity
 import com.example.rsdkiptvplayer.R
@@ -53,7 +55,15 @@ class RemotePollerService : Service() {
         super.onCreate()
         Log.d(TAG, "Service created")
         createNotificationChannel()
-        startForeground(NOTIFICATION_ID, buildNotification())
+        ServiceCompat.startForeground(
+            this,
+            NOTIFICATION_ID,
+            buildNotification(),
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE)
+                ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC
+            else
+                0
+        )
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
