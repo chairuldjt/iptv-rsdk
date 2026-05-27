@@ -7,6 +7,8 @@ import org.json.JSONObject
 data class HomeExperienceProfile(
     val logoUrl: String = "",
     val homeBackgroundUrl: String = "",
+    val startScreen: String = "home_screen",
+    val startScreenContentId: Int? = null,
     val menus: List<HomeExperienceMenu> = emptyList(),
     val splash: HomeExperienceSplash = HomeExperienceSplash(),
     val sounds: HomeExperienceSounds = HomeExperienceSounds()
@@ -65,17 +67,18 @@ object HomeExperienceParser {
 
         return try {
             val root = JSONObject(json)
+            val rawStartScreen = root.optString("startScreen", "home_screen")
+            val startScreen = if (rawStartScreen in listOf("live_tv", "category_list", "home_screen", "entertainment", "education")) rawStartScreen else "home_screen"
+            val startScreenContentId = root.optInt("startScreenContentId", 0).takeIf { it > 0 }
             val profile = HomeExperienceProfile(
                 logoUrl = root.optString("logoUrl"),
                 homeBackgroundUrl = root.optString("homeBackgroundUrl"),
+                startScreen = startScreen,
+                startScreenContentId = startScreenContentId,
                 menus = parseMenus(root.optJSONArray("menus")),
                 splash = parseSplash(root.optJSONObject("splash")),
                 sounds = parseSounds(root.optJSONObject("sounds"))
             )
-            // Server may briefly return a config with no enabled menus (e.g. an
-            // admin disabled every entry in the assigned profile). Treat that as
-            // "use the built-in defaults" so the device is never stranded with a
-            // blank carousel.
             if (profile.menus.isEmpty()) profile.copy(menus = defaultMenus()) else profile
         } catch (_: Exception) {
             defaultProfile()

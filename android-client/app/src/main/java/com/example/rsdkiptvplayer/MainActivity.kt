@@ -184,7 +184,18 @@ class MainActivity : ComponentActivity() {
                         when (currentScreen) {
                             "splash" -> {
                                 SplashScreen(
-                                    onSplashComplete = { currentScreen = "home" }
+                                    onSplashComplete = { startScreen, contentId ->
+                                        when (startScreen) {
+                                            "entertainment" -> {
+                                                selectedEntertainmentItemId = contentId ?: 0
+                                                currentScreen = "entertainment"
+                                            }
+                                            "education" -> currentScreen = "education"
+                                            "category_list" -> currentScreen = "channels"
+                                            "live_tv" -> currentScreen = "channels"
+                                            else -> currentScreen = "home"
+                                        }
+                                    }
                                 )
                             }
                             "home" -> {

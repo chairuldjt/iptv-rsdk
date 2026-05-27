@@ -6,7 +6,9 @@ import type {
   HomeExperienceConfig,
   HomeExperienceMenuItem,
   HomeExperienceScope,
+  StartScreenValue,
 } from '@/lib/homeExperience'
+import { START_SCREEN_VALUES } from '@/lib/homeExperience'
 
 export type EntertainmentItemOption = {
   id: number
@@ -72,6 +74,8 @@ export default function HomeExperienceForm({
   const [enableSelectionSound, setEnableSelectionSound] = useState(config.sounds.enableSelectionSound)
   const [enableSplashSound, setEnableSplashSound] = useState(config.sounds.enableSplashSound)
   const [selectionSoundUrl, setSelectionSoundUrl] = useState(config.sounds.selectionSoundUrl)
+  const [startScreen, setStartScreen] = useState<StartScreenValue>(config.startScreen)
+  const [startScreenContentId, setStartScreenContentId] = useState<number | null>(config.startScreenContentId ?? null)
   const [expandedSections, setExpandedSections] = useState<Record<string, Record<string, boolean>>>({})
   const [enabledSections, setEnabledSections] = useState<Record<string, Record<string, boolean>>>({})
 
@@ -606,6 +610,45 @@ export default function HomeExperienceForm({
             }}
           />
         </CollapsibleSection>
+
+        <div className="border-t border-border pt-5 space-y-3">
+          <div>
+            <label className="mb-1.5 block text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Start Screen</label>
+            <p className="text-[10px] text-muted-foreground mb-2">Layar pertama yang dibuka STB setelah splash selesai.</p>
+            <input type="hidden" name="startScreen" value={startScreen} />
+            <select
+              value={startScreen}
+              onChange={(e) => {
+                setStartScreen(e.target.value as StartScreenValue)
+                if (e.target.value !== 'entertainment') setStartScreenContentId(null)
+              }}
+              className="field-input py-2 w-full"
+            >
+              <option value="live_tv">Live TV (langsung ke player)</option>
+              <option value="category_list">Category List</option>
+              <option value="home_screen">Home Screen (menu utama)</option>
+              <option value="entertainment">Konten / Hiburan</option>
+              <option value="education">Video Edukasi</option>
+            </select>
+          </div>
+          {startScreen === 'entertainment' && (
+            <div>
+              <label className="mb-1.5 block text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Konten yang Dibuka</label>
+              <p className="text-[10px] text-muted-foreground mb-2">Pilih konten spesifik yang langsung dibuka. Kosongkan untuk membuka daftar konten.</p>
+              <input type="hidden" name="startScreenContentId" value={startScreenContentId ?? ''} />
+              <select
+                value={startScreenContentId ?? ''}
+                onChange={(e) => setStartScreenContentId(e.target.value ? Number(e.target.value) : null)}
+                className="field-input py-2 w-full"
+              >
+                <option value="">— Buka daftar konten (tidak spesifik) —</option>
+                {entertainmentItemOptions.map((item) => (
+                  <option key={item.id} value={item.id}>{item.label}</option>
+                ))}
+              </select>
+            </div>
+          )}
+        </div>
 
         <div className="flex flex-col sm:flex-row gap-3 border-t border-border pt-6">
           <button type="submit" className="flex-1 btn btn-primary py-2.5">Save Home Experience Profile</button>

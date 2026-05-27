@@ -40,7 +40,7 @@ import kotlinx.coroutines.withTimeoutOrNull
 
 @Composable
 fun SplashScreen(
-    onSplashComplete: () -> Unit
+    onSplashComplete: (startScreen: String, startScreenContentId: Int?) -> Unit
 ) {
     val context = LocalContext.current
     val app = context.applicationContext as IptvApplication
@@ -91,24 +91,23 @@ fun SplashScreen(
             scale.animateTo(targetValue = 1f, animationSpec = tween(durationMillis = 750))
         }
 
-        // Sync config + channels with 8s timeout so offline devices are not stuck
+        // Only wait for config sync (4s timeout) — channels sync in background
         loadingStatus = "Memuat konfigurasi..."
-        val syncJob = async {
-            withTimeoutOrNull(8_000L) {
-                try {
-                    app.repository.syncConfig()
-                } catch (_: Exception) {}
-            }
-            withTimeoutOrNull(8_000L) {
-                try {
-                    app.repository.syncChannels()
-                } catch (_: Exception) {}
+        val syncConfigJob = async {
+            withTimeoutOrNull(4_000L) {
+                try { app.repository.syncConfig() } catch (_: Exception) {}
             }
         }
 
-        // Wait for both animation and sync to finish
+        // Fire channel sync in background — don't block splash
+        val syncChannelsJob = async {
+            try { app.repository.syncChannels() } catch (_: Exception) {}
+        }
+
+        // Wait for animation and config sync only
         animJob.await()
-        syncJob.await()
+        syncConfigJob.await()
+        // syncChannels continues in background — don't await
 
         // After sync, homeExperienceJson in DataStore is now fresh.
         // Re-read it and preload all remote image URLs into Coil cache.
@@ -145,9 +144,8 @@ fun SplashScreen(
         }
 
         loadingStatus = ""
-        // Small pause so the UI doesn't flash immediately after loading
         delay(300)
-        onSplashComplete()
+        onSplashComplete(freshExp.startScreen, freshExp.startScreenContentId)
     }
 
     Box(modifier = Modifier.fillMaxSize()) {

@@ -71,11 +71,13 @@ export default async function SetupPage({
   searchParams: Promise<{ saved?: string; reset?: string; relaySaved?: string; relayReset?: string }>
 }) {
   const resolvedSearchParams = await searchParams
-  const config = await getDefaultDeviceConfig()
-  const relayConfig = await getOnDemandHlsRelayConfig()
-  const appPublicOrigin = await getAppPublicOrigin()
-  const apiBaseUrl = await getApiBaseUrl()
-  const primaryNtpServer = await getPrimaryNtpServer()
+  const [config, relayConfig, appPublicOrigin, apiBaseUrl, primaryNtpServer] = await Promise.all([
+    getDefaultDeviceConfig(),
+    getOnDemandHlsRelayConfig(),
+    getAppPublicOrigin(),
+    getApiBaseUrl(),
+    getPrimaryNtpServer(),
+  ])
   const showSaved = resolvedSearchParams.saved === '1'
   const showReset = resolvedSearchParams.reset === '1'
   const showRelaySaved = resolvedSearchParams.relaySaved === '1'
@@ -113,7 +115,13 @@ export default async function SetupPage({
 }
 
 /* ---- Default Setup Section ---- */
-function DefaultSetupSection({ config, saveDefaultSetupAction }: { config: Awaited<ReturnType<typeof getDefaultDeviceConfig>>; saveDefaultSetupAction: (fd: FormData) => Promise<void> }) {
+function DefaultSetupSection({
+  config,
+  saveDefaultSetupAction,
+}: {
+  config: Awaited<ReturnType<typeof getDefaultDeviceConfig>>
+  saveDefaultSetupAction: (fd: FormData) => Promise<void>
+}) {
   return (
     <form action={saveDefaultSetupAction}>
       <SectionCard title="Playback &amp; Sync" description="Mode sumber channel, interval sync, dan tampilan player awal.">
@@ -144,13 +152,6 @@ function DefaultSetupSection({ config, saveDefaultSetupAction }: { config: Await
           </Field>
           <Field label="Default Channel ID">
             <input type="number" name="defaultChannelId" defaultValue={config.defaultChannelId ?? ''} min={1} placeholder="Kosongkan jika tidak ada" className="field-input" />
-          </Field>
-          <Field label="Start Screen">
-            <select name="startScreen" defaultValue={config.startScreen} className="field-input py-2">
-              <option value="live_tv">Live TV</option>
-              <option value="category_list">Category List</option>
-              <option value="home_screen">Home Screen</option>
-            </select>
           </Field>
           <Field label="Technician PIN">
             <input type="text" name="technicianPin" defaultValue={config.technicianPin} required maxLength={8} className="field-input font-mono text-center font-bold tracking-widest text-primary" />

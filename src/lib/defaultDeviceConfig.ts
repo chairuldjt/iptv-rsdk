@@ -11,7 +11,6 @@ export type DefaultDeviceConfig = {
   syncInterval: number
   syncMode: string
   customM3uUrl: string
-  startScreen: string
   lockSettings: boolean
   autoStartOnBoot: boolean
   technicianPin: string
@@ -32,7 +31,6 @@ export const FALLBACK_DEFAULT_DEVICE_CONFIG: DefaultDeviceConfig = {
   syncInterval: envInt('IPTV_DEFAULT_SYNC_INTERVAL', 1800),
   syncMode: normalizeSyncMode(process.env.IPTV_DEFAULT_SYNC_MODE || DEFAULT_SYNC_MODE),
   customM3uUrl: process.env.IPTV_DEFAULT_CUSTOM_M3U_URL || DEFAULT_CUSTOM_M3U_URL,
-  startScreen: process.env.IPTV_DEFAULT_START_SCREEN || 'live_tv',
   lockSettings: envBoolean('IPTV_DEFAULT_LOCK_SETTINGS', true),
   autoStartOnBoot: envBoolean('IPTV_DEFAULT_AUTO_START_ON_BOOT', false),
   technicianPin: process.env.IPTV_DEFAULT_TECHNICIAN_PIN || '2468',
@@ -104,7 +102,6 @@ export function defaultDeviceConfigFromFormData(formData: FormData): DefaultDevi
     syncInterval: intValue(formData, 'syncInterval', FALLBACK_DEFAULT_DEVICE_CONFIG.syncInterval),
     syncMode: stringValue(formData, 'syncMode', FALLBACK_DEFAULT_DEVICE_CONFIG.syncMode),
     customM3uUrl: stringValue(formData, 'customM3uUrl', FALLBACK_DEFAULT_DEVICE_CONFIG.customM3uUrl),
-    startScreen: stringValue(formData, 'startScreen', FALLBACK_DEFAULT_DEVICE_CONFIG.startScreen),
     lockSettings: formData.get('lockSettings') === 'on',
     autoStartOnBoot: formData.get('autoStartOnBoot') === 'on',
     technicianPin: stringValue(formData, 'technicianPin', FALLBACK_DEFAULT_DEVICE_CONFIG.technicianPin),
@@ -129,7 +126,6 @@ function normalizeDefaultDeviceConfig(value: unknown): DefaultDeviceConfig {
     syncInterval: clampInt(source.syncInterval, 60, 86_400, FALLBACK_DEFAULT_DEVICE_CONFIG.syncInterval),
     syncMode: normalizeSyncMode(safeString(source.syncMode, FALLBACK_DEFAULT_DEVICE_CONFIG.syncMode)),
     customM3uUrl: safeString(source.customM3uUrl, FALLBACK_DEFAULT_DEVICE_CONFIG.customM3uUrl),
-    startScreen: oneOf(source.startScreen, ['live_tv', 'category_list', 'home_screen'], FALLBACK_DEFAULT_DEVICE_CONFIG.startScreen),
     lockSettings: safeBoolean(source.lockSettings, FALLBACK_DEFAULT_DEVICE_CONFIG.lockSettings),
     autoStartOnBoot: safeBoolean(source.autoStartOnBoot, FALLBACK_DEFAULT_DEVICE_CONFIG.autoStartOnBoot),
     technicianPin: safeString(source.technicianPin, FALLBACK_DEFAULT_DEVICE_CONFIG.technicianPin),

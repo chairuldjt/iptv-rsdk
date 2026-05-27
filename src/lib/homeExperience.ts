@@ -44,10 +44,16 @@ export type HomeExperienceRunningTextItem = {
   text: string
 }
 
+export type StartScreenValue = 'live_tv' | 'category_list' | 'home_screen' | 'entertainment' | 'education'
+
+export const START_SCREEN_VALUES: readonly StartScreenValue[] = ['live_tv', 'category_list', 'home_screen', 'entertainment', 'education']
+
 export type HomeExperienceResolvedConfig = {
   revision: number
   logoUrl: string
   homeBackgroundUrl: string
+  startScreen: StartScreenValue
+  startScreenContentId: number | null
   menus: HomeExperienceMenuItem[]
   splash: {
     enabled: boolean
@@ -92,6 +98,8 @@ export type HomeExperiencePatch = {
   revision?: number
   logoUrl?: string
   homeBackgroundUrl?: string
+  startScreen?: StartScreenValue
+  startScreenContentId?: number | null
   menus?: HomeExperienceMenuPatch[]
   splash?: Partial<HomeExperienceResolvedConfig['splash']>
   sounds?: Partial<HomeExperienceResolvedConfig['sounds']>
@@ -103,6 +111,8 @@ export const FALLBACK_HOME_EXPERIENCE_CONFIG: HomeExperienceResolvedConfig = {
   revision: 1,
   logoUrl: '',
   homeBackgroundUrl: '',
+  startScreen: 'home_screen',
+  startScreenContentId: null,
   menus: [
     {
       id: 'tv',
@@ -306,6 +316,13 @@ export function homeExperienceFromFormData(formData: FormData): HomeExperienceRe
     revision: Number.parseInt(String(formData.get('revision') || FALLBACK_HOME_EXPERIENCE_CONFIG.revision), 10),
     logoUrl: formData.get('logoUrl'),
     homeBackgroundUrl: formData.get('homeBackgroundUrl'),
+    startScreen: formData.get('startScreen'),
+    startScreenContentId: (() => {
+      const v = formData.get('startScreenContentId')
+      if (!v || v === '') return null
+      const n = Number.parseInt(String(v), 10)
+      return Number.isFinite(n) && n > 0 ? n : null
+    })(),
     menus: parseJsonArray(formData.get('menusJson'), FALLBACK_HOME_EXPERIENCE_CONFIG.menus),
     splash: {
       enabled: formData.get('splashEnabled') === 'on',
@@ -333,6 +350,8 @@ export function normalizeHomeExperienceConfig(value: unknown): HomeExperienceRes
     revision: clampInt(source.revision, 1, 100_000, FALLBACK_HOME_EXPERIENCE_CONFIG.revision),
     logoUrl: safeString(source.logoUrl, ''),
     homeBackgroundUrl: safeString(source.homeBackgroundUrl, ''),
+    startScreen: oneOf(source.startScreen, START_SCREEN_VALUES, FALLBACK_HOME_EXPERIENCE_CONFIG.startScreen),
+    startScreenContentId: safeNullableInt(source.startScreenContentId),
     menus: normalizeMenus(source.menus),
     splash: normalizeSplash(source.splash),
     sounds: normalizeSounds(source.sounds),
@@ -346,6 +365,8 @@ export function normalizeHomeExperiencePatch(value: unknown): HomeExperiencePatc
   if (hasOwn(source, 'revision')) patch.revision = clampInt(source.revision, 1, 100_000, FALLBACK_HOME_EXPERIENCE_CONFIG.revision)
   if (hasOwn(source, 'logoUrl')) patch.logoUrl = safeString(source.logoUrl, '')
   if (hasOwn(source, 'homeBackgroundUrl')) patch.homeBackgroundUrl = safeString(source.homeBackgroundUrl, '')
+  if (hasOwn(source, 'startScreen')) patch.startScreen = oneOf(source.startScreen, START_SCREEN_VALUES, FALLBACK_HOME_EXPERIENCE_CONFIG.startScreen)
+  if (hasOwn(source, 'startScreenContentId')) patch.startScreenContentId = safeNullableInt(source.startScreenContentId)
   if (hasOwn(source, 'menus')) patch.menus = normalizeMenuPatches(source.menus)
   if (hasOwn(source, 'splash')) patch.splash = normalizeSplashPatch(source.splash)
   if (hasOwn(source, 'sounds')) patch.sounds = normalizeSoundsPatch(source.sounds)
@@ -364,6 +385,8 @@ export function applyHomeExperiencePatch(
     revision: patch.revision ?? base.revision,
     logoUrl: patch.logoUrl ?? base.logoUrl,
     homeBackgroundUrl: patch.homeBackgroundUrl ?? base.homeBackgroundUrl,
+    startScreen: patch.startScreen ?? base.startScreen,
+    startScreenContentId: hasOwn(patch as Record<string, unknown>, 'startScreenContentId') ? patch.startScreenContentId : base.startScreenContentId,
     splash: {
       ...base.splash,
       ...(patch.splash ?? {}),
@@ -728,6 +751,8 @@ function compactHomeExperiencePatch(patch: HomeExperiencePatch): HomeExperienceP
   if (patch.homeBackgroundUrl !== undefined && patch.homeBackgroundUrl !== FALLBACK_HOME_EXPERIENCE_CONFIG.homeBackgroundUrl) {
     compacted.homeBackgroundUrl = patch.homeBackgroundUrl
   }
+  if (patch.startScreen !== undefined && patch.startScreen !== FALLBACK_HOME_EXPERIENCE_CONFIG.startScreen) compacted.startScreen = patch.startScreen
+  if (patch.startScreenContentId !== undefined && patch.startScreenContentId !== FALLBACK_HOME_EXPERIENCE_CONFIG.startScreenContentId) compacted.startScreenContentId = patch.startScreenContentId
 
   const compactMenus = compactMenuPatches(patch.menus)
   if (compactMenus.length > 0) compacted.menus = compactMenus
@@ -806,6 +831,12 @@ function hasOwn(record: Record<string, unknown>, key: string): boolean {
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
+}
+
+function safeNullableInt(value: unknown): number | null {
+  if (value === null || value === undefined || value === '') return null
+  const parsed = typeof value === 'number' ? value : Number.parseInt(String(value), 10)
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : null
 }
 
 function safeString(value: unknown, fallback: string): string {
