@@ -72,8 +72,7 @@ http://10.55.1.5:9000
 
 ### Mode Sinkronisasi
 - `custom`: default APK saat ini. Channel diambil dari URL M3U custom/fallback lokal.
-- `api`: channel diambil dari Web Admin/API global playlist.
-- `api`: channel diambil dari Web Admin/API. Jika playlist asal channel mengaktifkan relay, URL stream yang diterima client akan diarahkan ke HLS relay on-demand server.
+- `api`: channel diambil dari Web Admin/API global playlist. Jika playlist asal channel mengaktifkan flag `relayEnabled`, URL stream yang diterima client akan diarahkan ke HLS relay on-demand server secara otomatis.
 
 Android tetap mengambil remote config dari Web Admin walau sedang berada di mode `custom`, sehingga perubahan mode dari dashboard dapat diterapkan tanpa reinstall.
 

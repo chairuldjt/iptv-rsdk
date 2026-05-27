@@ -15,13 +15,16 @@ devices
   ├─ device_configs
   └─ device_logs
 
+education_folders
+  └─ education_videos
+
+entertainment_items
 app_settings
 app_updates
-sound_preferences
 users
 ```
 
-`playlists`, `categories`, dan `channels` menyimpan hasil parsing M3U. `devices` dan `device_configs` menyimpan status serta konfigurasi per STB. `app_settings` menyimpan konfigurasi global berbasis key/value seperti default setup device baru dan runtime relay. `app_updates` menyimpan metadata APK yang di-upload dari dashboard. `sound_preferences` masih tersedia di schema untuk preferensi suara per device, walaupun UI Android terbaru tidak lagi menampilkan toggle mute suara navigasi Home.
+`playlists`, `categories`, dan `channels` menyimpan hasil parsing M3U. `devices` dan `device_configs` menyimpan status serta konfigurasi per STB. `education_folders` dan `education_videos` mengelola repository video edukasi web. `entertainment_items` menyimpan item menu Hiburan Android. `app_settings` adalah key/value generic untuk konfigurasi global runtime (default device baru, runtime relay, NTP, home experience profiles, device groups, running text profiles, video broadcast profiles, dll). `app_updates` menyimpan metadata APK yang di-upload dari dashboard.
 
 ---
 
@@ -74,15 +77,7 @@ Daftar channel hasil parsing.
 Index penting: `(playlistId, isActive, sortOrder)`, `categoryId`.
 
 ### `education_videos`
-Daftar video edukasi di repository web terpusat.
-
-| Kolom | Tipe | Catatan |
-| --- | --- | --- |
-| `id` | Int | Primary key autoincrement. |
-| `title` | String | Judul video. |
-| `videoUrl` | Text | URL eksternal atau path file terunggah ke server lokal (misal: `/uploads/videos/...`). |
-| `isPublished` | Boolean | Jika `true`, video bisa dikirim ke playlist Video Edukasi Web Repository. |
-| `createdAt` / `updatedAt` | DateTime | Timestamp Prisma. |
+Daftar video edukasi di repository web terpusat. Schema lengkap diuraikan di bagian `EducationVideo` di bawah.
 
 ---
 
@@ -204,16 +199,27 @@ Menyimpan akun Web Admin.
 | `role` | String | Default `admin`. |
 
 ### `app_settings`
-Key/value untuk konfigurasi global runtime.
+Key/value untuk konfigurasi global runtime. Tabel ini bersifat generic — value disimpan sebagai string (umumnya JSON) dan dipakai oleh berbagai modul.
 
 Key yang dipakai kode saat ini:
 
 | Key | Isi |
 | --- | --- |
-| `device.defaultConfig` | JSON default config untuk device baru. |
-| `dashboard.offlineAutoDeleteDays` | Threshold auto-delete device offline. |
+| `device.defaultConfig` | JSON default config untuk device baru (lihat `src/lib/defaultDeviceConfig.ts`). |
+| `device.offlineAutoDeleteDays` | Threshold auto-delete device offline lama (0 = nonaktif). |
+| `device.groups` | Array JSON daftar device group (id, name, description, color). |
+| `device.groupAssignments` | Map JSON `{ deviceId: groupId }`. |
 | `app.publicOrigin` | Origin publik untuk URL absolut yang dikirim ke client. |
-| `stream.onDemandHlsRelayConfig` | JSON runtime ffmpeg/on-demand relay. |
+| `app.primaryNtpServer` | NTP server utama yang dikirim ke Android, default `0.id.pool.ntp.org`. |
+| `stream.onDemandHlsRelayConfig` | JSON runtime ffmpeg/on-demand relay (binary path, localaddr, output root, hls time, fifo size, idle timeout). |
+| `homeExperience.profiles` | Array metadata profile home experience. |
+| `homeExperience.profile.<id>` | JSON patch config home experience untuk profile tertentu. |
+| `homeExperience.globalProfileId` | ID profile yang dipakai sebagai global. |
+| `homeExperience.groupProfileMap` | Map JSON `{ groupId: profileId }`. |
+| `homeExperience.deviceProfileMap` | Map JSON `{ deviceId: profileId }`. |
+| `homeExperience.global` / `homeExperience.group.<id>` / `homeExperience.device.<id>` | Patch config legacy (dipakai sebagai fallback bila tidak ada profile mapping). |
+| `runningText.profiles` / `runningText.profile.<id>` / `runningText.globalProfileId` / `runningText.groupProfileMap` / `runningText.deviceProfileMap` | Profile management running text. |
+| `videoBroadcast.profiles` / `videoBroadcast.profile.<id>` / `videoBroadcast.globalProfileId` / `videoBroadcast.groupProfileMap` / `videoBroadcast.deviceProfileMap` | Profile management video broadcast. |
 
 Jika key belum ada, backend memakai fallback dari `.env` dan konstanta kode.
 
@@ -234,15 +240,6 @@ Alur dashboard:
 - Deploy version mengubah semua record lain menjadi `isDeployed=false`, lalu mengaktifkan satu record pilihan.
 - Delete update menghapus record database dan file APK di `public/uploads/apk`.
 
-### `sound_preferences`
-Preferensi suara per device.
-
-| Kolom | Tipe | Catatan |
-| --- | --- | --- |
-| `deviceId` | String | Primary key. |
-| `muteSelectionSound` | Boolean | Default `false`; tersisa untuk kompatibilitas data. |
-| `createdAt` / `updatedAt` | DateTime | Timestamp Prisma. |
-
 ---
 
 ## 5. Fitur Web Admin Aktual
@@ -251,8 +248,11 @@ Preferensi suara per device.
 - Aktivasi/deaktivasi device tanpa menghapus config.
 - Edit config per device: sync mode, custom M3U, aspect ratio, sync interval, lock settings, PIN, autostart, dan edukasi SMB.
 - Clear cache, force sync channel, dan force sync edukasi dari dashboard.
-- Playlist upload/sync M3U, parse category/channel, global playlist.
-- Preview stream direct/relay dan konfigurasi HLS relay.
+- Playlist upload/sync M3U, parse category/channel, global playlist, dan toggle relay per playlist.
+- Preview stream direct/relay dan konfigurasi HLS relay on-demand.
 - Upload APK dengan auto-detect manifest, draft history, deploy satu versi aktif, download, dan delete APK update.
-- Remote control device via polling command dan screenshot streaming.
+- Remote control device via polling command dan screenshot streaming (in-memory queue).
 - Log viewer untuk error yang dikirim Android.
+- Manajemen device group beserta assignment device ke group.
+- Manajemen profile Home Experience, Running Text, dan Video Broadcast dengan inheritance global → group → device.
+- Setup Defaults: konfigurasi default device baru, NTP server utama, dan runtime ffmpeg/HLS relay on-demand.

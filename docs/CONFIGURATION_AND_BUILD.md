@@ -51,10 +51,9 @@ Menentukan apakah APK bawaan langsung mencari playlist dari Server API atau dari
   prefs[SYNC_MODE] ?: "api"
   ```
 - **Pilihan value yang valid di sistem**:
-  - `api` = channel diambil dari global playlist backend apa adanya.
-- `api` = channel diambil dari global playlist backend. Jika playlist asal channel mengaktifkan relay, URL stream UDP akan diarahkan ke HLS relay server secara otomatis.
+  - `api` = channel diambil dari global playlist backend. Jika playlist asal channel mengaktifkan relay, URL stream UDP akan diarahkan ke HLS relay on-demand server secara otomatis.
   - `custom` = device mengabaikan global playlist dan memakai `customM3uUrl` miliknya sendiri.
-- **Catatan penting**: APK Android bawaan saat ini tetap fallback ke `custom` di sisi client lokal (`DEFAULT_SYNC_MODE` di `src/lib/defaults.ts` untuk web/backend juga `custom`), tetapi perangkat baru yang register ke backend akan mengikuti `IPTV_DEFAULT_SYNC_MODE` atau nilai yang disimpan di dashboard **Setup Defaults**. Jika masih ada nilai lama `api_relay` di `.env` atau database, backend akan memperlakukannya sebagai alias `api`.
+- **Catatan penting**: APK Android bawaan saat ini tetap fallback ke `custom` di sisi client lokal (`DEFAULT_SYNC_MODE` di `src/lib/defaults.ts` untuk web/backend juga `custom`), tetapi perangkat baru yang register ke backend akan mengikuti `IPTV_DEFAULT_SYNC_MODE` atau nilai yang disimpan di dashboard **Setup Defaults**. Nilai legacy `api_relay` di `.env` atau database masih diterima dan diperlakukan sebagai alias `api` (relay tetap mengikuti flag `relayEnabled` per playlist).
 
 ### D. Nilai Env Device Default yang Valid
 Nilai di bawah ini dibaca backend dari `.env` root proyek saat belum ada override dari dashboard **Setup Defaults**.
@@ -93,8 +92,8 @@ Keterangan pilihan value:
 - `IPTV_DEFAULT_CHANNEL_ID`: kosongkan untuk `null`, atau isi ID channel numerik yang sudah ada di database
 
 - **Rekomendasi operasional**:
-  - Pakai `api` lalu aktifkan relay di playlist jika sumber siaran banyak memakai UDP multicast atau stream yang hanya bisa dibaca server relay.
   - Pakai `api` jika STB bisa mengakses stream asli secara langsung tanpa relay.
+  - Pakai `api` lalu aktifkan flag relay di playlist jika sumber siaran banyak memakai UDP multicast atau stream yang hanya bisa dibaca dari server relay.
   - Pakai `custom` jika tiap perangkat atau grup perangkat memakai URL M3U berbeda.
 
 ### E. Default Status Koneksi Server API (Enabled / Disabled)

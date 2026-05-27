@@ -262,7 +262,10 @@ Step 4: Tambahkan metadata resolusi
   resolved_from = { global: version, group: id, device: id }
 
 Step 5: Return response
-  { status: true, home_experience: result, resolved_from: ... }
+  Konfigurasi efektif diserialisasi sebagai string JSON
+  dan dikirim di `data.home_experience_json`,
+  `data.running_text_json`, dan `data.video_broadcast_json`
+  pada response `GET /api/device/config/{deviceId}`.
 ```
 
 ---
@@ -298,14 +301,15 @@ Render UI
 
 | Aspek | Status |
 |---|---|
-| Global Config | ✅ Sudah ada |
-| Group Config | ✅ Sudah ada (via `app_settings` JSON) |
-| Device Override | ✅ Sudah ada |
-| Merge Resolver di backend | ✅ Sudah ada |
-| Group sebagai tabel Prisma terpisah | 🔄 Belum — masih via `app_settings` JSON |
-| Push refresh tanpa restart | 🔲 Direncanakan — lihat progress doc |
-| RSoP preview di dashboard | 🔲 Direncanakan — lihat progress doc |
-| Asset Manifest generik | 🔲 Direncanakan — lihat progress doc |
+| Global Config | Sudah ada (via `app_settings`, profile-based) |
+| Group Config | Sudah ada (via `app_settings`, profile-based) |
+| Device Override | Sudah ada (via `app_settings`, profile-based) |
+| Merge Resolver di backend | Sudah ada (`resolveEffectiveHomeExperience`, `resolveEffectiveRunningText`, `resolveEffectiveVideoBroadcast`) |
+| Profile Library (Home / Running Text / Video Broadcast) | Sudah ada — lihat `app_settings` keys `homeExperience.profiles`, `runningText.profiles`, `videoBroadcast.profiles` |
+| Group sebagai tabel Prisma terpisah | Belum — masih via `app_settings` (`device.groups`, `device.groupAssignments`) |
+| Push refresh tanpa restart | Direncanakan — lihat progress doc |
+| RSoP preview di dashboard | Direncanakan — lihat progress doc |
+| Asset Manifest generik | Direncanakan — lihat progress doc |
 
 Detail rencana dan status implementasi lanjutan: [POLICY_APPLY_PROGRESS.md](./POLICY_APPLY_PROGRESS.md)
 

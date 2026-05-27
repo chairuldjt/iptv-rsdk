@@ -76,7 +76,11 @@ Server juga mencoba mencocokkan `mac_address` saat `device_id` baru belum ditemu
     "education_play_order": "alphabetical",
     "education_source": "smb",
     "education_playback_mode": "copy",
-    "education_force_sync": false
+    "education_force_sync": false,
+    "ntp_server": "0.id.pool.ntp.org",
+    "home_experience_json": "{\"revision\":1,\"menus\":[...]}",
+    "running_text_json": "{\"enabled\":false,\"items\":[...]}",
+    "video_broadcast_json": "{\"enabled\":false,\"items\":[]}"
   }
 }
 ```
@@ -96,6 +100,11 @@ Device tidak ditemukan mengembalikan HTTP `404` dengan message `Device not found
 | `education_source` | String | Sumber video edukasi (`smb` atau `web`). |
 | `education_playback_mode` | String | Mode putar video edukasi (`copy` ke lokal atau `stream` langsung). |
 | `education_*` | String | Path SMB, kredensial, repeat mode, dan urutan playlist edukasi. |
+| `ntp_server` | String | NTP server utama yang dipakai client untuk sinkronisasi waktu (default `0.id.pool.ntp.org`, override via `Setup Defaults`). |
+| `home_experience_json` | String | JSON config home experience efektif hasil merge `global → group → device` (lihat [POLICY_APPLY_FLOW.md](./POLICY_APPLY_FLOW.md)). |
+| `running_text_json` | String | JSON config running text efektif (profil global / group / device). |
+| `video_broadcast_json` | String | JSON config video broadcast efektif beserta daftar video yang sudah di-resolve. |
+
 ---
 
 ## 3. Device Channels
@@ -273,19 +282,21 @@ Command yang dipakai client saat ini:
 
 ### Screenshot Remote
 **Endpoint:** `POST /api/device/remote/screenshot`  
-Web Admin menyalakan/mematikan permintaan screenshot aktif.
+Web Admin menyalakan/mematikan permintaan screenshot aktif (payload `{"deviceId": "...", "active": true}`). Endpoint yang sama juga menerima upload screenshot dari Android (`{"deviceId": "...", "image": "data:image/..."}`).
 
 **Endpoint:** `GET /api/device/remote/screenshot?deviceId={deviceId}`  
-Web Admin mengambil frame screenshot terbaru.
+Web Admin mengambil frame screenshot terbaru dan status streaming. Tanpa `deviceId`, endpoint mengembalikan daftar device yang punya frame cached dan daftar device yang sedang aktif diminta screenshotnya.
 
 **Endpoint:** `POST /api/device/remote/screenshot/upload`  
-Android mengirim screenshot base64:
+Endpoint khusus upload base64 screenshot dari Android (path alternatif yang dipakai client baru):
 ```json
 {
   "deviceId": "STB-RSDK-A8F91C-9823-UUID",
   "image": "data:image/jpeg;base64,..."
 }
 ```
+
+> Catatan: cache screenshot dan flag aktif disimpan di memory (`src/lib/remoteQueue.ts`) sehingga akan hilang saat proses Next.js restart.
 
 ---
 
@@ -302,9 +313,9 @@ Memulai atau memakai ulang proses ffmpeg on-demand untuk channel UDP lalu mengem
 Mengirim segment `.ts` hasil relay dari output root yang dikonfigurasi.
 
 ### Generic Relay
-**Endpoint:** `GET /api/stream/relay?url={encodedUrl}`
+**Endpoint:** `GET /api/stream/relay?t={token}`
 
-Proxy ringan untuk preview stream HTTP/HLS tertentu dari dashboard.
+Proxy ringan untuk preview stream HTTP/HLS dari dashboard. Token ditandatangani di server (lihat `src/lib/streamRelay.ts`); URL relay biasanya dibuat oleh helper `createRelayUrl()` saat backend menyiapkan response channels, bukan diisi manual oleh client.
 
 ---
 

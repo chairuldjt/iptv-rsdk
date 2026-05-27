@@ -96,29 +96,34 @@ Karakteristik:
 - Tidak lagi menjalankan semua channel sekaligus.
 - Relay otomatis dimatikan setelah idle. Default saat ini: 10 menit.
 
-Env penting:
+Konfigurasi runtime relay disimpan di tabel `app_settings` dengan key `stream.onDemandHlsRelayConfig` dan dapat diatur dari **Dashboard → Setup Defaults → On-Demand HLS Relay Runtime**. Field utamanya:
 
-```env
-IPTV_ON_DEMAND_FFMPEG_BIN=/usr/bin/ffmpeg
-IPTV_ON_DEMAND_LOCALADDR=10.0.0.199
-IPTV_ON_DEMAND_OUTPUT_ROOT=/var/www/html/landingpage/relay
-IPTV_ON_DEMAND_FIFO_SIZE=50000
-IPTV_ON_DEMAND_IDLE_TIMEOUT_MS=600000
+| Field | Default | Catatan |
+| --- | --- | --- |
+| `ffmpegBin` | `/usr/bin/ffmpeg` | Path biner ffmpeg di server. |
+| `localAddr` | `10.0.0.199` | Interface NIC server yang punya akses ke VLAN IPTV. |
+| `outputRoot` | `/var/www/html/landingpage/relay` | Direktori penyimpanan segment HLS. Wajib absolute path. |
+| `hlsTime` | `2` | Durasi tiap segment (detik). |
+| `hlsListSize` | `6` | Jumlah segment dalam manifest. |
+| `fifoSize` | `50000` | UDP fifo size. |
+| `logLevel` | `warning` | Salah satu dari `quiet`, `panic`, `fatal`, `error`, `warning`, `info`, `verbose`, `debug`. |
+| `idleTimeoutMs` | `600000` | Idle timeout dalam ms. Range 10000–86400000. |
+
+Bila record `app_settings` belum ada, backend memakai konstanta default di `src/lib/settings.ts`. Selain itu setiap playlist dapat memiliki override sendiri lewat field `relayConfig` (JSON) di tabel `playlists`.
+
+Minimal yang harus benar untuk join stream UDP dari interface yang tepat:
+
+```text
+localAddr = 10.0.0.199
 ```
 
-Minimal yang harus benar:
-
-```env
-IPTV_ON_DEMAND_LOCALADDR=10.0.0.199
-```
-
-`HLS Relay Base URL` di dashboard harus menunjuk ke folder segment yang diserve oleh web server, contoh:
+`HLS Relay Base URL` di dashboard bersifat opsional dan dipakai sebagai base URL legacy untuk dashboard preview. Untuk client Android dan preview HLS on-demand, manifest selalu mengikuti origin server Next.js (`/api/stream/udp-hls/{channelId}/index.m3u8`). Contoh nilai HLS Relay Base URL bila dipakai:
 
 ```text
 http://10.55.1.5/relay
 ```
 
-atau domain publik jika segment harus diakses dari internet:
+atau domain publik:
 
 ```text
 https://iptv.teknisirsdk.my.id/relay
@@ -278,7 +283,7 @@ Biasanya normal saat ffmpeg baru join stream H264 di tengah GOP. Jika setelah be
 ## Rekomendasi Operasional
 
 - Untuk STB kantor yang bisa akses VLAN IPTV: gunakan mode `api` direct.
-- Untuk emulator/HP/development dari rumah: gunakan mode `api`, lalu aktifkan relay pada playlist yang sumbernya perlu on-demand relay.
+- Untuk emulator/HP/development dari rumah: gunakan mode `api`, lalu aktifkan flag relay pada playlist yang sumbernya perlu on-demand relay.
 - Jangan jalankan `iptv-relay-all.service` kecuali memang ingin prewarm banyak channel.
-- Pastikan `IPTV_ON_DEMAND_LOCALADDR` selalu mengarah ke interface server yang bisa join stream IPTV.
-- Pastikan HLS Relay Base URL bisa diakses dari jaringan client yang memutar stream.
+- Pastikan `localAddr` di `app_settings.stream.onDemandHlsRelayConfig` selalu mengarah ke interface server yang bisa join stream IPTV.
+- Pastikan HLS Relay Base URL (jika diset) bisa diakses dari jaringan client yang memutar stream.

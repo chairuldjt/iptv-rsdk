@@ -90,6 +90,7 @@ Target fitur:
 
 - Device saat ini hanya menerapkan perubahan setelah restart aplikasi.
 - `Sound effect` saat ini sudah mendukung enable/disable dan remote URL untuk splash serta selection sound, tetapi belum ada library soundboard / multi-event audio yang lebih lengkap.
-- `Force video` sudah dikeluarkan dari ruang lingkup Home Experience dan akan lebih cocok dikelola dari repository / modul video terpisah.
-- Group dan assignment saat ini disimpan di backend melalui `app_settings` JSON, belum menjadi tabel Prisma terpisah.
+- `Force video` sudah dipindahkan ke modul **Video Broadcast** (lihat `src/lib/videoBroadcast.ts`) yang juga memakai inheritance global → group → device dengan profile.
+- Konfigurasi Home Experience, Running Text, dan Video Broadcast saat ini disimpan di `app_settings` sebagai **profile** (lihat key `homeExperience.profiles`, `runningText.profiles`, `videoBroadcast.profiles` di [BACKEND_DATABASE.md](./BACKEND_DATABASE.md)). Setiap scope (global / group / device) memiliki map terpisah yang menunjuk ke profile aktifnya.
+- Group dan assignment device tetap disimpan di `app_settings` dengan key `device.groups` dan `device.groupAssignments`, belum menjadi tabel Prisma terpisah.
 - Beberapa poin membutuhkan kemampuan shell Android baru terlebih dahulu. Setelah kemampuan itu ditanam ke APK, perubahan berikutnya dapat dilakukan dari server tanpa update APK lagi.
