@@ -217,10 +217,10 @@ export default function DashboardShell({ children }: DashboardShellProps) {
         {/* Topbar */}
         <header className="glass-panel sticky top-0 z-30 flex h-16 items-center justify-between border-b border-white/8 px-4 md:px-6 shrink-0">
           <div className="flex items-center gap-3">
-            {/* Mobile Menu */}
+          {/* Mobile Menu */}
             <button
               onClick={() => setMobileOpen(!mobileOpen)}
-              className="p-2 md:hidden text-muted-foreground hover:text-foreground rounded-lg hover:bg-accent/50 transition-colors"
+              className="p-2 md:hidden text-muted-foreground hover:text-foreground rounded-xl hover:bg-white/[0.06] transition-colors"
             >
               <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5" />
@@ -230,7 +230,7 @@ export default function DashboardShell({ children }: DashboardShellProps) {
             {/* Desktop Collapse */}
             <button
               onClick={() => setCollapsed(!collapsed)}
-              className="hidden md:flex p-2 text-muted-foreground hover:text-foreground rounded-lg hover:bg-accent/50 transition-colors"
+              className="hidden md:flex p-2 text-muted-foreground hover:text-foreground rounded-xl hover:bg-white/[0.06] transition-colors"
               title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
             >
               <svg

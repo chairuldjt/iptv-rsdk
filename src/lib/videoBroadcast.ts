@@ -10,10 +10,23 @@ export type VideoBroadcastProfile = {
 
 export type VideoBroadcastScope = 'global' | 'group' | 'device'
 
+export type VideoBroadcastItem = {
+  videoId: number
+  repeatCount: number
+}
+
 export type VideoBroadcastConfig = {
   revision: number
   enabled: boolean
   videoId: number | null
+  repeatCount: number
+  items: VideoBroadcastItem[]
+}
+
+export type ResolvedVideoBroadcastItem = {
+  title: string
+  url: string
+  thumbnailUrl: string
   repeatCount: number
 }
 
@@ -22,6 +35,7 @@ export type ResolvedVideoBroadcastConfig = VideoBroadcastConfig & {
   videoUrl: string
   thumbnailUrl: string
   scopeApplied: 'global' | 'group' | 'device' | 'fallback'
+  videos: ResolvedVideoBroadcastItem[]
 }
 
 export const FALLBACK_VIDEO_BROADCAST_CONFIG: VideoBroadcastConfig = {
@@ -29,6 +43,7 @@ export const FALLBACK_VIDEO_BROADCAST_CONFIG: VideoBroadcastConfig = {
   enabled: false,
   videoId: null,
   repeatCount: 1,
+  items: [],
 }
 
 const VIDEO_PROFILES_META_KEY = 'videoBroadcast.profiles'
@@ -210,11 +225,36 @@ export function videoBroadcastFromFormData(formData: FormData): VideoBroadcastCo
 export function normalizeVideoBroadcastConfig(value: unknown): VideoBroadcastConfig {
   const source = isRecord(value) ? value : {}
 
+  const rawItems = Array.isArray(source.items) ? source.items : []
+  let items: VideoBroadcastItem[] = rawItems
+    .map((item) => {
+      if (isRecord(item)) {
+        const videoId = nullableNumber(item.videoId)
+        const repeatCount = clampInt(item.repeatCount, 1, 100, 1)
+        if (videoId !== null) {
+          return { videoId, repeatCount }
+        }
+      }
+      return null
+    })
+    .filter((item): item is VideoBroadcastItem => item !== null)
+
+  const legacyVideoId = nullableNumber(source.videoId)
+  if (items.length === 0 && legacyVideoId !== null) {
+    items = [{
+      videoId: legacyVideoId,
+      repeatCount: clampInt(source.repeatCount, 1, 100, FALLBACK_VIDEO_BROADCAST_CONFIG.repeatCount)
+    }]
+  }
+
+  const firstItem = items[0] || null
+
   return {
     revision: clampInt(source.revision, 1, 100_000, FALLBACK_VIDEO_BROADCAST_CONFIG.revision),
     enabled: safeBoolean(source.enabled, FALLBACK_VIDEO_BROADCAST_CONFIG.enabled),
-    videoId: nullableNumber(source.videoId),
-    repeatCount: clampInt(source.repeatCount, 1, 100, FALLBACK_VIDEO_BROADCAST_CONFIG.repeatCount),
+    videoId: firstItem ? firstItem.videoId : null,
+    repeatCount: firstItem ? firstItem.repeatCount : FALLBACK_VIDEO_BROADCAST_CONFIG.repeatCount,
+    items,
   }
 }
 
@@ -253,7 +293,7 @@ export async function resolveEffectiveVideoBroadcast(deviceId: string): Promise<
 
   const scopeApplied = deviceConfig ? 'device' : groupConfig ? 'group' : globalProfileId ? 'global' : 'fallback'
 
-  if (!merged.enabled || !merged.videoId) {
+  if (!merged.enabled || merged.items.length === 0) {
     return {
       ...merged,
       enabled: false,
@@ -261,21 +301,37 @@ export async function resolveEffectiveVideoBroadcast(deviceId: string): Promise<
       videoUrl: '',
       thumbnailUrl: '',
       scopeApplied,
+      videos: [],
     }
   }
 
-  const video = await prisma.educationVideo.findUnique({
-    where: { id: merged.videoId },
+  const videoIds = merged.items.map((item) => item.videoId)
+  const videos = await prisma.educationVideo.findMany({
+    where: { id: { in: videoIds } },
     include: { folder: true },
   })
 
-  const isPlayable = Boolean(
-    video &&
-      video.isPublished &&
-      (!video.folder || video.folder.isPublished)
-  )
+  const videoMap = new Map(videos.map((v) => [v.id, v]))
 
-  if (!isPlayable || !video) {
+  const resolvedVideos: ResolvedVideoBroadcastItem[] = []
+  for (const item of merged.items) {
+    const video = videoMap.get(item.videoId)
+    const isPlayable = Boolean(
+      video &&
+        video.isPublished &&
+        (!video.folder || video.folder.isPublished)
+    )
+    if (isPlayable && video) {
+      resolvedVideos.push({
+        title: video.title,
+        url: video.videoUrl,
+        thumbnailUrl: video.thumbnailUrl || '',
+        repeatCount: item.repeatCount,
+      })
+    }
+  }
+
+  if (resolvedVideos.length === 0) {
     return {
       ...merged,
       enabled: false,
@@ -283,16 +339,20 @@ export async function resolveEffectiveVideoBroadcast(deviceId: string): Promise<
       videoUrl: '',
       thumbnailUrl: '',
       scopeApplied,
+      videos: [],
     }
   }
+
+  const firstVideo = resolvedVideos[0]
 
   return {
     ...merged,
     enabled: true,
-    videoTitle: video.title,
-    videoUrl: video.videoUrl,
-    thumbnailUrl: video.thumbnailUrl || '',
+    videoTitle: firstVideo.title,
+    videoUrl: firstVideo.url,
+    thumbnailUrl: firstVideo.thumbnailUrl,
     scopeApplied,
+    videos: resolvedVideos,
   }
 }
 

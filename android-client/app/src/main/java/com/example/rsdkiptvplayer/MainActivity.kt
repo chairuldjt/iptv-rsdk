@@ -36,6 +36,7 @@ import com.example.rsdkiptvplayer.data.api.UpdateCheckResponse
 import com.example.rsdkiptvplayer.util.UpdateManager
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.delay
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -52,11 +53,13 @@ import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.media3.common.MediaItem
+import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.ui.PlayerView
 import com.example.rsdkiptvplayer.util.VideoBroadcastProfile
 import com.example.rsdkiptvplayer.util.VideoBroadcastParser
+import com.example.rsdkiptvplayer.util.VideoItem
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -77,12 +80,10 @@ class MainActivity : ComponentActivity() {
                     var selectedChannelId by remember { mutableIntStateOf(-1) }
                     var showExitConfirmDialog by remember { mutableStateOf(false) }
                     var showVideoBroadcastOverlay by remember { mutableStateOf(false) }
-                    var videoBroadcastAlreadyShown by remember { mutableStateOf(false) }
                     var activeVideoBroadcast by remember { mutableStateOf(VideoBroadcastProfile()) }
+                    var videoBroadcastSessionKey by remember { mutableIntStateOf(0) }
                     val confirmNoFocusRequester = remember { FocusRequester() }
                     val serverUrl by dataStoreManager.serverUrlFlow.collectAsState(initial = "")
-                    val videoBroadcastJson by dataStoreManager.videoBroadcastJsonFlow.collectAsState(initial = "")
-                    val videoBroadcast = remember(videoBroadcastJson) { VideoBroadcastParser.parse(videoBroadcastJson) }
 
                     LaunchedEffect(Unit) {
                         app.repository.remoteCommandFlow.collect { (command, value) ->
@@ -103,13 +104,38 @@ class MainActivity : ComponentActivity() {
                                 }
                                 "PLAY_VIDEO_BROADCAST" -> {
                                     val liveBroadcast = VideoBroadcastParser.parse(value)
-                                    if (liveBroadcast.enabled && liveBroadcast.videoUrl.isNotBlank()) {
-                                        activeVideoBroadcast = liveBroadcast
+                                    val finalBroadcast = if (!liveBroadcast.enabled && (liveBroadcast.videoUrl.isNotBlank() || liveBroadcast.videos.isNotEmpty())) {
+                                        liveBroadcast.copy(enabled = true)
+                                    } else {
+                                        liveBroadcast
+                                    }
+                                    if (finalBroadcast.enabled && (finalBroadcast.videoUrl.isNotBlank() || finalBroadcast.videos.isNotEmpty())) {
+                                        activeVideoBroadcast = finalBroadcast
+                                        videoBroadcastSessionKey += 1
                                         showVideoBroadcastOverlay = true
                                     }
                                 }
                                 "STOP_VIDEO_BROADCAST" -> {
                                     showVideoBroadcastOverlay = false
+                                    activeVideoBroadcast = VideoBroadcastProfile()
+                                    videoBroadcastSessionKey += 1
+                                }
+                                "UPDATE_RUNNING_TEXT" -> {
+                                    if (!value.isNullOrBlank()) {
+                                        try {
+                                            val newRunningTextObj = org.json.JSONObject(value)
+                                            val currentJson = dataStoreManager.getHomeExperienceJson()
+                                            val root = if (currentJson.isNotBlank()) {
+                                                org.json.JSONObject(currentJson)
+                                            } else {
+                                                org.json.JSONObject()
+                                            }
+                                            root.put("runningText", newRunningTextObj)
+                                            dataStoreManager.setHomeExperienceJson(root.toString())
+                                        } catch (e: Exception) {
+                                            e.printStackTrace()
+                                        }
+                                    }
                                 }
                             }
                         }
@@ -200,18 +226,7 @@ class MainActivity : ComponentActivity() {
                         }
                     }
 
-                    LaunchedEffect(currentScreen, videoBroadcastJson, serverUrl) {
-                        if (
-                            currentScreen != "splash" &&
-                            !videoBroadcastAlreadyShown &&
-                            videoBroadcast.enabled &&
-                            videoBroadcast.videoUrl.isNotBlank()
-                        ) {
-                            videoBroadcastAlreadyShown = true
-                            activeVideoBroadcast = videoBroadcast
-                            showVideoBroadcastOverlay = true
-                        }
-                    }
+
 
                     if (showExitConfirmDialog) {
                         BackHandler(enabled = showExitConfirmDialog) {
@@ -296,11 +311,39 @@ class MainActivity : ComponentActivity() {
                     }
 
                     if (showVideoBroadcastOverlay) {
-                        ForcedVideoOverlay(
-                            videoUrl = resolveRemoteVideoUrl(serverUrl, activeVideoBroadcast.videoUrl),
-                            repeatCount = activeVideoBroadcast.repeatCount,
-                            onFinished = { showVideoBroadcastOverlay = false }
-                        )
+                        val resolvedVideos = remember(activeVideoBroadcast, serverUrl) {
+                            if (activeVideoBroadcast.videos.isNotEmpty()) {
+                                activeVideoBroadcast.videos.map {
+                                    it.copy(url = resolveRemoteVideoUrl(serverUrl, it.url))
+                                }
+                            } else if (activeVideoBroadcast.videoUrl.isNotBlank()) {
+                                listOf(
+                                    VideoItem(
+                                        title = activeVideoBroadcast.videoTitle,
+                                        url = resolveRemoteVideoUrl(serverUrl, activeVideoBroadcast.videoUrl),
+                                        thumbnailUrl = activeVideoBroadcast.thumbnailUrl,
+                                        repeatCount = activeVideoBroadcast.repeatCount
+                                    )
+                                )
+                            } else {
+                                emptyList()
+                            }
+                        }
+
+                        if (resolvedVideos.isNotEmpty()) {
+                            ForcedVideoOverlay(
+                                sessionKey = videoBroadcastSessionKey,
+                                videos = resolvedVideos,
+                                onFinished = {
+                                    showVideoBroadcastOverlay = false
+                                    activeVideoBroadcast = VideoBroadcastProfile()
+                                    videoBroadcastSessionKey += 1
+                                }
+                            )
+                        } else {
+                            showVideoBroadcastOverlay = false
+                            activeVideoBroadcast = VideoBroadcastProfile()
+                        }
                     }
                 }
             }
@@ -341,39 +384,84 @@ class MainActivity : ComponentActivity() {
 
 @Composable
 private fun ForcedVideoOverlay(
-    videoUrl: String,
-    repeatCount: Int,
+    sessionKey: Int,
+    videos: List<VideoItem>,
     onFinished: () -> Unit
 ) {
     val context = androidx.compose.ui.platform.LocalContext.current
-    val exoPlayer = remember(videoUrl) {
-        ExoPlayer.Builder(context).build().apply {
-            setMediaItem(MediaItem.fromUri(videoUrl))
-            prepare()
-            playWhenReady = true
+    var currentVideoIndex by remember(sessionKey, videos) { mutableIntStateOf(0) }
+    var completedLoops by remember(sessionKey, videos) { mutableIntStateOf(0) }
+    var playbackAttempt by remember(sessionKey, currentVideoIndex) { mutableIntStateOf(0) }
+    var showFileName by remember(sessionKey, currentVideoIndex, playbackAttempt) { mutableStateOf(true) }
+    val maxRetryPerVideo = 1
+
+    val currentVideo = remember(currentVideoIndex, videos) {
+        if (currentVideoIndex in videos.indices) videos[currentVideoIndex] else null
+    }
+    val displayFileName = remember(currentVideo) {
+        currentVideo?.let(::resolveBroadcastDisplayName).orEmpty()
+    }
+
+    val exoPlayer = remember(currentVideo, playbackAttempt, sessionKey) {
+        currentVideo?.let { video ->
+            ExoPlayer.Builder(context).build().apply {
+                setMediaItem(MediaItem.fromUri(video.url))
+                prepare()
+                playWhenReady = true
+            }
         }
     }
-    var completedLoops by remember { mutableIntStateOf(0) }
 
-    DisposableEffect(videoUrl) {
+    LaunchedEffect(sessionKey, currentVideoIndex, playbackAttempt) {
+        showFileName = true
+        delay(3_000)
+        showFileName = false
+    }
+
+    DisposableEffect(currentVideo) {
+        if (currentVideo == null) {
+            onFinished()
+            return@DisposableEffect onDispose {}
+        }
         val listener = object : Player.Listener {
             override fun onPlaybackStateChanged(playbackState: Int) {
                 if (playbackState == Player.STATE_ENDED) {
                     completedLoops += 1
-                    if (completedLoops >= repeatCount) {
-                        onFinished()
+                    if (completedLoops >= currentVideo.repeatCount) {
+                        completedLoops = 0
+                        playbackAttempt = 0
+                        if (currentVideoIndex + 1 < videos.size) {
+                            currentVideoIndex += 1
+                        } else {
+                            onFinished()
+                        }
                     } else {
-                        exoPlayer.seekTo(0)
-                        exoPlayer.playWhenReady = true
+                        exoPlayer?.seekTo(0)
+                        exoPlayer?.playWhenReady = true
                     }
+                }
+            }
+
+            override fun onPlayerError(error: PlaybackException) {
+                if (playbackAttempt < maxRetryPerVideo) {
+                    playbackAttempt += 1
+                    return
+                }
+
+                completedLoops = 0
+                playbackAttempt = 0
+                if (currentVideoIndex + 1 < videos.size) {
+                    currentVideoIndex += 1
+                } else {
+                    onFinished()
                 }
             }
         }
 
-        exoPlayer.addListener(listener)
+        exoPlayer?.addListener(listener)
         onDispose {
-            exoPlayer.removeListener(listener)
-            exoPlayer.release()
+            exoPlayer?.removeListener(listener)
+            exoPlayer?.release()
         }
     }
 
@@ -382,16 +470,54 @@ private fun ForcedVideoOverlay(
             .fillMaxSize()
             .background(Color.Black)
     ) {
-        AndroidView(
-            factory = { ctx ->
-                PlayerView(ctx).apply {
-                    player = exoPlayer
-                    useController = false
-                }
-            },
-            modifier = Modifier.fillMaxSize()
-        )
+        if (exoPlayer != null) {
+            AndroidView(
+                factory = { ctx ->
+                    PlayerView(ctx).apply {
+                        player = exoPlayer
+                        useController = false
+                    }
+                },
+                update = { playerView ->
+                    if (playerView.player !== exoPlayer) {
+                        playerView.player = exoPlayer
+                    }
+                },
+                modifier = Modifier.fillMaxSize()
+            )
+        }
+
+        if (showFileName && displayFileName.isNotBlank()) {
+            Box(
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .padding(bottom = 28.dp, start = 24.dp, end = 24.dp)
+                    .clip(RoundedCornerShape(14.dp))
+                    .background(Color.Black.copy(alpha = 0.58f))
+                    .padding(horizontal = 16.dp, vertical = 10.dp)
+            ) {
+                Text(
+                    text = displayFileName,
+                    color = Color.White,
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+        }
     }
+}
+
+private fun resolveBroadcastDisplayName(video: VideoItem): String {
+    val path = video.url.substringBefore('?').substringBefore('#')
+    val fileName = path.substringAfterLast('/').trim()
+    if (fileName.isNotBlank()) {
+        return fileName
+    }
+
+    val title = video.title.trim()
+    return if (title.isNotBlank()) title else "video"
 }
 
 private fun resolveRemoteVideoUrl(serverUrl: String, value: String): String {

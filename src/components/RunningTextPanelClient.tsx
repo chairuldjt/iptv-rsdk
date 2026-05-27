@@ -1,6 +1,7 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useRef, useTransition } from 'react'
+import { createPortal } from 'react-dom'
 import type { HomeExperienceRunningTextItem } from '@/lib/homeExperience'
 
 type RunningTextPanelClientProps = {
@@ -13,8 +14,9 @@ type RunningTextPanelClientProps = {
     displaySeconds: number
     items: HomeExperienceRunningTextItem[]
   }
-  groups: Array<{ id: string; name: string; color: string }>
-  devices: Array<{ deviceId: string; deviceName: string; isActive: boolean; groupName: string | null }>
+  isGlobal: boolean
+  assignedGroupCount: number
+  assignedDeviceCount: number
   saveAction: (fd: FormData) => Promise<void>
   pushLiveAction: (fd: FormData) => Promise<void>
 }
@@ -23,8 +25,9 @@ export default function RunningTextPanelClient({
   profileId,
   profileName,
   runningText,
-  groups,
-  devices,
+  isGlobal,
+  assignedGroupCount,
+  assignedDeviceCount,
   saveAction,
   pushLiveAction,
 }: RunningTextPanelClientProps) {
@@ -35,11 +38,43 @@ export default function RunningTextPanelClient({
   const [rotationSeconds, setRotationSeconds] = useState<number>(runningText.rotationSeconds)
   const [displaySeconds, setDisplaySeconds] = useState<number>(runningText.displaySeconds)
 
-  // Live targeting state
-  const [liveTarget, setLiveTarget] = useState<string>('global')
-  const [liveGroupId, setLiveGroupId] = useState<string>(groups[0]?.id || '')
-  const [liveDeviceId, setLiveDeviceId] = useState<string>(devices[0]?.deviceId || '')
-  const [selectedDeviceIds, setSelectedDeviceIds] = useState<string[]>([])
+  // Confirmation state
+  const [showPushConfirm, setShowPushConfirm] = useState(false)
+
+  const formRef = useRef<HTMLFormElement>(null)
+  const [isPushPending, startPushTransition] = useTransition()
+  const [pushError, setPushError] = useState<string | null>(null)
+
+  const handlePushConfirm = () => {
+    setPushError(null)
+    if (!formRef.current) return
+    const formData = new FormData(formRef.current)
+    startPushTransition(async () => {
+      try {
+        await pushLiveAction(formData)
+        setShowPushConfirm(false)
+      } catch (err: unknown) {
+        const isRedirect =
+          err instanceof Error &&
+          (err.message.includes('NEXT_REDIRECT') ||
+            ('digest' in err && String((err as { digest?: string }).digest).includes('NEXT_REDIRECT')))
+        if (isRedirect) {
+          setShowPushConfirm(false)
+          return
+        }
+        console.error('Push live action failed:', err)
+        setPushError(err instanceof Error ? err.message : 'Gagal mengirim live text.')
+      }
+    })
+  }
+
+  const hasTargets = isGlobal || assignedGroupCount > 0 || assignedDeviceCount > 0
+
+  const targetLabel = isGlobal
+    ? 'semua device aktif (Global Profile)'
+    : hasTargets
+    ? `${assignedGroupCount} grup dan ${assignedDeviceCount} device yang terhubung`
+    : 'tidak ada device terhubung (silakan assign profile ini terlebih dahulu)'
 
   const activeItems = items.filter((i) => i.enabled && i.text.trim())
 
@@ -64,13 +99,7 @@ export default function RunningTextPanelClient({
     setItems((current) => current.filter((item) => item.id !== id))
   }
 
-  const handleDeviceSelectionToggle = (deviceId: string) => {
-    setSelectedDeviceIds((current) =>
-      current.includes(deviceId)
-        ? current.filter((id) => id !== deviceId)
-        : [...current, deviceId]
-    )
-  }
+
 
   return (
     <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_380px] gap-6 items-start animate-fade-in">
@@ -97,22 +126,22 @@ export default function RunningTextPanelClient({
           {/* Profile ID identifier */}
           <input type="hidden" name="profileId" value={profileId} />
           {/* Main settings row */}
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 p-3.5 rounded-xl bg-accent/20 border border-border">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 p-4 rounded-xl bg-accent/15 border border-border/80">
             <label className="flex flex-col justify-center">
-              <span className="block text-[9px] font-semibold uppercase tracking-wider text-muted-foreground mb-1.5">Status</span>
-              <label className="flex items-center gap-2 cursor-pointer">
+              <span className="block text-[9px] font-bold uppercase tracking-wider text-muted-foreground mb-1.5">Status Ticker</span>
+              <label className="flex items-center gap-2 cursor-pointer w-fit">
                 <input
                   type="checkbox"
                   name="rtEnabled"
                   checked={enabled}
                   onChange={(e) => setEnabled(e.target.checked)}
-                  className="h-4 w-4 rounded accent-primary cursor-pointer"
+                  className="h-4.5 w-4.5 rounded accent-primary cursor-pointer"
                 />
-                <span className="text-xs font-medium text-foreground select-none">Aktif</span>
+                <span className="text-xs font-semibold text-foreground select-none">Aktifkan Running Text</span>
               </label>
             </label>
             <label>
-              <span className="block text-[9px] font-semibold uppercase tracking-wider text-muted-foreground mb-1.5">Visible Count</span>
+              <span className="block text-[9px] font-bold uppercase tracking-wider text-muted-foreground mb-1.5">Visible Count (Jumlah Baris)</span>
               <input
                 type="number"
                 name="rtVisibleCount"
@@ -124,7 +153,7 @@ export default function RunningTextPanelClient({
               />
             </label>
             <label>
-              <span className="block text-[9px] font-semibold uppercase tracking-wider text-muted-foreground mb-1.5">Rotation (s)</span>
+              <span className="block text-[9px] font-bold uppercase tracking-wider text-muted-foreground mb-1.5">Rotation Speed (Detik)</span>
               <input
                 type="number"
                 name="rtRotationSeconds"
@@ -135,18 +164,8 @@ export default function RunningTextPanelClient({
                 className="field-input py-1.5 text-xs w-full"
               />
             </label>
-            <label>
-              <span className="block text-[9px] font-semibold uppercase tracking-wider text-muted-foreground mb-1.5">Display (s)</span>
-              <input
-                type="number"
-                name="rtDisplaySeconds"
-                value={displaySeconds}
-                onChange={(e) => setDisplaySeconds(Math.max(1, Math.min(600, parseInt(e.target.value) || 10)))}
-                min={1}
-                max={600}
-                className="field-input py-1.5 text-xs w-full"
-              />
-            </label>
+            {/* Hidden field to keep database structure intact */}
+            <input type="hidden" name="rtDisplaySeconds" value={displaySeconds} />
           </div>
 
           {/* Hidden text items payload */}
@@ -164,49 +183,44 @@ export default function RunningTextPanelClient({
                 Belum ada pesan ticker. Klik tombol <strong>+ Tambah Pesan</strong> di kanan atas untuk membuat pesan baru.
               </div>
             ) : (
-              items.map((item) => (
-                <div key={item.id} className="rounded-xl border border-border bg-accent/10 p-3.5 space-y-3 transition-all">
-                  <div className="grid grid-cols-1 md:grid-cols-[160px_minmax(0,1fr)_auto] gap-3 items-start">
-                    {/* ID */}
-                    <div>
-                      <span className="block text-[9px] font-semibold uppercase tracking-wider text-muted-foreground mb-1">ID Ticker</span>
-                      <input
-                        type="text"
-                        value={item.id}
-                        onChange={(e) => handleUpdateItem(item.id, { id: e.target.value })}
-                        className="field-input py-1.5 text-xs font-mono w-full"
-                        placeholder="Contoh: ticker_1"
-                      />
-                    </div>
-                    {/* Text */}
-                    <div>
-                      <span className="block text-[9px] font-semibold uppercase tracking-wider text-muted-foreground mb-1">Isi Pesan</span>
-                      <textarea
-                        value={item.text}
-                        onChange={(e) => handleUpdateItem(item.id, { text: e.target.value })}
-                        className="field-input min-h-[64px] py-1.5 text-xs w-full resize-y"
-                        placeholder="Ketik isi running text di sini..."
-                      />
-                    </div>
-                    {/* Actions */}
-                    <div className="flex md:flex-col gap-2 pt-4 md:pt-4 justify-between md:justify-start shrink-0">
-                      <label className="flex items-center gap-1.5 cursor-pointer bg-accent/20 px-2 py-1.5 rounded-lg border border-border hover:bg-accent/40">
-                        <input
-                          type="checkbox"
-                          checked={item.enabled}
-                          onChange={(e) => handleUpdateItem(item.id, { enabled: e.target.checked })}
-                          className="h-3.5 w-3.5 rounded accent-primary cursor-pointer"
-                        />
-                        <span className="text-[10px] font-semibold text-foreground select-none">Aktif</span>
-                      </label>
-                      <button
-                        type="button"
-                        onClick={() => handleDeleteItem(item.id)}
-                        className="rounded-lg border border-rose-500/20 bg-rose-500/5 hover:bg-rose-500/10 px-2.5 py-1.5 text-[10px] font-bold text-rose-450 transition-all select-none cursor-pointer"
-                      >
-                        Hapus
-                      </button>
-                    </div>
+              items.map((item, idx) => (
+                <div key={item.id} className="rounded-xl border border-border bg-accent/5 p-3 flex gap-3 items-center hover:border-primary/20 hover:bg-accent/10 transition-all group">
+                  {/* Left: Index number */}
+                  <div className="flex items-center justify-center font-mono text-[10px] font-bold text-muted-foreground bg-accent/20 w-7 h-7 rounded-lg border border-border shrink-0 select-none">
+                    {idx + 1}
+                  </div>
+
+                  {/* Middle: Text Input */}
+                  <div className="flex-1">
+                    <textarea
+                      value={item.text}
+                      onChange={(e) => handleUpdateItem(item.id, { text: e.target.value })}
+                      className="field-input py-1.5 px-3 text-xs w-full min-h-[38px] resize-none"
+                      placeholder="Ketik isi running text di sini..."
+                      rows={1}
+                    />
+                  </div>
+
+                  {/* Right: Actions */}
+                  <div className="flex items-center gap-2 shrink-0">
+                    <button
+                      type="button"
+                      onClick={() => handleUpdateItem(item.id, { enabled: !item.enabled })}
+                      className={`rounded-lg px-2.5 py-1.5 text-[10px] font-bold border transition-all select-none cursor-pointer ${
+                        item.enabled
+                          ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400 hover:bg-emerald-500/25'
+                          : 'bg-muted/10 border-border text-muted-foreground hover:bg-muted/20'
+                      }`}
+                    >
+                      {item.enabled ? 'Aktif' : 'Nonaktif'}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleDeleteItem(item.id)}
+                      className="rounded-lg border border-rose-500/20 bg-rose-500/5 hover:bg-rose-500/10 px-2.5 py-1.5 text-[10px] font-bold text-rose-400 hover:text-rose-350 transition-all select-none cursor-pointer"
+                    >
+                      Hapus
+                    </button>
                   </div>
                 </div>
               ))
@@ -259,95 +273,31 @@ export default function RunningTextPanelClient({
         </div>
 
         {/* Live Push Form */}
-        <form action={pushLiveAction} className="card rounded-2xl p-5 border border-border bg-card text-card-foreground shadow-sm space-y-4">
+        <form
+          ref={formRef}
+          onSubmit={(e) => e.preventDefault()}
+          className="card rounded-2xl p-5 border border-border bg-card text-card-foreground shadow-sm space-y-4"
+        >
           {/* Synchronize editor state to this form's submission inputs */}
+          <input type="hidden" name="profileId" value={profileId} />
           <input type="hidden" name="rtEnabled" value={enabled ? 'on' : 'off'} />
           <input type="hidden" name="rtVisibleCount" value={visibleCount} />
+          <input type="hidden" name="rtRotationSeconds" value={rotationSeconds} />
+          <input type="hidden" name="rtDisplaySeconds" value={displaySeconds} />
           <input type="hidden" name="rtItemsJson" value={JSON.stringify(items)} />
 
           <div>
             <h3 className="text-sm font-semibold text-foreground mb-1">Kirim Live ke Device</h3>
             <p className="text-[10px] text-muted-foreground leading-normal">
-              Dorong config running text (bisa yang belum disimpan) langsung ke memori runtime device aktif.
+              Dorong config running text (bisa yang belum disimpan) langsung ke memori runtime device aktif. Target diresolusi otomatis dari assignment profile ({targetLabel}).
             </p>
           </div>
 
-          <label className="block">
-            <span className="block text-[10px] font-semibold uppercase tracking-wider text-muted-foreground mb-1.5">Target Kirim</span>
-            <select
-              name="rtLiveTarget"
-              value={liveTarget}
-              onChange={(e) => setLiveTarget(e.target.value)}
-              className="field-input py-2 text-xs w-full cursor-pointer"
-            >
-              <option value="global">Semua Device Aktif</option>
-              <option value="group">Per Group</option>
-              <option value="device">Satu Device</option>
-              <option value="selected">Pilih Manual</option>
-            </select>
-          </label>
-
-          {liveTarget === 'group' && groups.length > 0 && (
-            <label className="block animate-slide-down">
-              <span className="block text-[10px] font-semibold uppercase tracking-wider text-muted-foreground mb-1.5">Pilih Group</span>
-              <select
-                name="rtLiveGroupId"
-                value={liveGroupId}
-                onChange={(e) => setLiveGroupId(e.target.value)}
-                className="field-input py-2 text-xs w-full cursor-pointer"
-              >
-                {groups.map((g) => (
-                  <option key={g.id} value={g.id}>{g.name}</option>
-                ))}
-              </select>
-            </label>
-          )}
-
-          {liveTarget === 'device' && devices.length > 0 && (
-            <label className="block animate-slide-down">
-              <span className="block text-[10px] font-semibold uppercase tracking-wider text-muted-foreground mb-1.5">Pilih Device</span>
-              <select
-                name="rtLiveDeviceId"
-                value={liveDeviceId}
-                onChange={(e) => setLiveDeviceId(e.target.value)}
-                className="field-input py-2 text-xs w-full cursor-pointer"
-              >
-                {devices.map((d) => (
-                  <option key={d.deviceId} value={d.deviceId}>
-                    {d.deviceName} {d.groupName ? `(${d.groupName})` : ''} {!d.isActive ? '• Nonaktif' : ''}
-                  </option>
-                ))}
-              </select>
-            </label>
-          )}
-
-          {liveTarget === 'selected' && (
-            <div className="space-y-2 animate-slide-down">
-              <span className="block text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Pilih Device (Multi-select)</span>
-              <div className="rounded-xl border border-border bg-accent/10 max-h-[160px] overflow-y-auto p-2 space-y-1.5">
-                {devices.map((d) => (
-                  <label key={d.deviceId} className="flex items-center gap-2 px-2 py-1.5 rounded hover:bg-accent/20 cursor-pointer text-xs">
-                    <input
-                      type="checkbox"
-                      name="rtSelectedDeviceIds"
-                      value={d.deviceId}
-                      checked={selectedDeviceIds.includes(d.deviceId)}
-                      onChange={() => handleDeviceSelectionToggle(d.deviceId)}
-                      className="h-4.5 w-4.5 rounded accent-primary cursor-pointer"
-                    />
-                    <span className="flex-1 min-w-0">
-                      <span className="block text-foreground truncate font-medium">{d.deviceName}</span>
-                      <span className="text-[9px] text-muted-foreground font-mono">{d.deviceId} {d.groupName ? `• ${d.groupName}` : ''}</span>
-                    </span>
-                  </label>
-                ))}
-              </div>
-            </div>
-          )}
-
           <button
-            type="submit"
-            className="w-full rounded-xl border border-emerald-400/20 bg-emerald-500/10 hover:bg-emerald-500/15 py-2.5 text-xs font-bold text-emerald-300 transition-all cursor-pointer select-none"
+            type="button"
+            onClick={() => setShowPushConfirm(true)}
+            disabled={!hasTargets}
+            className="w-full rounded-xl border border-emerald-400/20 bg-emerald-500/10 hover:bg-emerald-500/15 py-2.5 text-xs font-bold text-emerald-300 transition-all cursor-pointer select-none disabled:opacity-40 disabled:cursor-not-allowed"
           >
             📢 Kirim Live ke Device
           </button>
@@ -357,6 +307,61 @@ export default function RunningTextPanelClient({
           </p>
         </form>
       </div>
+
+      {/* Confirmation Modal: Push Live */}
+      {showPushConfirm && typeof window !== 'undefined' && createPortal(
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/78 p-4 backdrop-blur-md animate-fade-in" onClick={() => !isPushPending && setShowPushConfirm(false)}>
+          <div className="w-full max-w-md rounded-[28px] border border-border bg-card p-6 shadow-[0_30px_90px_rgba(0,0,0,0.55)] animate-slide-up" onClick={e => e.stopPropagation()}>
+            <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl border border-emerald-500/20 bg-emerald-500/10 text-emerald-300">
+              <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z" />
+              </svg>
+            </div>
+            <div className="mt-5 space-y-2 text-center">
+              <h3 className="text-lg font-semibold text-foreground">Konfirmasi Kirim Live</h3>
+              <p className="text-sm leading-relaxed text-muted-foreground">
+                Pesan running text akan segera dikirim live ke <strong className="text-foreground">{targetLabel}</strong>.
+              </p>
+            </div>
+
+            {pushError && (
+              <div className="mt-4 rounded-xl border border-rose-500/20 bg-rose-500/10 p-3 text-xs font-semibold text-rose-300">
+                {pushError}
+              </div>
+            )}
+
+            <div className="mt-6 flex flex-col gap-3 sm:flex-row">
+              <button
+                type="button"
+                disabled={isPushPending}
+                onClick={() => setShowPushConfirm(false)}
+                className="btn btn-secondary flex-1 py-2.5"
+              >
+                Batal
+              </button>
+              <button
+                type="button"
+                disabled={isPushPending}
+                onClick={handlePushConfirm}
+                className="flex-1 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-2.5 text-xs transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+              >
+                {isPushPending ? (
+                  <>
+                    <svg className="animate-spin h-3.5 w-3.5" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                    </svg>
+                    Memproses...
+                  </>
+                ) : (
+                  'Ya, Kirim Sekarang'
+                )}
+              </button>
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
     </div>
   )
 }

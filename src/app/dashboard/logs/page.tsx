@@ -55,86 +55,81 @@ export default async function LogsPage({
         </ConfirmForm>
       </div>
 
-      {/* Filter Bar */}
-      <div className="card p-4 rounded-2xl">
-        <form method="GET" action="/dashboard/logs" className="flex flex-wrap gap-4 items-center">
+      <div className="toolbar">
+        <form method="GET" action="/dashboard/logs" className="flex flex-wrap gap-3 items-end">
           <div className="flex flex-col">
-            <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-1.5">Filter by Device</span>
+            <span className="text-[0.625rem] font-semibold text-muted-foreground uppercase tracking-wider mb-1">Filter Perangkat</span>
             <select name="deviceId" defaultValue={filterDeviceId || ''} className="field-input py-2 min-w-[200px]">
-              <option value="">All Registered Devices</option>
+              <option value="">Semua Perangkat</option>
               {devices.map((d) => (
-                <option key={d.id} value={d.deviceId}>{d.deviceName} ({d.deviceId.substring(0, 8)}...)</option>
+                <option key={d.id} value={d.deviceId}>{d.deviceName}</option>
               ))}
             </select>
           </div>
-          <button type="submit" className="btn btn-primary btn-sm py-2">Apply Filters</button>
+          <button type="submit" className="btn btn-primary btn-sm">Terapkan</button>
           {filterDeviceId && (
-            <a href="/dashboard/logs" className="btn btn-sm btn-ghost self-end">Clear Filter</a>
+            <a href="/dashboard/logs" className="btn btn-sm btn-ghost">Hapus Filter</a>
           )}
         </form>
       </div>
 
-      {/* Logs Table */}
-      <div className="card rounded-2xl overflow-hidden">
-        <div className="px-5 py-4 border-b border-border">
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-            <h3 className="font-semibold text-foreground text-sm">Diagnostics Logs ({totalLogs})</h3>
-            {totalLogs > PAGE_SIZE && (
-              <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                <span>Page {safePage} of {totalPages}</span>
-                <a href={`/dashboard/logs?deviceId=${filterDeviceId || ''}&page=${Math.max(1, safePage - 1)}`}
-                  className={`btn btn-xs btn-ghost ${safePage <= 1 ? 'pointer-events-none opacity-30' : ''}`}>Previous</a>
-                <a href={`/dashboard/logs?deviceId=${filterDeviceId || ''}&page=${Math.min(totalPages, safePage + 1)}`}
-                  className={`btn btn-xs btn-ghost ${safePage >= totalPages ? 'pointer-events-none opacity-30' : ''}`}>Next</a>
-              </div>
-            )}
-          </div>
+      <div className="section-card">
+        <div className="section-card-header flex items-center justify-between flex-wrap gap-3">
+          <h3 className="font-semibold text-sm text-foreground">Diagnostics Logs ({totalLogs})</h3>
+          {totalLogs > PAGE_SIZE && (
+            <div className="flex items-center gap-2 text-xs text-muted-foreground">
+              <span>Halaman {safePage} / {totalPages}</span>
+              <a href={`/dashboard/logs?deviceId=${filterDeviceId || ''}&page=${Math.max(1, safePage - 1)}`}
+                className={`btn btn-xs btn-ghost ${safePage <= 1 ? 'pointer-events-none opacity-30' : ''}`}>Sebelumnya</a>
+              <a href={`/dashboard/logs?deviceId=${filterDeviceId || ''}&page=${Math.min(totalPages, safePage + 1)}`}
+                className={`btn btn-xs btn-ghost ${safePage >= totalPages ? 'pointer-events-none opacity-30' : ''}`}>Berikutnya</a>
+            </div>
+          )}
         </div>
-
-        <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse">
+        <div className="table-responsive">
+          <table className="data-table">
             <thead>
-              <tr className="border-b border-border text-muted-foreground text-[10px] font-semibold uppercase tracking-wider">
-                <th className="p-4 px-5">Timestamp</th>
-                <th className="p-4">Client STB</th>
-                <th className="p-4">Error Type</th>
-                <th className="p-4">Error Message & Stream URL</th>
-                <th className="p-4 px-5 text-center">Android SDK</th>
+              <tr>
+                <th>Timestamp</th>
+                <th>Perangkat</th>
+                <th>Tipe Error</th>
+                <th>Pesan &amp; Stream</th>
+                <th className="text-center">SDK</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-border/50 text-xs">
+            <tbody>
               {logs.length === 0 ? (
                 <tr>
                   <td colSpan={5}>
                     <EmptyState
-                      title="No Diagnostics Logs"
-                      description="Client devices are operating without issues!"
+                      title="Tidak Ada Log Diagnostik"
+                      description="Semua perangkat beroperasi normal tanpa masalah!"
                     />
                   </td>
                 </tr>
               ) : (
                 logs.map((l) => (
-                  <tr key={l.id} className="hover:bg-accent/30 transition-colors">
-                    <td className="p-4 px-5 text-xs text-muted-foreground font-medium font-mono">
-                      {new Date(l.createdAt).toLocaleString()}
+                  <tr key={l.id}>
+                    <td className="text-muted-foreground font-mono text-[0.6875rem]">
+                      {new Date(l.createdAt).toLocaleString('id-ID')}
                     </td>
-                    <td className="p-4">
-                      <div className="font-semibold text-foreground text-xs">{l.device.deviceName}</div>
-                      <div className="text-muted-foreground text-[10px] font-mono mt-0.5">ID: {l.deviceId.substring(0, 12)}...</div>
+                    <td>
+                      <div className="font-semibold text-foreground">{l.device.deviceName}</div>
+                      <div className="text-[0.625rem] text-muted-foreground font-mono mt-0.5">ID: {l.deviceId.substring(0, 12)}...</div>
                     </td>
-                    <td className="p-4">
+                    <td>
                       <span className="badge badge-destructive">{l.errorType}</span>
                     </td>
-                    <td className="p-4 max-w-md">
-                      <div className="text-foreground/80 font-semibold text-xs leading-normal break-words">{l.errorMessage}</div>
+                    <td className="max-w-md">
+                      <div className="text-foreground/80 font-medium leading-normal break-words">{l.errorMessage}</div>
                       {l.streamUrl && (
-                        <div className="text-muted-foreground text-[10px] font-mono break-all mt-1 bg-background/60 p-2 rounded-lg border border-border">
+                        <div className="text-[0.625rem] text-muted-foreground font-mono break-all mt-1 bg-background/60 p-2 rounded-lg border border-border">
                           Stream: {l.streamUrl}
                         </div>
                       )}
-                      {l.channelId && <div className="text-muted-foreground text-[9px] mt-1 font-semibold">Channel ID: {l.channelId}</div>}
+                      {l.channelId && <div className="text-[0.5625rem] text-muted-foreground mt-1">Channel ID: {l.channelId}</div>}
                     </td>
-                    <td className="p-4 px-5 text-center text-muted-foreground text-xs font-mono">{l.androidSdk || 'N/A'}</td>
+                    <td className="text-center text-muted-foreground font-mono">{l.androidSdk || '-'}</td>
                   </tr>
                 ))
               )}

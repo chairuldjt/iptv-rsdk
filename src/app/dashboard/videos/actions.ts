@@ -144,7 +144,7 @@ export async function addVideoAction(formData: FormData) {
       })
     }
 
-    await prisma.educationVideo.create({
+    const newVideo = await prisma.educationVideo.create({
       data: {
         title,
         videoUrl,
@@ -154,7 +154,12 @@ export async function addVideoAction(formData: FormData) {
     })
 
     revalidatePath('/dashboard/videos')
-    return { success: true, message: 'Video berhasil ditambahkan ke galeri.' }
+    revalidatePath('/dashboard/broadcast')
+    return {
+      success: true,
+      message: 'Video berhasil ditambahkan ke galeri.',
+      video: { id: newVideo.id, title: newVideo.title },
+    }
   } catch (error) {
     console.error('Add video action error:', error)
     return { success: false, message: `Gagal menambahkan video: ${getErrorMessage(error)}` }

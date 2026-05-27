@@ -3,6 +3,7 @@ import { getOnlineThreshold } from '@/lib/time'
 import Link from 'next/link'
 import StatCard from '@/components/StatCard'
 import PageHeader from '@/components/PageHeader'
+import Badge, { StatusDot } from '@/components/Badge'
 
 export const revalidate = 0
 
@@ -37,15 +38,15 @@ export default async function DashboardPage() {
     <div className="space-y-8 animate-fade-in">
       <PageHeader
         title="Dashboard Overview"
-        description="Real-time status of your RSDK IPTV player fleet and channel distribution."
+        description="Status real-time armada pemutar IPTV RSDK dan distribusi channel."
       />
 
       {/* Stats Grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <StatCard
-          title="Total Devices"
+          title="Total Perangkat"
           value={totalDevices}
-          subtitle={`${activeDevices} Active · ${totalDevices - activeDevices} Inactive`}
+          subtitle={`${activeDevices} Aktif · ${totalDevices - activeDevices} Nonaktif`}
           variant="info"
           icon={
             <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
@@ -54,9 +55,9 @@ export default async function DashboardPage() {
           }
         />
         <StatCard
-          title="Online STBs"
+          title="STB Online"
           value={onlineDevices}
-          subtitle="Active heartbeats (10 min)"
+          subtitle="Heartbeat aktif (10 mnt)"
           variant="success"
           icon={
             <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
@@ -65,9 +66,9 @@ export default async function DashboardPage() {
           }
         />
         <StatCard
-          title="Total Channels"
+          title="Total Channel"
           value={totalChannels}
-          subtitle={`From ${totalPlaylists} M3U Playlists`}
+          subtitle={`Dari ${totalPlaylists} Playlist M3U`}
           variant="info"
           icon={
             <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
@@ -76,9 +77,9 @@ export default async function DashboardPage() {
           }
         />
         <StatCard
-          title="Playback Errors"
+          title="Error Pemutaran"
           value={totalLogs}
-          subtitle="Urgent logs registered"
+          subtitle="Log diagnostik tercatat"
           variant="destructive"
           icon={
             <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
@@ -91,29 +92,29 @@ export default async function DashboardPage() {
       {/* Main Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Recent Devices */}
-        <div className="card rounded-2xl overflow-hidden border-border">
-          <div className="px-5 py-4 border-b border-border flex items-center justify-between">
-            <h4 className="font-semibold text-foreground text-sm">Recently Active Devices</h4>
+        <div className="section-card">
+          <div className="section-card-header flex items-center justify-between">
+            <h4 className="font-semibold text-sm text-foreground">Perangkat Baru Aktif</h4>
             <Link href="/dashboard/devices" className="text-xs font-semibold text-primary hover:text-primary/80 transition-colors">
-              View All &rarr;
+              Lihat Semua &rarr;
             </Link>
           </div>
           <div className="divide-y divide-border/50">
             {recentDevices.length === 0 ? (
-              <div className="px-5 py-12 text-center text-xs text-muted-foreground">
-                No registered devices yet. Run the Android client to auto-register.
+              <div className="px-5 py-16 text-center">
+                <p className="text-xs text-muted-foreground">Belum ada perangkat terdaftar. Jalankan aplikasi Android untuk registrasi otomatis.</p>
               </div>
             ) : (
               recentDevices.map((d) => {
                 const isOnline = d.lastOnline && d.lastOnline.getTime() >= tenMinutesAgo.getTime()
                 return (
-                  <div key={d.id} className="p-4 px-5 flex items-center justify-between hover:bg-accent/30 transition-colors">
+                  <div key={d.id} className="p-4 px-5 flex items-center justify-between hover:bg-white/[0.02] transition-colors">
                     <div className="flex items-center gap-3 min-w-0">
-                      <span className={`w-2 h-2 rounded-full shrink-0 ${isOnline ? 'bg-emerald-500' : 'bg-muted'}`} />
+                      <StatusDot status={d.isActive ? (isOnline ? 'online' : 'offline') : 'disabled'} />
                       <div className="min-w-0">
                         <span className="font-semibold text-xs text-foreground block truncate">{d.deviceName}</span>
-                        <div className="flex flex-wrap gap-x-2 gap-y-0.5 text-[10px] text-muted-foreground mt-0.5 font-mono">
-                          <span>IP: {d.lastIp || 'Unknown'}</span>
+                        <div className="flex flex-wrap gap-x-2 gap-y-0.5 text-[0.625rem] text-muted-foreground mt-0.5 font-mono">
+                          <span>IP: {d.lastIp || '-'}</span>
                           {d.macAddress && (
                             <>
                               <span>·</span>
@@ -124,14 +125,11 @@ export default async function DashboardPage() {
                       </div>
                     </div>
                     <div className="text-right shrink-0 ml-4">
-                      <span className={d.isActive
-                        ? 'badge badge-success'
-                        : 'badge badge-muted'
-                      }>
-                        {d.isActive ? 'Active' : 'Disabled'}
-                      </span>
-                      <p className="text-[9px] text-muted-foreground mt-1 font-mono">
-                        {d.lastOnline ? new Date(d.lastOnline).toLocaleTimeString() : 'Never'}
+                      <Badge variant={d.isActive ? 'success' : 'muted'}>
+                        {d.isActive ? 'Aktif' : 'Nonaktif'}
+                      </Badge>
+                      <p className="text-[0.5625rem] text-muted-foreground mt-1 font-mono">
+                        {d.lastOnline ? new Date(d.lastOnline).toLocaleTimeString('id-ID') : '-'}
                       </p>
                     </div>
                   </div>
@@ -142,32 +140,32 @@ export default async function DashboardPage() {
         </div>
 
         {/* Recent Logs */}
-        <div className="card rounded-2xl overflow-hidden border-border">
-          <div className="px-5 py-4 border-b border-border flex items-center justify-between">
-            <h4 className="font-semibold text-foreground text-sm">Recent Diagnostics Logs</h4>
+        <div className="section-card">
+          <div className="section-card-header flex items-center justify-between">
+            <h4 className="font-semibold text-sm text-foreground">Log Diagnostik Terbaru</h4>
             <Link href="/dashboard/logs" className="text-xs font-semibold text-primary hover:text-primary/80 transition-colors">
-              View All &rarr;
+              Lihat Semua &rarr;
             </Link>
           </div>
           <div className="divide-y divide-border/50">
             {recentLogs.length === 0 ? (
-              <div className="px-5 py-12 text-center text-xs text-muted-foreground">
-                No client errors reported. Systems are running smoothly.
+              <div className="px-5 py-16 text-center">
+                <p className="text-xs text-muted-foreground">Tidak ada error dilaporkan. Sistem berjalan normal.</p>
               </div>
             ) : (
               recentLogs.map((l) => (
-                <div key={l.id} className="p-4 px-5 hover:bg-accent/30 transition-colors flex flex-col gap-1.5">
+                <div key={l.id} className="p-4 px-5 hover:bg-white/[0.02] transition-colors flex flex-col gap-1.5">
                   <div className="flex items-center justify-between">
-                    <span className="badge badge-destructive">{l.errorType}</span>
-                    <span className="text-[9px] text-muted-foreground font-mono">
-                      {new Date(l.createdAt).toLocaleString()}
+                    <Badge variant="danger">{l.errorType}</Badge>
+                    <span className="text-[0.5625rem] text-muted-foreground font-mono">
+                      {new Date(l.createdAt).toLocaleString('id-ID')}
                     </span>
                   </div>
                   <p className="text-xs font-medium text-foreground/80 line-clamp-1">{l.errorMessage}</p>
-                  <div className="flex gap-2 text-[9px] text-muted-foreground font-mono">
+                  <div className="flex gap-2 text-[0.5625rem] text-muted-foreground font-mono">
                     <span>STB: {l.device.deviceName}</span>
                     <span>·</span>
-                    <span>Channel ID: {l.channelId || 'N/A'}</span>
+                    <span>Channel ID: {l.channelId || '-'}</span>
                   </div>
                 </div>
               ))

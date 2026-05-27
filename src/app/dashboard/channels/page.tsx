@@ -157,27 +157,26 @@ export default async function ChannelsPage({
         description="Browse, search, and manage channels extracted from your playlists. Disable offline/broken streams instantly."
       />
 
-      {/* Filter Bar */}
-      <div className="card p-4 rounded-2xl">
-        <form method="GET" action="/dashboard/channels" className="flex flex-col md:flex-row gap-4 items-center w-full">
+      <div className="toolbar">
+        <form method="GET" action="/dashboard/channels" className="flex flex-col md:flex-row gap-3 items-end w-full">
           <div className="flex flex-col w-full md:w-auto md:min-w-[200px]">
-            <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-1.5">Select Playlist</span>
+            <span className="text-[0.625rem] font-semibold text-muted-foreground uppercase tracking-wider mb-1">Playlist</span>
             <select name="playlistId" defaultValue={selectedPlaylistId || ''} className="field-input py-2">
               {playlists.map((p) => (
-                <option key={p.id} value={p.id}>{p.name} ({p.totalChannels} channels)</option>
+                <option key={p.id} value={p.id}>{p.name} ({p.totalChannels} channel)</option>
               ))}
             </select>
           </div>
           <div className="flex flex-col flex-1 w-full">
-            <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-1.5">Search Channels</span>
+            <span className="text-[0.625rem] font-semibold text-muted-foreground uppercase tracking-wider mb-1">Cari Channel</span>
             <div className="relative">
-              <input type="text" name="search" defaultValue={searchQuery} placeholder="Search channel name..." className="field-input pl-9" />
+              <input type="text" name="search" defaultValue={searchQuery} placeholder="Cari nama channel..." className="field-input pl-9" />
               <svg className="w-4 h-4 text-muted-foreground absolute left-3 top-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z" />
               </svg>
             </div>
           </div>
-          <button type="submit" className="btn btn-primary btn-sm py-2 md:self-end cursor-pointer">Apply Filters</button>
+          <button type="submit" className="btn btn-primary btn-sm">Terapkan</button>
         </form>
       </div>
 

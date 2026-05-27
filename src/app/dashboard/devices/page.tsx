@@ -239,125 +239,101 @@ export default async function DevicesPage({
         description="Monitor all registered Android STBs, control active status, assign playlists, and set remote configuration overrides."
       />
 
-      {/* Status Messages */}
       {showCleanupSaved && (
-        <div className="p-3.5 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs font-semibold">
-          Offline cleanup setting saved. {cleanedDeviceCount > 0 ? `${cleanedDeviceCount} old offline device(s) were deleted.` : 'No old offline devices matched the threshold.'}
+        <div className="alert-banner alert-banner-success">
+          <svg className="w-4 h-4 shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+          </svg>
+          {cleanedDeviceCount > 0 ? `${cleanedDeviceCount} perangkat offline lama dihapus.` : 'Tidak ada perangkat offline yang melewati ambang batas.'}
         </div>
       )}
-      {/* Filter & Settings Panel */}
-      <div className="card p-4 rounded-2xl space-y-4">
-        <div className="flex flex-col lg:flex-row gap-4 lg:items-end lg:justify-between">
-          <div className="space-y-3">
-            {/* Status Filter */}
-            <div>
-              <span className="block text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-2">Status</span>
-              <div className="flex flex-wrap gap-2">
-                {filterItems.map((item) => (
-                  <a
-                    key={item.value}
-                    href={`/dashboard/devices?status=${item.value}${groupFilter ? `&group=${encodeURIComponent(groupFilter)}` : ''}`}
-                    className={`px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all ${
-                      statusFilter === item.value
-                        ? 'bg-primary/15 text-primary border-primary/30'
-                        : 'text-muted-foreground border-border hover:text-foreground hover:bg-accent/50'
-                    }`}
-                  >
-                    {item.label} ({item.count})
-                  </a>
-                ))}
-              </div>
-            </div>
-            {/* Group Filter */}
-            <div>
-              <span className="block text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-2">Group</span>
-              <div className="flex flex-wrap gap-2">
-                <a
-                  href={`/dashboard/devices?status=${statusFilter}`}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all ${
-                    !groupFilter
-                      ? 'bg-primary/15 text-primary border-primary/30'
-                      : 'text-muted-foreground border-border hover:text-foreground hover:bg-accent/50'
-                  }`}
-                >
-                  Semua Group
-                </a>
-                <a
-                  href={`/dashboard/devices?status=${statusFilter}&group=__none__`}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all ${
-                    groupFilter === '__none__'
-                      ? 'bg-primary/15 text-primary border-primary/30'
-                      : 'text-muted-foreground border-border hover:text-foreground hover:bg-accent/50'
-                  }`}
-                >
-                  Tanpa Grup
-                </a>
-                {deviceGroups.map((g) => (
-                  <a
-                    key={g.id}
-                    href={`/dashboard/devices?status=${statusFilter}&group=${encodeURIComponent(g.id)}`}
-                    className={`px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all flex items-center gap-1.5 ${
-                      groupFilter === g.id
-                        ? 'bg-primary/15 text-primary border-primary/30'
-                        : 'text-muted-foreground border-border hover:text-foreground hover:bg-accent/50'
-                    }`}
-                  >
-                    <span className="w-2 h-2 rounded-full" style={{ backgroundColor: g.color }} />
-                    {g.name}
-                  </a>
-                ))}
-              </div>
-            </div>
-          </div>
-          <form action={saveOfflineCleanupSettingAction} className="flex flex-col sm:flex-row gap-3 sm:items-end shrink-0">
-            <div>
-              <label className="block text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-1.5">Auto-delete Offline After</label>
-              <div className="flex items-center gap-2">
-                <input
-                  type="number" name="offlineAutoDeleteDays" defaultValue={offlineAutoDeleteDays}
-                  min={0} max={3650}
-                  className="w-24 px-3 py-1.5 bg-background border border-border rounded-lg text-foreground text-xs font-medium focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary/20"
-                />
-                <span className="text-xs text-muted-foreground">days</span>
-              </div>
-              <p className="text-[9px] text-muted-foreground/60 mt-1">0 disables auto-delete</p>
-            </div>
-            <button type="submit" className="btn btn-primary btn-sm py-2">Save Cleanup</button>
+
+      <div className="toolbar">
+        <span className="text-[0.625rem] font-semibold text-muted-foreground uppercase tracking-wider">Status:</span>
+        {filterItems.map((item) => (
+          <a
+            key={item.value}
+            href={`/dashboard/devices?status=${item.value}${groupFilter ? `&group=${encodeURIComponent(groupFilter)}` : ''}`}
+            className={`px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all ${
+              statusFilter === item.value
+                ? 'bg-primary/15 text-primary border-primary/30'
+                : 'text-muted-foreground border-border hover:text-foreground hover:bg-accent/50'
+            }`}
+          >
+            {item.label} ({item.count})
+          </a>
+        ))}
+
+        <span className="w-px h-5 bg-border hidden md:block" />
+
+        <span className="text-[0.625rem] font-semibold text-muted-foreground uppercase tracking-wider">Group:</span>
+        <a
+          href={`/dashboard/devices?status=${statusFilter}`}
+          className={`px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all ${
+            !groupFilter ? 'bg-primary/15 text-primary border-primary/30' : 'text-muted-foreground border-border hover:text-foreground hover:bg-accent/50'
+          }`}
+        >
+          Semua
+        </a>
+        {deviceGroups.map((g) => (
+          <a
+            key={g.id}
+            href={`/dashboard/devices?status=${statusFilter}&group=${encodeURIComponent(g.id)}`}
+            className={`px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all flex items-center gap-1.5 ${
+              groupFilter === g.id ? 'bg-primary/15 text-primary border-primary/30' : 'text-muted-foreground border-border hover:text-foreground hover:bg-accent/50'
+            }`}
+          >
+            <span className="w-2 h-2 rounded-full" style={{ backgroundColor: g.color }} />
+            {g.name}
+          </a>
+        ))}
+
+        <div className="ml-auto">
+          <form action={saveOfflineCleanupSettingAction} className="flex items-center gap-2">
+            <label className="text-[0.625rem] text-muted-foreground">Hapus offline &gt;</label>
+            <input
+              type="number" name="offlineAutoDeleteDays" defaultValue={offlineAutoDeleteDays}
+              min={0} max={3650}
+              className="w-16 px-2 py-1 bg-background border border-border rounded-lg text-foreground text-xs focus:outline-none focus:border-primary"
+            />
+            <span className="text-[0.625rem] text-muted-foreground">hari</span>
+            <button type="submit" className="btn btn-primary btn-xs">Simpan</button>
           </form>
         </div>
       </div>
 
-      {/* Device Table */}
-      <div className="card rounded-2xl overflow-hidden">
-        <div className="px-5 py-4 border-b border-border flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-          <h3 className="font-semibold text-foreground text-sm">
-            Registered Devices ({searchQuery ? `${searchedDevices.length} found` : `${filteredDevices.length}/${devices.length}`})
-          </h3>
+      <div className="section-card">
+        <div className="section-card-header flex items-center justify-between flex-wrap gap-3">
+          <div>
+            <h3 className="font-semibold text-sm text-foreground">
+              Daftar Perangkat ({searchQuery ? `${searchedDevices.length} ditemukan` : `${filteredDevices.length}/${devices.length}`})
+            </h3>
+          </div>
         </div>
 
         <DeviceSearchAndLimit />
 
-        <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse">
+        <div className="table-responsive">
+          <table className="data-table">
             <thead>
-              <tr className="border-b border-border text-muted-foreground text-[10px] font-semibold uppercase tracking-wider">
-                <th className="p-4 px-5">Status</th>
-                <th className="p-4 min-w-[260px]">Device Details</th>
-                <th className="p-4">Group</th>
-                <th className="p-4">Sync Mode</th>
-                <th className="p-4">Versions & Network</th>
-                <th className="p-4 px-5 text-right">Actions</th>
+              <tr>
+                <th>Status</th>
+                <th className="min-w-[240px]">Detail Perangkat</th>
+                <th>Group</th>
+                <th>Sync Mode</th>
+                <th>Versi &amp; Jaringan</th>
+                <th className="text-right">Aksi</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-border/50 text-xs">
+            <tbody>
               {searchedDevices.length === 0 ? (
                 <tr>
                   <td colSpan={6}>
                     <EmptyState
-                      title={devices.length === 0 ? 'No Devices Registered' : 'No Matching Devices'}
+                      title={devices.length === 0 ? 'Belum Ada Perangkat' : 'Tidak Ada Hasil'}
                       description={devices.length === 0
-                        ? 'Open the RSDK IPTV Android Player app on any STB to register automatically.'
-                        : 'No devices match the selected search query or filter.'}
+                        ? 'Jalankan aplikasi RSDK IPTV di STB Android untuk registrasi otomatis.'
+                        : 'Tidak ada perangkat yang cocok dengan filter atau pencarian saat ini.'}
                     />
                   </td>
                 </tr>
@@ -367,113 +343,84 @@ export default async function DevicesPage({
                   const assignedGroupId = groupAssignments[d.deviceId] || ''
                   const assignedGroup = deviceGroups.find((group) => group.id === assignedGroupId)
                   return (
-                    <tr key={d.id} className="hover:bg-accent/30 transition-colors">
-                      <td className="p-4 px-5">
+                    <tr key={d.id}>
+                      <td>
                         <div className="flex flex-col gap-1.5">
                           <div className="flex items-center gap-2">
-                            <span className={`w-2 h-2 rounded-full ${
-                              !d.isActive ? 'bg-destructive' : isOnline ? 'bg-emerald-500' : 'bg-muted'
-                            }`} />
-                            <span className={`font-semibold text-[10px] tracking-wide ${
-                              !d.isActive ? 'text-destructive' : isOnline ? 'text-emerald-400' : 'text-muted-foreground'
-                            }`}>
-                              {!d.isActive ? 'DISABLED' : isOnline ? 'ONLINE' : 'OFFLINE'}
+                            <span className={`w-2 h-2 rounded-full ${!d.isActive ? 'bg-destructive' : isOnline ? 'bg-emerald-500 animate-pulse-glow' : 'bg-muted'}`} />
+                            <span className={`font-semibold text-[0.625rem] tracking-wide ${!d.isActive ? 'text-destructive' : isOnline ? 'text-emerald-400' : 'text-muted-foreground'}`}>
+                              {!d.isActive ? 'NONAKTIF' : isOnline ? 'ONLINE' : 'OFFLINE'}
                             </span>
                           </div>
                           <span className={`badge ${d.isActive ? 'badge-success' : 'badge-destructive'}`}>
-                            API {d.isActive ? 'Enabled' : 'Disabled'}
+                            {d.isActive ? 'Aktif' : 'Nonaktif'}
                           </span>
                         </div>
                       </td>
-                      <td className="p-4 min-w-[260px]">
-                        <div className="font-semibold text-foreground text-xs">{d.deviceName}</div>
-                        <div className="text-muted-foreground text-[10px] mt-0.5 font-mono break-all" title={d.deviceId}>
-                          <span className="text-muted-foreground/60">ID:</span> {d.deviceId}
+                      <td>
+                        <div className="font-semibold text-foreground">{d.deviceName}</div>
+                        <div className="text-[0.625rem] text-muted-foreground mt-0.5 font-mono break-all">
+                          ID: {d.deviceId}
                         </div>
                       </td>
-                      <td className="p-4">
+                      <td>
                         {assignedGroup ? (
                           <div className="flex items-center gap-2">
-                            <span
-                              className="w-2 h-2 rounded-full shrink-0"
-                              style={{ backgroundColor: assignedGroup.color }}
-                            />
-                            <span className="text-xs font-medium text-foreground">{assignedGroup.name}</span>
+                            <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: assignedGroup.color }} />
+                            <span className="font-medium text-foreground">{assignedGroup.name}</span>
                           </div>
                         ) : (
-                          <span className="text-[11px] text-muted-foreground/60 italic">Tanpa grup</span>
+                          <span className="text-muted-foreground/60 italic text-[0.6875rem]">Tanpa grup</span>
                         )}
-                        <a
-                          href="/dashboard/groups"
-                          className="mt-1 block text-[9px] text-primary/60 hover:text-primary transition-colors"
-                        >
-                          Kelola grup →
-                        </a>
                       </td>
-                      <td className="p-4">
-                        <div className="flex flex-col gap-1">
-                          <span className={getSyncModeBadgeClass(normalizeSyncMode(d.config?.syncMode || DEFAULT_SYNC_MODE))}>
-                            {getSyncModeLabel(normalizeSyncMode(d.config?.syncMode || DEFAULT_SYNC_MODE))}
-                          </span>
-                          {normalizeSyncMode(d.config?.syncMode || DEFAULT_SYNC_MODE) === 'custom' ? (
-                            <div className="text-[9px] text-muted-foreground truncate max-w-[130px] font-mono" title={d.config?.customM3uUrl || DEFAULT_CUSTOM_M3U_URL}>
-                              {d.config?.customM3uUrl || DEFAULT_CUSTOM_M3U_URL}
-                            </div>
-                          ) : (
-                            <div className="text-[9px] text-muted-foreground/60 italic">Centralized</div>
-                          )}
-                        </div>
+                      <td>
+                        <span className={getSyncModeBadgeClass(normalizeSyncMode(d.config?.syncMode || DEFAULT_SYNC_MODE))}>
+                          {getSyncModeLabel(normalizeSyncMode(d.config?.syncMode || DEFAULT_SYNC_MODE))}
+                        </span>
                       </td>
-                      <td className="p-4">
-                        <div className="text-foreground/80 text-xs">App v{d.appVersion || '1.0.0'} (Android {d.androidVersion || '10'})</div>
-                        <div className="text-muted-foreground text-[10px] mt-0.5 font-mono">IP: {d.lastIp || '127.0.0.1'}</div>
+                      <td>
+                        <div className="text-foreground/80">App v{d.appVersion || '1.0.0'}</div>
+                        <div className="text-[0.625rem] text-muted-foreground mt-0.5 font-mono">IP: {d.lastIp || '-'}</div>
                         {d.macAddress && (
-                          <div className="text-primary/70 text-[10px] mt-0.5 font-mono">MAC: {d.macAddress}</div>
+                          <div className="text-[0.625rem] text-muted-foreground font-mono">MAC: {d.macAddress}</div>
                         )}
                       </td>
-                      <td className="p-4 px-5 text-right">
-                        <div className="flex items-center justify-end gap-2">
+                      <td className="text-right">
+                        <div className="flex items-center justify-end gap-1.5">
                           <ConfirmForm
                             action={toggleDeviceActiveAction}
-                            message={d.isActive
-                              ? `Disable API connection for ${d.deviceName}? The STB will be blocked without deleting its settings.`
-                              : `Enable API connection for ${d.deviceName}? The STB can sync and play again.`}
+                            message={d.isActive ? `Nonaktifkan ${d.deviceName}? Perangkat akan diblokir tanpa menghapus pengaturan.` : `Aktifkan ${d.deviceName}? Perangkat dapat sync dan memutar kembali.`}
+                            confirmLabel={d.isActive ? 'Nonaktifkan' : 'Aktifkan'}
                           >
                             <input type="hidden" name="deviceId" value={d.deviceId} />
                             <input type="hidden" name="currentStatus" value={d.isActive ? 'true' : 'false'} />
-                            <button type="submit" className={`btn btn-xs ${d.isActive
-                              ? 'text-amber-400 hover:text-amber-300 border border-amber-500/20 hover:bg-amber-500/10'
-                              : 'text-emerald-400 hover:text-emerald-300 border border-emerald-500/20 hover:bg-emerald-500/10'
-                            }`}>
-                              {d.isActive ? 'Disable' : 'Enable'}
+                            <button type="submit" className={`btn btn-xs rounded-lg ${d.isActive ? 'text-amber-400 border-amber-500/20 hover:bg-amber-500/10' : 'text-emerald-400 border-emerald-500/20 hover:bg-emerald-500/10'}`}>
+                              {d.isActive ? 'Nonaktifkan' : 'Aktifkan'}
                             </button>
                           </ConfirmForm>
 
-                          <a href={`/dashboard/devices?edit=${d.deviceId}`}
-                            className="btn btn-xs text-primary hover:text-primary/80 border border-primary/20 hover:bg-primary/10">
-                            Config
+                          <a href={`/dashboard/devices?edit=${d.deviceId}`} className="btn btn-xs text-primary border-primary/20 hover:bg-primary/10 rounded-lg">
+                            Konfigurasi
                           </a>
 
                           {d.isActive && isOnline ? (
-                            <a href={`/dashboard/devices?remote=${d.deviceId}`}
-                              className="btn btn-xs text-emerald-400 hover:text-emerald-300 border border-emerald-500/20 hover:bg-emerald-500/10 animate-pulse-glow">
+                            <a href={`/dashboard/devices?remote=${d.deviceId}`} className="btn btn-xs text-emerald-400 border-emerald-500/20 hover:bg-emerald-500/10 rounded-lg animate-pulse-glow">
                               Remote
                             </a>
                           ) : (
-                            <button disabled
-                              className="btn btn-xs text-muted-foreground/30 border border-border/30 cursor-not-allowed"
-                              title="Device must be active and online">
+                            <button disabled className="btn btn-xs text-muted/30 border-border/30 rounded-lg cursor-not-allowed opacity-40">
                               Remote
                             </button>
                           )}
 
                           <ConfirmForm
                             action={deleteDeviceAction}
-                            message={`Are you sure you want to delete ${d.deviceName}? This will wipe its remote settings.`}
+                            message={`Hapus ${d.deviceName}? Semua pengaturan remote akan dihapus permanen.`}
+                            confirmLabel="Hapus"
+                            successToast="Perangkat berhasil dihapus."
                           >
                             <input type="hidden" name="deviceId" value={d.deviceId} />
-                            <button type="submit"
-                              className="p-1.5 text-rose-400 hover:text-rose-300 border border-rose-500/10 hover:bg-rose-500/10 rounded-lg transition-all">
+                            <button type="submit" className="p-1.5 text-rose-400 hover:text-rose-300 border border-rose-500/10 hover:bg-rose-500/10 rounded-lg transition-all">
                               <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
                                 <path strokeLinecap="round" strokeLinejoin="round" d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0" />
                               </svg>

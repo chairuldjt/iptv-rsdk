@@ -50,3 +50,7 @@ prisma/*.db-journal
 # builds
 *.apk
 app-debug.apk
+
+# generated uploads / local debug artifacts
+public/uploads/videos/
+android-client/replay_pid*.log

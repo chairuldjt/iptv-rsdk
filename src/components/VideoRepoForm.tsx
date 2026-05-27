@@ -21,6 +21,7 @@ interface VideoRepoFormProps {
     thumbnailUrl: string | null
     folderId: number | null
   } | null
+  onSuccess?: (video: { id: number; title: string }) => void
 }
 
 type FormErrors = {
@@ -35,6 +36,7 @@ export default function VideoRepoForm({
   editingVideo,
   surface = 'card',
   cancelHref = '/dashboard/videos',
+  onSuccess,
 }: VideoRepoFormProps) {
   const [sourceType, setSourceType] = useState<'url' | 'file'>(
     editingVideo?.videoUrl?.startsWith('/uploads/videos/') ? 'file' : 'url'
@@ -84,6 +86,10 @@ export default function VideoRepoForm({
 
       if (result?.success) {
         showToast('success', result.message || 'Video berhasil disimpan.')
+        const res = result as { success: boolean; message: string; video?: { id: number; title: string } }
+        if (res.video && onSuccess) {
+          onSuccess(res.video)
+        }
       } else if (result && !result.success) {
         showToast('error', result.message || 'Gagal menyimpan video.')
       }

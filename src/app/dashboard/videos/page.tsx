@@ -16,6 +16,7 @@ import {
   setGlobalVideoBroadcast,
   setGroupVideoBroadcast,
   type ResolvedVideoBroadcastConfig,
+  type ResolvedVideoBroadcastItem,
   type VideoBroadcastConfig,
   type VideoBroadcastScope,
   videoBroadcastFromFormData,
@@ -910,34 +911,65 @@ async function loadVideoBroadcastConfig(
           : null
 
   const safeConfig: VideoBroadcastConfig = config ?? FALLBACK_VIDEO_BROADCAST_CONFIG
-  if (!safeConfig.videoId) {
+  if (safeConfig.items.length === 0) {
     return {
       ...safeConfig,
+      enabled: false,
       videoTitle: '',
       videoUrl: '',
       thumbnailUrl: '',
       scopeApplied: scope === 'global' ? 'global' : 'fallback',
+      videos: [],
     }
   }
 
-  const video = await prisma.educationVideo.findUnique({
-    where: { id: safeConfig.videoId },
+  const videoIds = safeConfig.items.map((item) => item.videoId)
+  const videos = await prisma.educationVideo.findMany({
+    where: { id: { in: videoIds } },
     include: { folder: true },
   })
+  const videoMap = new Map(videos.map((v) => [v.id, v]))
 
-  const isPlayable = Boolean(
-    video &&
-      video.isPublished &&
-      (!video.folder || video.folder.isPublished)
-  )
+  const resolvedVideos: ResolvedVideoBroadcastItem[] = []
+  for (const item of safeConfig.items) {
+    const video = videoMap.get(item.videoId)
+    const isPlayable = Boolean(
+      video &&
+        video.isPublished &&
+        (!video.folder || video.folder.isPublished)
+    )
+    if (isPlayable && video) {
+      resolvedVideos.push({
+        title: video.title,
+        url: video.videoUrl,
+        thumbnailUrl: video.thumbnailUrl || '',
+        repeatCount: item.repeatCount,
+      })
+    }
+  }
+
+  if (resolvedVideos.length === 0) {
+    return {
+      ...safeConfig,
+      enabled: false,
+      videoTitle: '',
+      videoUrl: '',
+      thumbnailUrl: '',
+      scopeApplied: scope === 'global' ? 'global' : 'fallback',
+      videos: [],
+    }
+  }
+
+  const firstVideo = resolvedVideos[0]
 
   return {
     ...safeConfig,
-    enabled: safeConfig.enabled && isPlayable,
-    videoTitle: video?.title || '',
-    videoUrl: video?.videoUrl || '',
-    thumbnailUrl: video?.thumbnailUrl || '',
+    enabled: safeConfig.enabled,
+    videoTitle: firstVideo.title,
+    videoUrl: firstVideo.url,
+    thumbnailUrl: firstVideo.thumbnailUrl,
     scopeApplied: config ? scope : 'fallback',
+    videos: resolvedVideos,
   }
 }
 

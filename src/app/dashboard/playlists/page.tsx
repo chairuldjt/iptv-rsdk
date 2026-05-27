@@ -11,6 +11,7 @@ import {
   playlistRelayConfigFromFormData,
   serializePlaylistRelayConfig,
 } from '@/lib/playlistRelay'
+import PlaylistsClient from './PlaylistsClient'
 
 export const revalidate = 0
 
@@ -126,125 +127,104 @@ export default async function PlaylistsPage({
     <div className="space-y-6 animate-fade-in">
       <PageHeader
         title="Playlists Manager"
-        description="Upload local M3U files or sync with external IPTV server URLs to populate channels."
+        description="Upload file M3U lokal atau sinkron dengan URL server IPTV eksternal untuk mengisi channel."
+        actions={
+          <PlaylistsClient uploadPlaylistAction={uploadPlaylistAction} />
+        }
       />
 
       {showRelaySaved && (
-        <div className="p-3.5 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs font-semibold">
-          Playlist relay settings berhasil disimpan.
+        <div className="alert-banner alert-banner-success">
+          <svg className="w-4 h-4 shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+          </svg>
+          Pengaturan relay playlist berhasil disimpan.
         </div>
       )}
       {showRelayToggled && (
-        <div className="p-3.5 rounded-xl bg-primary/10 border border-primary/20 text-primary text-xs font-semibold">
+        <div className="alert-banner alert-banner-info">
+          <svg className="w-4 h-4 shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+          </svg>
           Status relay playlist berhasil diperbarui.
         </div>
       )}
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Upload Form */}
-        <div className="lg:col-span-1 card p-5 rounded-2xl h-fit space-y-4">
-          <h3 className="font-semibold text-foreground text-sm">Add Playlist</h3>
-          <form action={uploadPlaylistAction} className="space-y-4">
-            <div>
-              <label className="block text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-1.5">Playlist Name</label>
-              <input type="text" name="name" required placeholder="e.g. National Premium TV" className="field-input" />
-            </div>
-            <div>
-              <label className="block text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-1.5">M3U File Upload</label>
-              <input type="file" name="m3uFile" accept=".m3u,.m3u8" className="file-input" />
-            </div>
-            <div className="flex items-center gap-2 py-1">
-              <div className="h-px flex-1 bg-border" />
-              <span className="text-[9px] font-semibold text-muted-foreground uppercase tracking-wider">OR</span>
-              <div className="h-px flex-1 bg-border" />
-            </div>
-            <div>
-              <label className="block text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-1.5">External M3U URL</label>
-              <input type="url" name="sourceUrl" placeholder="http://example.com/playlist.m3u8" className="field-input" />
-            </div>
-            <label className="flex items-center gap-3 cursor-pointer p-3 bg-accent/30 border border-border rounded-xl hover:bg-accent/50 transition-colors">
-              <input type="checkbox" name="relayEnabled" className="w-4 h-4 rounded accent-primary" />
-              <span>
-                <span className="text-xs font-semibold text-foreground block">Enable On-Demand Relay</span>
-                <span className="text-[10px] text-muted-foreground">Playlist ini langsung siap memakai relay UDP on-demand dengan fallback ke setting global.</span>
-              </span>
-            </label>
-            <button type="submit" className="w-full btn btn-primary py-2.5">
-              Parse & Save Playlist
-            </button>
-          </form>
-        </div>
-
-        {/* Playlists List */}
-        <div className="lg:col-span-2 card rounded-2xl overflow-hidden">
-          <div className="px-5 py-4 border-b border-border">
-            <h3 className="font-semibold text-foreground text-sm">Parsed Playlists ({playlists.length})</h3>
+      {/* Playlists List */}
+      <div className="section-card">
+        <div className="section-card-header flex items-center justify-between">
+          <div>
+            <h3 className="font-semibold text-sm text-foreground">Daftar Playlist</h3>
+            <p className="mt-0.5 text-[0.6875rem] text-muted-foreground">{playlists.length} playlist tersimpan</p>
           </div>
-          <div className="divide-y divide-border/50">
-            {playlists.length === 0 ? (
-              <div className="px-5 py-16 text-center text-xs text-muted-foreground">
-                No playlists parsed yet. Fill the upload form on the left to add your first playlist!
+        </div>
+        <div className={playlists.length > 0 ? 'divide-y divide-border/50' : ''}>
+          {playlists.length === 0 ? (
+            <div className="section-card-body flex flex-col items-center justify-center py-16 text-center">
+              <div className="w-14 h-14 rounded-2xl bg-primary/10 border border-primary/20 flex items-center justify-center mb-3">
+                <svg className="w-6 h-6 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 9.776c.112-.017.227-.026.344-.026h15.812c.117 0 .232.009.344.026m-16.5 0a2.25 2.25 0 00-1.883 2.542l.857 6a2.25 2.25 0 002.227 1.932H19.05a2.25 2.25 0 002.227-1.932l.857-6a2.25 2.25 0 00-1.883-2.542m-16.5 0V6A2.25 2.25 0 016 3.75h3.879a1.5 1.5 0 011.06.44l2.122 2.12a1.5 1.5 0 001.06.44H18A2.25 2.25 0 0120.25 9v.776" />
+                </svg>
               </div>
-            ) : (
-              playlists.map((p) => {
-                const relaySettings = getPlaylistRelaySettingsFromValue(p.relayEnabled, p.relayConfig)
+              <p className="text-xs font-semibold text-foreground">Belum ada playlist</p>
+              <p className="text-[0.6875rem] text-muted-foreground mt-1">Klik &quot;Tambah Playlist&quot; untuk menambahkan playlist pertama.</p>
+            </div>
+          ) : (
+            playlists.map((p) => {
+              const relaySettings = getPlaylistRelaySettingsFromValue(p.relayEnabled, p.relayConfig)
 
-                return (
-                  <div key={p.id} className="p-5 flex flex-col md:flex-row md:items-center justify-between gap-4 hover:bg-accent/30 transition-colors">
-                    <div className="space-y-1 min-w-0">
-                      <div className="flex items-center flex-wrap gap-2">
-                        <h4 className="font-semibold text-foreground text-sm truncate">{p.name}</h4>
-                        {p.isGlobal && <span className="badge badge-success">Global Active</span>}
-                        {relaySettings.enabled && <span className="badge badge-warning">Relay Enabled</span>}
-                      </div>
-                      <div className="flex flex-wrap gap-x-3 gap-y-0.5 text-xs text-muted-foreground">
-                        <span>Channels: <strong className="text-violet-400 font-semibold">{p.totalChannels} channels</strong></span>
-                        <span className="text-border">·</span>
-                        <span>Uploaded: {new Date(p.createdAt).toLocaleDateString()}</span>
-                      </div>
-                      {p.sourceUrl && (
-                        <p className="text-[10px] text-muted-foreground break-all font-mono">URL: {p.sourceUrl}</p>
-                      )}
-                      <p className="text-[10px] text-muted-foreground">
-                        Relay override:
-                        {' '}
-                        {Object.keys(relaySettings.config).length > 0 ? `${Object.keys(relaySettings.config).length} field custom` : 'ikut global default'}
-                      </p>
+              return (
+                <div key={p.id} className="p-5 flex flex-col md:flex-row md:items-center justify-between gap-4 hover:bg-accent/30 transition-colors">
+                  <div className="space-y-1 min-w-0">
+                    <div className="flex items-center flex-wrap gap-2">
+                      <h4 className="font-semibold text-foreground text-sm truncate">{p.name}</h4>
+                      {p.isGlobal && <span className="badge badge-success">Global</span>}
+                      {relaySettings.enabled && <span className="badge badge-warning">Relay Aktif</span>}
                     </div>
-                    <div className="flex items-center gap-3 shrink-0 self-end md:self-center">
-                      {!p.isGlobal && (
-                        <form action={setGlobalPlaylistAction}>
-                          <input type="hidden" name="playlistId" value={p.id} />
-                          <button type="submit" className="btn btn-xs text-emerald-400 hover:text-emerald-300 border border-emerald-500/20 hover:bg-emerald-500/10">
-                            Set as Global
-                          </button>
-                        </form>
-                      )}
-                      <form action={togglePlaylistRelayAction}>
+                    <div className="flex flex-wrap gap-x-3 gap-y-0.5 text-xs text-muted-foreground">
+                      <span>Channel: <strong className="text-violet-400 font-semibold">{p.totalChannels} channel</strong></span>
+                      <span className="text-border">·</span>
+                      <span>Upload: {new Date(p.createdAt).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' })}</span>
+                    </div>
+                    {p.sourceUrl && (
+                      <p className="text-[0.625rem] text-muted-foreground break-all font-mono">URL: {p.sourceUrl}</p>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-2 shrink-0 flex-wrap self-end md:self-center">
+                    {!p.isGlobal && (
+                      <form action={setGlobalPlaylistAction}>
                         <input type="hidden" name="playlistId" value={p.id} />
-                        <input type="hidden" name="nextEnabled" value={relaySettings.enabled ? 'false' : 'true'} />
-                        <button type="submit" className={`btn btn-xs border ${relaySettings.enabled ? 'text-amber-300 border-amber-500/20 hover:bg-amber-500/10' : 'text-sky-300 border-sky-500/20 hover:bg-sky-500/10'}`}>
-                          {relaySettings.enabled ? 'Disable Relay' : 'Enable Relay'}
+                        <button type="submit" className="btn btn-xs text-emerald-400 hover:text-emerald-300 border border-emerald-500/20 hover:bg-emerald-500/10 rounded-lg">
+                          Set Global
                         </button>
                       </form>
-                      <a href={`/dashboard/playlists?relay=${p.id}`} className="btn btn-xs text-primary border border-primary/20 hover:bg-primary/10">
-                        Relay Settings
-                      </a>
-                      <ConfirmForm
-                        action={deletePlaylistAction}
-                        message="Are you sure you want to delete this playlist? This will instantly delete all categories and channels tied to it."
-                      >
-                        <input type="hidden" name="playlistId" value={p.id} />
-                        <button type="submit" className="btn btn-xs text-rose-400 hover:text-rose-300 border border-rose-500/20 hover:bg-rose-500/10">
-                          Delete Playlist
-                        </button>
-                      </ConfirmForm>
-                    </div>
+                    )}
+                    <form action={togglePlaylistRelayAction}>
+                      <input type="hidden" name="playlistId" value={p.id} />
+                      <input type="hidden" name="nextEnabled" value={relaySettings.enabled ? 'false' : 'true'} />
+                      <button type="submit" className={`btn btn-xs rounded-lg border ${relaySettings.enabled ? 'text-amber-300 border-amber-500/20 hover:bg-amber-500/10' : 'text-sky-300 border-sky-500/20 hover:bg-sky-500/10'}`}>
+                        {relaySettings.enabled ? 'Nonaktifkan Relay' : 'Aktifkan Relay'}
+                      </button>
+                    </form>
+                    <a href={`/dashboard/playlists?relay=${p.id}`} className="btn btn-xs text-primary border border-primary/20 hover:bg-primary/10 rounded-lg">
+                      Pengaturan Relay
+                    </a>
+                    <ConfirmForm
+                      action={deletePlaylistAction}
+                      message="Menghapus playlist akan menghapus semua kategori dan channel terkait. Data yang dihapus tidak dapat dikembalikan."
+                      confirmLabel="Hapus"
+                      successToast="Playlist berhasil dihapus."
+                    >
+                      <input type="hidden" name="playlistId" value={p.id} />
+                      <button type="submit" className="btn btn-xs text-rose-400 hover:text-rose-300 border border-rose-500/20 hover:bg-rose-500/10 rounded-lg">
+                        Hapus
+                      </button>
+                    </ConfirmForm>
                   </div>
-                )
-              })
-            )}
-          </div>
+                </div>
+              )
+            })
+          )}
         </div>
       </div>
 

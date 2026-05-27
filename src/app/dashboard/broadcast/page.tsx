@@ -1,10 +1,5 @@
 import { redirect } from 'next/navigation'
-import { revalidatePath } from 'next/cache'
 import prisma from '@/lib/db'
-import PageHeader from '@/components/PageHeader'
-import ConfirmForm from '@/components/ConfirmForm'
-import VideoBroadcastManager from '@/components/VideoBroadcastManager'
-import RunningTextPanelClient from '@/components/RunningTextPanelClient'
 import {
   FALLBACK_VIDEO_BROADCAST_CONFIG,
   getVideoBroadcastProfiles,
@@ -12,16 +7,6 @@ import {
   getVideoBroadcastGroupProfileMap,
   getVideoBroadcastDeviceProfileMap,
   getVideoBroadcastProfileConfig,
-  createVideoBroadcastProfile,
-  updateVideoBroadcastProfileMeta,
-  saveVideoBroadcastProfileConfig,
-  deleteVideoBroadcastProfile,
-  setVideoGlobalProfileId,
-  assignVideoBroadcastProfileToGroup,
-  assignVideoBroadcastProfileToDevice,
-  type VideoBroadcastProfile,
-  type VideoBroadcastConfig,
-  videoBroadcastFromFormData,
 } from '@/lib/videoBroadcast'
 import {
   FALLBACK_RUNNING_TEXT_CONFIG,
@@ -30,325 +15,118 @@ import {
   getRunningTextGroupProfileMap,
   getRunningTextDeviceProfileMap,
   getRunningTextProfileConfig,
-  createRunningTextProfile,
-  updateRunningTextProfileMeta,
-  saveRunningTextProfileConfig,
-  deleteRunningTextProfile,
-  setRunningGlobalProfileId,
-  assignRunningTextProfileToGroup,
-  assignRunningTextProfileToDevice,
-  type RunningTextProfile,
-  type RunningTextConfig,
 } from '@/lib/runningText'
-import type { HomeExperienceRunningTextItem } from '@/lib/homeExperience'
 import { getDeviceGroupAssignments, getDeviceGroups } from '@/lib/deviceGroups'
-import { pushCommand } from '@/lib/remoteQueue'
+
+import VideoBroadcastManager from '@/components/VideoBroadcastManager'
+import RunningTextPanelClient from '@/components/RunningTextPanelClient'
+
+import TabsNavigation from './_components/TabsNavigation'
+import ProfileCardItem from './_components/ProfileCardItem'
+import NotificationBar from './_components/NotificationBar'
+import BackBreadcrumb from './_components/BackBreadcrumb'
+import AssignPanel from './_components/AssignPanel'
+
+import {
+  createVideoProfileAction,
+  saveVideoProfileConfigAction,
+  deleteVideoProfileAction,
+  setVideoGlobalAction,
+  assignVideoGroupAction,
+  assignVideoDeviceAction,
+  playVideoBroadcastNowAction,
+  stopVideoBroadcastNowAction,
+} from './actions/videoActions'
+
+import {
+  createRunningProfileAction,
+  saveRunningProfileConfigAction,
+  deleteRunningProfileAction,
+  setRunningGlobalAction,
+  assignRunningGroupAction,
+  assignRunningDeviceAction,
+  pushRunningTextLiveAction,
+} from './actions/runningTextActions'
 
 export const revalidate = 0
 
-// ── 📹 Video Profile Server Actions ───────────────────────────────────────────
+// ── Search Params Type ────────────────────────────────────────────────────────
 
-async function createVideoProfileAction(formData: FormData) {
-  'use server'
-  const name = (formData.get('profileName') as string) || ''
-  const description = (formData.get('profileDescription') as string) || ''
-  const profile = await createVideoBroadcastProfile({ name, description })
-  revalidatePath('/dashboard/broadcast')
-  redirect(`/dashboard/broadcast?tab=video&editVideoProfile=${encodeURIComponent(profile.id)}&created=1`)
+type BroadcastSearchParams = {
+  tab?: string
+  editVideoProfile?: string
+  assignVideoProfile?: string
+  editRunningProfile?: string
+  assignRunningProfile?: string
+  created?: string
+  saved?: string
+  reset?: string
+  updated?: string
+  deleted?: string
+  globalSet?: string
+  ok?: string
+  notice?: string
+  pushed?: string
+  error?: string
+  count?: string
+  skipped?: string
 }
 
-async function updateVideoProfileMetaAction(formData: FormData) {
-  'use server'
-  const profileId = (formData.get('profileId') as string) || ''
-  const name = (formData.get('profileName') as string) || ''
-  const description = (formData.get('profileDescription') as string) || ''
-  if (profileId) await updateVideoBroadcastProfileMeta(profileId, { name, description })
-  revalidatePath('/dashboard/broadcast')
-  redirect(`/dashboard/broadcast?tab=video&updated=1`)
-}
+function countVideoProfileRecipients(params: {
+  profileId: string
+  isGlobal: boolean
+  devices: Array<{ deviceId: string; isActive: boolean }>
+  groupAssignments: Record<string, string>
+  groupProfileMap: Record<string, string>
+  deviceProfileMap: Record<string, string>
+}): number {
+  const { profileId, isGlobal, devices, groupAssignments, groupProfileMap, deviceProfileMap } = params
+  const activeDeviceIds = devices.filter((device) => device.isActive).map((device) => device.deviceId)
+  if (isGlobal) return activeDeviceIds.length
 
-async function saveVideoProfileConfigAction(formData: FormData) {
-  'use server'
-  const profileId = (formData.get('profileId') as string) || ''
-  if (!profileId) return
-  const enabled = formData.get('enabled') === 'on'
-  const videoId = formData.get('videoId') ? parseInt(formData.get('videoId') as string, 10) : null
-  const repeatCount = parseInt((formData.get('repeatCount') as string) || '1', 10)
+  const assignedGroupIds = Object.entries(groupProfileMap)
+    .filter(([, pid]) => pid === profileId)
+    .map(([groupId]) => groupId)
 
-  await saveVideoBroadcastProfileConfig(profileId, {
-    revision: 1,
-    enabled,
-    videoId,
-    repeatCount: Math.max(1, Math.min(100, repeatCount)),
+  const assignedDeviceIds = Object.entries(deviceProfileMap)
+    .filter(([, pid]) => pid === profileId)
+    .map(([deviceId]) => deviceId)
+
+  const recipients = activeDeviceIds.filter((deviceId) => {
+    const assignedGroupId = groupAssignments[deviceId]
+    return assignedDeviceIds.includes(deviceId) || (assignedGroupId ? assignedGroupIds.includes(assignedGroupId) : false)
   })
 
-  revalidatePath('/dashboard/broadcast')
-  redirect(`/dashboard/broadcast?tab=video&editVideoProfile=${encodeURIComponent(profileId)}&saved=1`)
+  return Array.from(new Set(recipients)).length
 }
 
-async function resetVideoProfileConfigAction(formData: FormData) {
-  'use server'
-  const profileId = (formData.get('profileId') as string) || ''
-  if (!profileId) return
-  await saveVideoBroadcastProfileConfig(profileId, FALLBACK_VIDEO_BROADCAST_CONFIG)
-  revalidatePath('/dashboard/broadcast')
-  redirect(`/dashboard/broadcast?tab=video&editVideoProfile=${encodeURIComponent(profileId)}&reset=1`)
-}
-
-async function deleteVideoProfileAction(formData: FormData) {
-  'use server'
-  const profileId = (formData.get('profileId') as string) || ''
-  if (profileId) await deleteVideoBroadcastProfile(profileId)
-  revalidatePath('/dashboard/broadcast')
-  redirect('/dashboard/broadcast?tab=video&deleted=1')
-}
-
-async function setVideoGlobalAction(formData: FormData) {
-  'use server'
-  const profileId = (formData.get('profileId') as string) || ''
-  if (profileId) await setVideoGlobalProfileId(profileId)
-  revalidatePath('/dashboard/broadcast')
-  redirect('/dashboard/broadcast?tab=video&globalSet=1')
-}
-
-async function assignVideoGroupAction(formData: FormData) {
-  'use server'
-  const profileId = (formData.get('profileId') as string) || ''
-  const groupId = (formData.get('groupId') as string) || ''
-  const action = (formData.get('action') as string) || 'assign'
-  if (profileId && groupId) {
-    await assignVideoBroadcastProfileToGroup(groupId, action === 'assign' ? profileId : null)
-  }
-  revalidatePath('/dashboard/broadcast')
-  redirect(`/dashboard/broadcast?tab=video&assignVideoProfile=${encodeURIComponent(profileId)}&ok=1`)
-}
-
-async function assignVideoDeviceAction(formData: FormData) {
-  'use server'
-  const profileId = (formData.get('profileId') as string) || ''
-  const deviceId = (formData.get('deviceId') as string) || ''
-  const action = (formData.get('action') as string) || 'assign'
-  if (profileId && deviceId) {
-    await assignVideoBroadcastProfileToDevice(deviceId, action === 'assign' ? profileId : null)
-  }
-  revalidatePath('/dashboard/broadcast')
-  redirect(`/dashboard/broadcast?tab=video&assignVideoProfile=${encodeURIComponent(profileId)}&ok=1`)
-}
-
-// ── Video Live Execution Actions ──────────────────────────────────────────────
-
-async function playVideoBroadcastNowAction(formData: FormData) {
-  'use server'
-  const profileId = (formData.get('profileId') as string) || ''
-  const videoId = formData.get('videoId') ? parseInt(formData.get('videoId') as string, 10) : null
-  const repeatCount = parseInt((formData.get('repeatCount') as string) || '1', 10)
-  
-  if (!videoId) {
-    redirect(`/dashboard/broadcast?tab=video&profileId=${profileId}&notice=broadcast-live`)
+function buildVideoNotice(sp: BroadcastSearchParams): { message: string; tone: 'success' | 'error' | 'info' } | null {
+  if (sp.error) {
+    return {
+      message: decodeURIComponent(sp.error),
+      tone: 'error',
+    }
   }
 
-  const video = await prisma.educationVideo.findUnique({ where: { id: videoId } })
-  if (!video || !video.isPublished) {
-    redirect(`/dashboard/broadcast?tab=video&profileId=${profileId}&notice=broadcast-live`)
+  if (sp.saved) {
+    return { message: 'Konfigurasi Video Broadcast berhasil disimpan.', tone: 'success' }
   }
 
-  const payload = {
-    videoUrl: video.videoUrl,
-    repeatCount: Math.max(1, Math.min(100, repeatCount)),
+  if (sp.notice === 'broadcast-live-played') {
+    const count = Number.parseInt(sp.count || '0', 10) || 0
+    const skipped = Number.parseInt(sp.skipped || '0', 10) || 0
+    const baseMessage = `Live broadcast berhasil dikirim ke ${count} device aktif.`
+    return skipped > 0
+      ? { message: `${baseMessage} ${skipped} item tidak ikut terkirim karena sudah tidak playable.`, tone: 'info' }
+      : { message: baseMessage, tone: 'success' }
   }
 
-  const liveTargetMode = (formData.get('liveTargetMode') as string) || 'global'
-  const liveGroupId = (formData.get('liveGroupId') as string) || ''
-  const liveDeviceId = (formData.get('liveDeviceId') as string) || ''
-  const selectedDeviceIds = (formData.getAll('selectedDeviceIds') as string[])
-
-  let recipients: string[] = []
-  if (liveTargetMode === 'global') {
-    const devices = await prisma.device.findMany({ where: { isActive: true }, select: { deviceId: true } })
-    recipients = devices.map((d) => d.deviceId)
-  } else if (liveTargetMode === 'group' && liveGroupId) {
-    const assignments = await getDeviceGroupAssignments()
-    const groupDeviceIds = Object.entries(assignments)
-      .filter(([, gid]) => gid === liveGroupId)
-      .map(([did]) => did)
-    const devices = await prisma.device.findMany({
-      where: { deviceId: { in: groupDeviceIds }, isActive: true },
-      select: { deviceId: true },
-    })
-    recipients = devices.map((d) => d.deviceId)
-  } else if (liveTargetMode === 'device' && liveDeviceId) {
-    recipients = [liveDeviceId]
-  } else if (liveTargetMode === 'selected' && selectedDeviceIds.length > 0) {
-    recipients = selectedDeviceIds
+  if (sp.notice === 'broadcast-live-stopped') {
+    const count = Number.parseInt(sp.count || '0', 10) || 0
+    return { message: `Perintah stop broadcast berhasil dikirim ke ${count} device aktif.`, tone: 'success' }
   }
 
-  for (const deviceId of recipients) {
-    pushCommand(deviceId, 'PLAY_VIDEO_BROADCAST', JSON.stringify(payload))
-  }
-
-  revalidatePath('/dashboard/broadcast')
-  redirect(`/dashboard/broadcast?tab=video&notice=broadcast-live`)
-}
-
-async function stopVideoBroadcastNowAction(formData: FormData) {
-  'use server'
-  const liveTargetMode = (formData.get('liveTargetMode') as string) || 'global'
-  const liveGroupId = (formData.get('liveGroupId') as string) || ''
-  const liveDeviceId = (formData.get('liveDeviceId') as string) || ''
-  const selectedDeviceIds = (formData.getAll('selectedDeviceIds') as string[])
-
-  let recipients: string[] = []
-  if (liveTargetMode === 'global') {
-    const devices = await prisma.device.findMany({ where: { isActive: true }, select: { deviceId: true } })
-    recipients = devices.map((d) => d.deviceId)
-  } else if (liveTargetMode === 'group' && liveGroupId) {
-    const assignments = await getDeviceGroupAssignments()
-    const groupDeviceIds = Object.entries(assignments)
-      .filter(([, gid]) => gid === liveGroupId)
-      .map(([did]) => did)
-    const devices = await prisma.device.findMany({
-      where: { deviceId: { in: groupDeviceIds }, isActive: true },
-      select: { deviceId: true },
-    })
-    recipients = devices.map((d) => d.deviceId)
-  } else if (liveTargetMode === 'device' && liveDeviceId) {
-    recipients = [liveDeviceId]
-  } else if (liveTargetMode === 'selected' && selectedDeviceIds.length > 0) {
-    recipients = selectedDeviceIds
-  }
-
-  for (const deviceId of recipients) {
-    pushCommand(deviceId, 'STOP_VIDEO_BROADCAST')
-  }
-
-  revalidatePath('/dashboard/broadcast')
-  redirect(`/dashboard/broadcast?tab=video&notice=broadcast-live`)
-}
-
-
-// ── 📢 Running Text Profile Server Actions ────────────────────────────────────
-
-async function createRunningProfileAction(formData: FormData) {
-  'use server'
-  const name = (formData.get('profileName') as string) || ''
-  const description = (formData.get('profileDescription') as string) || ''
-  const profile = await createRunningTextProfile({ name, description })
-  revalidatePath('/dashboard/broadcast')
-  redirect(`/dashboard/broadcast?tab=ticker&editRunningProfile=${encodeURIComponent(profile.id)}&created=1`)
-}
-
-async function updateRunningProfileMetaAction(formData: FormData) {
-  'use server'
-  const profileId = (formData.get('profileId') as string) || ''
-  const name = (formData.get('profileName') as string) || ''
-  const description = (formData.get('profileDescription') as string) || ''
-  if (profileId) await updateRunningTextProfileMeta(profileId, { name, description })
-  revalidatePath('/dashboard/broadcast')
-  redirect(`/dashboard/broadcast?tab=ticker&updated=1`)
-}
-
-async function saveRunningProfileConfigAction(formData: FormData) {
-  'use server'
-  const profileId = (formData.get('profileId') as string) || ''
-  if (!profileId) return
-  const items: HomeExperienceRunningTextItem[] = parseRunningTextItems(formData)
-  const enabled = formData.get('rtEnabled') === 'on'
-  const visibleCount = parseInt((formData.get('rtVisibleCount') as string) || '1', 10)
-  const rotationSeconds = parseInt((formData.get('rtRotationSeconds') as string) || '10', 10)
-  const displaySeconds = parseInt((formData.get('rtDisplaySeconds') as string) || '10', 10)
-
-  await saveRunningTextProfileConfig(profileId, {
-    enabled,
-    visibleCount: Math.max(1, Math.min(10, visibleCount)),
-    rotationSeconds: Math.max(1, Math.min(600, rotationSeconds)),
-    displaySeconds: Math.max(1, Math.min(600, displaySeconds)),
-    items,
-  })
-
-  revalidatePath('/dashboard/broadcast')
-  redirect(`/dashboard/broadcast?tab=ticker&editRunningProfile=${encodeURIComponent(profileId)}&saved=1`)
-}
-
-async function deleteRunningProfileAction(formData: FormData) {
-  'use server'
-  const profileId = (formData.get('profileId') as string) || ''
-  if (profileId) await deleteRunningTextProfile(profileId)
-  revalidatePath('/dashboard/broadcast')
-  redirect('/dashboard/broadcast?tab=ticker&deleted=1')
-}
-
-async function setRunningGlobalAction(formData: FormData) {
-  'use server'
-  const profileId = (formData.get('profileId') as string) || ''
-  if (profileId) await setRunningGlobalProfileId(profileId)
-  revalidatePath('/dashboard/broadcast')
-  redirect('/dashboard/broadcast?tab=ticker&globalSet=1')
-}
-
-async function assignRunningGroupAction(formData: FormData) {
-  'use server'
-  const profileId = (formData.get('profileId') as string) || ''
-  const groupId = (formData.get('groupId') as string) || ''
-  const action = (formData.get('action') as string) || 'assign'
-  if (profileId && groupId) {
-    await assignRunningTextProfileToGroup(groupId, action === 'assign' ? profileId : null)
-  }
-  revalidatePath('/dashboard/broadcast')
-  redirect(`/dashboard/broadcast?tab=ticker&assignRunningProfile=${encodeURIComponent(profileId)}&ok=1`)
-}
-
-async function assignRunningDeviceAction(formData: FormData) {
-  'use server'
-  const profileId = (formData.get('profileId') as string) || ''
-  const deviceId = (formData.get('deviceId') as string) || ''
-  const action = (formData.get('action') as string) || 'assign'
-  if (profileId && deviceId) {
-    await assignRunningTextProfileToDevice(deviceId, action === 'assign' ? profileId : null)
-  }
-  revalidatePath('/dashboard/broadcast')
-  redirect(`/dashboard/broadcast?tab=ticker&assignRunningProfile=${encodeURIComponent(profileId)}&ok=1`)
-}
-
-// ── Running Text Live Execution Action ────────────────────────────────────────
-
-async function pushRunningTextLiveAction(formData: FormData) {
-  'use server'
-  const items: HomeExperienceRunningTextItem[] = parseRunningTextItems(formData)
-  const enabled = formData.get('rtEnabled') === 'on'
-  const visibleCount = parseInt((formData.get('rtVisibleCount') as string) || '1', 10)
-  const targetMode = (formData.get('rtLiveTarget') as string) || 'global'
-  const targetGroupId = (formData.get('rtLiveGroupId') as string) || ''
-  const targetDeviceId = (formData.get('rtLiveDeviceId') as string) || ''
-  const selectedDeviceIds = (formData.getAll('rtSelectedDeviceIds') as string[])
-
-  const payload = JSON.stringify({ enabled, items, visibleCount })
-
-  let recipients: string[] = []
-  if (targetMode === 'global') {
-    const devices = await prisma.device.findMany({ where: { isActive: true }, select: { deviceId: true } })
-    recipients = devices.map((d) => d.deviceId)
-  } else if (targetMode === 'group' && targetGroupId) {
-    const assignments = await getDeviceGroupAssignments()
-    const groupDeviceIds = Object.entries(assignments)
-      .filter(([, gid]) => gid === targetGroupId)
-      .map(([did]) => did)
-    const devices = await prisma.device.findMany({
-      where: { deviceId: { in: groupDeviceIds }, isActive: true },
-      select: { deviceId: true },
-    })
-    recipients = devices.map((d) => d.deviceId)
-  } else if (targetMode === 'device' && targetDeviceId) {
-    recipients = [targetDeviceId]
-  } else if (targetMode === 'selected' && selectedDeviceIds.length > 0) {
-    recipients = selectedDeviceIds
-  }
-
-  for (const deviceId of recipients) {
-    pushCommand(deviceId, 'UPDATE_RUNNING_TEXT', payload)
-  }
-
-  revalidatePath('/dashboard/broadcast')
-  redirect(`/dashboard/broadcast?tab=ticker&pushed=1`)
+  return null
 }
 
 // ── Page Component ────────────────────────────────────────────────────────────
@@ -356,29 +134,14 @@ async function pushRunningTextLiveAction(formData: FormData) {
 export default async function BroadcastPage({
   searchParams,
 }: {
-  searchParams: Promise<{
-    tab?: string
-    editVideoProfile?: string
-    assignVideoProfile?: string
-    editRunningProfile?: string
-    assignRunningProfile?: string
-    created?: string
-    saved?: string
-    reset?: string
-    updated?: string
-    deleted?: string
-    globalSet?: string
-    ok?: string
-    notice?: string
-    pushed?: string
-  }>
+  searchParams: Promise<BroadcastSearchParams>
 }) {
   const sp = await searchParams
   const activeTab = sp.tab === 'ticker' ? 'ticker' : 'video'
-  const hasNotif = sp.created || sp.saved || sp.reset || sp.updated || sp.deleted || sp.globalSet || sp.ok || sp.notice || sp.pushed
+  const hasNotif = sp.created || sp.saved || sp.updated || sp.deleted || sp.globalSet || sp.ok || sp.notice || sp.pushed
 
   // Load common data
-  const [groups, groupAssignments, devices, broadcastVideos] = await Promise.all([
+  const [groups, groupAssignments, devices, broadcastVideos, folders] = await Promise.all([
     getDeviceGroups(),
     getDeviceGroupAssignments(),
     prisma.device.findMany({
@@ -393,16 +156,14 @@ export default async function BroadcastPage({
       orderBy: [{ folder: { name: 'asc' } }, { title: 'asc' }],
       select: { id: true, title: true, videoUrl: true, isPublished: true, folder: { select: { name: true } } },
     }),
+    prisma.educationFolder.findMany({
+      orderBy: { name: 'asc' },
+      select: { id: true, name: true },
+    }),
   ])
 
-  const deviceOptions = devices.map((d) => ({
-    deviceId: d.deviceId,
-    deviceName: d.deviceName,
-    isActive: d.isActive,
-    groupName: groups.find((g) => g.id === (groupAssignments[d.deviceId] || ''))?.name || null,
-  }))
+  // ── Tab 1: Video Broadcast ────────────────────────────────────────────────
 
-  // ── Tab 1: Video Broadcast ──────────────────────────────────────────────────
   if (activeTab === 'video') {
     const videoProfiles = await getVideoBroadcastProfiles()
     const globalVideoProfileId = await getVideoGlobalProfileId()
@@ -416,70 +177,45 @@ export default async function BroadcastPage({
 
       const rawConfig = (await getVideoBroadcastProfileConfig(profile.id)) ?? FALLBACK_VIDEO_BROADCAST_CONFIG
 
-      let videoTitle = ''
-      let videoUrl = ''
-      let thumbnailUrl = ''
-      if (rawConfig.videoId) {
-        const video = await prisma.educationVideo.findUnique({ where: { id: rawConfig.videoId }, include: { folder: true } })
-        if (video && video.isPublished && (!video.folder || video.folder.isPublished)) {
-          videoTitle = video.title
-          videoUrl = video.videoUrl
-          thumbnailUrl = video.thumbnailUrl || ''
-        }
-      }
-
-      const resolvedConfig = {
-        ...rawConfig,
-        videoTitle,
-        videoUrl,
-        thumbnailUrl,
-        scopeApplied: (globalVideoProfileId === profile.id ? 'global' : 'fallback') as any,
-      }
+      const notification = buildVideoNotice(sp)
+      const activeRecipientCount = countVideoProfileRecipients({
+        profileId: profile.id,
+        isGlobal: globalVideoProfileId === profile.id,
+        devices,
+        groupAssignments,
+        groupProfileMap: groupVideoProfileMap,
+        deviceProfileMap: deviceVideoProfileMap,
+      })
 
       return (
         <div className="space-y-6 animate-fade-in">
-          <div className="flex items-center gap-3">
-            <a
-              href="/dashboard/broadcast?tab=video"
-              className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
-            >
-              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M10.5 19.5L3 12m0 0l7.5-7.5M3 12h18" />
-              </svg>
-              Kembali ke Daftar Profile Video
-            </a>
-            <span className="text-border">/</span>
-            <span className="text-xs text-foreground font-semibold">Edit Config: {profile.name}</span>
-          </div>
-
-          {(sp.saved || sp.reset || sp.notice) && (
-            <div className="p-3.5 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs font-semibold animate-fade-in">
-              {sp.saved && 'Konfigurasi Video Broadcast berhasil disimpan.'}
-              {sp.reset && 'Konfigurasi Video Broadcast berhasil di-reset.'}
-              {sp.notice === 'broadcast-live' && 'Command live trigger berhasil dikirim.'}
-            </div>
-          )}
-
-          <div className="card rounded-2xl p-5 border border-border bg-card">
-            <VideoBroadcastManager
-              profileId={profile.id}
-              profileName={profile.name}
-              config={resolvedConfig}
-              surface="plain"
-              videos={broadcastVideos.map((v) => ({
-                id: v.id,
-                title: v.title,
-                folderName: v.folder?.name || null,
-                isPublished: v.isPublished,
-              }))}
-              groups={groups}
-              devices={deviceOptions}
-              onSaveAction={saveVideoProfileConfigAction}
-              onResetAction={resetVideoProfileConfigAction}
-              onPlayNowAction={playVideoBroadcastNowAction}
-              onStopNowAction={stopVideoBroadcastNowAction}
-            />
-          </div>
+          <BackBreadcrumb
+            href="/dashboard/broadcast?tab=video"
+            backLabel="Kembali ke Daftar Profile Video"
+            currentLabel={`Edit Config: ${profile.name}`}
+          />
+          {notification && <NotificationBar message={notification.message} tone={notification.tone} />}
+          <VideoBroadcastManager
+            profileId={profile.id}
+            profileName={profile.name}
+            initialVideoId={rawConfig.videoId}
+            initialRepeatCount={rawConfig.repeatCount}
+            initialItems={rawConfig.items || []}
+            videos={broadcastVideos.map((v) => ({
+              id: v.id,
+              title: v.title,
+              folderName: v.folder?.name || null,
+              isPublished: v.isPublished,
+            }))}
+            isGlobal={globalVideoProfileId === profile.id}
+            assignedGroupCount={Object.values(groupVideoProfileMap).filter((pid) => pid === profile.id).length}
+            assignedDeviceCount={Object.values(deviceVideoProfileMap).filter((pid) => pid === profile.id).length}
+            activeRecipientCount={activeRecipientCount}
+            folders={folders}
+            onSaveAction={saveVideoProfileConfigAction}
+            onPlayNowAction={playVideoBroadcastNowAction}
+            onStopNowAction={stopVideoBroadcastNowAction}
+          />
         </div>
       )
     }
@@ -489,89 +225,55 @@ export default async function BroadcastPage({
       const profile = videoProfiles.find((p) => p.id === sp.assignVideoProfile)
       if (!profile) redirect('/dashboard/broadcast?tab=video')
 
-      const assignedGroupIds = new Set(Object.entries(groupVideoProfileMap).filter(([, pid]) => pid === profile.id).map(([gid]) => gid))
-      const assignedDeviceIds = new Set(Object.entries(deviceVideoProfileMap).filter(([, pid]) => pid === profile.id).map(([did]) => did))
+      const groupTargets = groups.map((group) => {
+        const isAssigned = groupVideoProfileMap[group.id] === profile.id
+        const curPid = groupVideoProfileMap[group.id]
+        const curProfile = curPid && curPid !== profile.id ? videoProfiles.find((p) => p.id === curPid) : null
+        return {
+          id: group.id,
+          name: group.name,
+          isAssigned,
+          currentProfileName: curProfile?.name || null,
+        }
+      })
+
+      const deviceTargets = devices.map((device) => {
+        const isAssigned = deviceVideoProfileMap[device.deviceId] === profile.id
+        const curPid = deviceVideoProfileMap[device.deviceId]
+        const curProfile = curPid && curPid !== profile.id ? videoProfiles.find((p) => p.id === curPid) : null
+        return {
+          id: device.deviceId,
+          name: device.deviceName,
+          isAssigned,
+          currentProfileName: curProfile?.name || null,
+        }
+      })
 
       return (
         <div className="space-y-6 animate-fade-in">
-          <div className="flex items-center gap-3">
-            <a
-              href="/dashboard/broadcast?tab=video"
-              className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
-            >
-              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M10.5 19.5L3 12m0 0l7.5-7.5M3 12h18" />
-              </svg>
-              Kembali ke Daftar Profile Video
-            </a>
-            <span className="text-border">/</span>
-            <span className="text-xs text-foreground font-semibold">Assign Profile Video: {profile.name}</span>
-          </div>
-
-          {sp.ok && (
-            <div className="p-3.5 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs font-semibold">
-              Assignment berhasil diperbarui.
-            </div>
-          )}
-
+          <BackBreadcrumb
+            href="/dashboard/broadcast?tab=video"
+            backLabel="Kembali ke Daftar Profile Video"
+            currentLabel={`Assign Profile Video: ${profile.name}`}
+          />
+          {sp.ok && <NotificationBar message="Assignment berhasil diperbarui." tone="success" />}
           <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
-            <div className="card rounded-2xl overflow-hidden border border-border bg-card">
-              <div className="px-5 py-4 border-b border-border">
-                <h3 className="text-sm font-semibold text-foreground">Group Level (Video)</h3>
-                <p className="text-[10px] text-muted-foreground mt-0.5">Device dalam grup terhubung akan memutar video broadcast ini.</p>
-              </div>
-              <div className="divide-y divide-border/50">
-                {groups.length === 0 ? (
-                  <div className="px-5 py-6 text-center text-xs text-muted-foreground">Belum ada grup.</div>
-                ) : (
-                  groups.map((group) => {
-                    const isAssigned = assignedGroupIds.has(group.id)
-                    const curPid = groupVideoProfileMap[group.id]
-                    const curProfile = curPid && curPid !== profile.id ? videoProfiles.find((p) => p.id === curPid) : null
-                    return (
-                      <div key={group.id} className="flex items-center justify-between gap-3 px-5 py-3 text-xs">
-                        <span className="font-semibold text-foreground">{group.name} {curProfile && `(aktif: ${curProfile.name})`}</span>
-                        <form action={assignVideoGroupAction}>
-                          <input type="hidden" name="profileId" value={profile.id} />
-                          <input type="hidden" name="groupId" value={group.id} />
-                          <input type="hidden" name="action" value={isAssigned ? 'remove' : 'assign'} />
-                          <button type="submit" className={`btn btn-xs ${isAssigned ? 'btn-danger' : 'btn-primary'}`}>
-                            {isAssigned ? 'Remove' : 'Assign'}
-                          </button>
-                        </form>
-                      </div>
-                    )
-                  })
-                )}
-              </div>
-            </div>
-
-            <div className="card rounded-2xl overflow-hidden border border-border bg-card">
-              <div className="px-5 py-4 border-b border-border">
-                <h3 className="text-sm font-semibold text-foreground">Device Level Override (Video)</h3>
-                <p className="text-[10px] text-muted-foreground mt-0.5">Override khusus per device, melompati aturan grup.</p>
-              </div>
-              <div className="divide-y divide-border/50 max-h-96 overflow-y-auto">
-                {devices.map((device) => {
-                  const isAssigned = assignedDeviceIds.has(device.deviceId)
-                  const curPid = deviceVideoProfileMap[device.deviceId]
-                  const curProfile = curPid && curPid !== profile.id ? videoProfiles.find((p) => p.id === curPid) : null
-                  return (
-                    <div key={device.deviceId} className="flex items-center justify-between gap-3 px-5 py-3 text-xs">
-                      <span className="font-semibold text-foreground">{device.deviceName} {curProfile && `(aktif: ${curProfile.name})`}</span>
-                      <form action={assignVideoDeviceAction}>
-                        <input type="hidden" name="profileId" value={profile.id} />
-                        <input type="hidden" name="deviceId" value={device.deviceId} />
-                        <input type="hidden" name="action" value={isAssigned ? 'remove' : 'assign'} />
-                        <button type="submit" className={`btn btn-xs ${isAssigned ? 'btn-danger' : 'btn-primary'}`}>
-                          {isAssigned ? 'Remove' : 'Assign'}
-                        </button>
-                      </form>
-                    </div>
-                  )
-                })}
-              </div>
-            </div>
+            <AssignPanel
+              title="Group Level (Video)"
+              description="Device dalam grup terhubung akan memutar video broadcast ini."
+              targets={groupTargets}
+              profileId={profile.id}
+              assignAction={assignVideoGroupAction}
+              idFieldName="groupId"
+            />
+            <AssignPanel
+              title="Device Level Override (Video)"
+              description="Override khusus per device, melompati aturan grup."
+              targets={deviceTargets}
+              profileId={profile.id}
+              assignAction={assignVideoDeviceAction}
+              idFieldName="deviceId"
+            />
           </div>
         </div>
       )
@@ -583,12 +285,19 @@ export default async function BroadcastPage({
         <TabsNavigation activeTab={activeTab} />
 
         {hasNotif && (
-          <div className="p-3.5 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs font-semibold animate-fade-in">
-            {sp.created && 'Video Broadcast Profile baru berhasil dibuat.'}
-            {sp.deleted && 'Profile berhasil dihapus.'}
-            {sp.globalSet && 'Global Video profile berhasil diperbarui.'}
-            {sp.notice === 'broadcast-live' && 'Perintah live trigger berhasil dikirim.'}
-          </div>
+          <NotificationBar
+            message={
+              sp.created ? 'Video Broadcast Profile baru berhasil dibuat.'
+              : sp.deleted ? 'Profile berhasil dihapus.'
+              : sp.globalSet ? 'Global Video profile berhasil diperbarui.'
+              : buildVideoNotice(sp)?.message || ''
+            }
+            tone={
+              sp.created || sp.deleted || sp.globalSet
+                ? 'success'
+                : buildVideoNotice(sp)?.tone || 'success'
+            }
+          />
         )}
 
         <div className="grid grid-cols-1 xl:grid-cols-[340px_minmax(0,1fr)] gap-6 items-start animate-fade-in">
@@ -617,6 +326,8 @@ export default async function BroadcastPage({
             ) : (
               videoProfiles.map((p) => {
                 const isGlobal = globalVideoProfileId === p.id
+                const assignedGroupCount = Object.values(groupVideoProfileMap).filter((pid) => pid === p.id).length
+                const assignedDeviceCount = Object.values(deviceVideoProfileMap).filter((pid) => pid === p.id).length
                 return (
                   <ProfileCardItem
                     key={p.id}
@@ -626,6 +337,8 @@ export default async function BroadcastPage({
                     assignHref={`/dashboard/broadcast?tab=video&assignVideoProfile=${p.id}`}
                     deleteAction={deleteVideoProfileAction}
                     setGlobalAction={setVideoGlobalAction}
+                    assignedGroupCount={assignedGroupCount}
+                    assignedDeviceCount={assignedDeviceCount}
                   />
                 )
               })
@@ -637,6 +350,7 @@ export default async function BroadcastPage({
   }
 
   // ── Tab 2: Running Text Ticker ──────────────────────────────────────────────
+
   if (activeTab === 'ticker') {
     const runningProfiles = await getRunningTextProfiles()
     const globalRunningProfileId = await getRunningGlobalProfileId()
@@ -650,35 +364,27 @@ export default async function BroadcastPage({
 
       const rawConfig = (await getRunningTextProfileConfig(profile.id)) ?? FALLBACK_RUNNING_TEXT_CONFIG
 
+      const notifMessage = sp.saved
+        ? 'Konfigurasi Running Text berhasil disimpan ke profile.'
+        : sp.pushed
+        ? 'Konfigurasi Running Text berhasil dikirim live ke device.'
+        : null
+
       return (
         <div className="space-y-6 animate-fade-in">
-          <div className="flex items-center gap-3">
-            <a
-              href="/dashboard/broadcast?tab=ticker"
-              className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
-            >
-              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M10.5 19.5L3 12m0 0l7.5-7.5M3 12h18" />
-              </svg>
-              Kembali ke Daftar Profile Running Text
-            </a>
-            <span className="text-border">/</span>
-            <span className="text-xs text-foreground font-semibold">Edit Config: {profile.name}</span>
-          </div>
-
-          {(sp.saved || sp.pushed) && (
-            <div className="p-3.5 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs font-semibold animate-fade-in">
-              {sp.saved && 'Konfigurasi Running Text berhasil disimpan ke profile.'}
-              {sp.pushed && 'Konfigurasi Running Text berhasil dikirim live ke device.'}
-            </div>
-          )}
-
+          <BackBreadcrumb
+            href="/dashboard/broadcast?tab=ticker"
+            backLabel="Kembali ke Daftar Profile Running Text"
+            currentLabel={`Edit Config: ${profile.name}`}
+          />
+          {notifMessage && <NotificationBar message={notifMessage} tone="success" />}
           <RunningTextPanelClient
             profileId={profile.id}
             profileName={profile.name}
             runningText={rawConfig}
-            groups={groups}
-            devices={deviceOptions}
+            isGlobal={globalRunningProfileId === profile.id}
+            assignedGroupCount={Object.values(groupRunningProfileMap).filter((pid) => pid === profile.id).length}
+            assignedDeviceCount={Object.values(deviceRunningProfileMap).filter((pid) => pid === profile.id).length}
             saveAction={saveRunningProfileConfigAction}
             pushLiveAction={pushRunningTextLiveAction}
           />
@@ -691,89 +397,55 @@ export default async function BroadcastPage({
       const profile = runningProfiles.find((p) => p.id === sp.assignRunningProfile)
       if (!profile) redirect('/dashboard/broadcast?tab=ticker')
 
-      const assignedGroupIds = new Set(Object.entries(groupRunningProfileMap).filter(([, pid]) => pid === profile.id).map(([gid]) => gid))
-      const assignedDeviceIds = new Set(Object.entries(deviceRunningProfileMap).filter(([, pid]) => pid === profile.id).map(([did]) => did))
+      const groupTargets = groups.map((group) => {
+        const isAssigned = groupRunningProfileMap[group.id] === profile.id
+        const curPid = groupRunningProfileMap[group.id]
+        const curProfile = curPid && curPid !== profile.id ? runningProfiles.find((p) => p.id === curPid) : null
+        return {
+          id: group.id,
+          name: group.name,
+          isAssigned,
+          currentProfileName: curProfile?.name || null,
+        }
+      })
+
+      const deviceTargets = devices.map((device) => {
+        const isAssigned = deviceRunningProfileMap[device.deviceId] === profile.id
+        const curPid = deviceRunningProfileMap[device.deviceId]
+        const curProfile = curPid && curPid !== profile.id ? runningProfiles.find((p) => p.id === curPid) : null
+        return {
+          id: device.deviceId,
+          name: device.deviceName,
+          isAssigned,
+          currentProfileName: curProfile?.name || null,
+        }
+      })
 
       return (
         <div className="space-y-6 animate-fade-in">
-          <div className="flex items-center gap-3">
-            <a
-              href="/dashboard/broadcast?tab=ticker"
-              className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
-            >
-              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M10.5 19.5L3 12m0 0l7.5-7.5M3 12h18" />
-              </svg>
-              Kembali ke Daftar Profile Running Text
-            </a>
-            <span className="text-border">/</span>
-            <span className="text-xs text-foreground font-semibold">Assign Profile Running Text: {profile.name}</span>
-          </div>
-
-          {sp.ok && (
-            <div className="p-3.5 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs font-semibold">
-              Assignment berhasil diperbarui.
-            </div>
-          )}
-
+          <BackBreadcrumb
+            href="/dashboard/broadcast?tab=ticker"
+            backLabel="Kembali ke Daftar Profile Running Text"
+            currentLabel={`Assign Profile Running Text: ${profile.name}`}
+          />
+          {sp.ok && <NotificationBar message="Assignment berhasil diperbarui." />}
           <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
-            <div className="card rounded-2xl overflow-hidden border border-border bg-card">
-              <div className="px-5 py-4 border-b border-border">
-                <h3 className="text-sm font-semibold text-foreground">Group Level (Ticker)</h3>
-                <p className="text-[10px] text-muted-foreground mt-0.5">Device dalam grup terhubung akan mendapatkan running text profile ini.</p>
-              </div>
-              <div className="divide-y divide-border/50">
-                {groups.length === 0 ? (
-                  <div className="px-5 py-6 text-center text-xs text-muted-foreground">Belum ada grup.</div>
-                ) : (
-                  groups.map((group) => {
-                    const isAssigned = assignedGroupIds.has(group.id)
-                    const curPid = groupRunningProfileMap[group.id]
-                    const curProfile = curPid && curPid !== profile.id ? runningProfiles.find((p) => p.id === curPid) : null
-                    return (
-                      <div key={group.id} className="flex items-center justify-between gap-3 px-5 py-3 text-xs">
-                        <span className="font-semibold text-foreground">{group.name} {curProfile && `(aktif: ${curProfile.name})`}</span>
-                        <form action={assignRunningGroupAction}>
-                          <input type="hidden" name="profileId" value={profile.id} />
-                          <input type="hidden" name="groupId" value={group.id} />
-                          <input type="hidden" name="action" value={isAssigned ? 'remove' : 'assign'} />
-                          <button type="submit" className={`btn btn-xs ${isAssigned ? 'btn-danger' : 'btn-primary'}`}>
-                            {isAssigned ? 'Remove' : 'Assign'}
-                          </button>
-                        </form>
-                      </div>
-                    )
-                  })
-                )}
-              </div>
-            </div>
-
-            <div className="card rounded-2xl overflow-hidden border border-border bg-card">
-              <div className="px-5 py-4 border-b border-border">
-                <h3 className="text-sm font-semibold text-foreground">Device Level Override (Ticker)</h3>
-                <p className="text-[10px] text-muted-foreground mt-0.5">Override khusus per device, melompati aturan grup.</p>
-              </div>
-              <div className="divide-y divide-border/50 max-h-96 overflow-y-auto">
-                {devices.map((device) => {
-                  const isAssigned = assignedDeviceIds.has(device.deviceId)
-                  const curPid = deviceRunningProfileMap[device.deviceId]
-                  const curProfile = curPid && curPid !== profile.id ? runningProfiles.find((p) => p.id === curPid) : null
-                  return (
-                    <div key={device.deviceId} className="flex items-center justify-between gap-3 px-5 py-3 text-xs">
-                      <span className="font-semibold text-foreground">{device.deviceName} {curProfile && `(aktif: ${curProfile.name})`}</span>
-                      <form action={assignRunningDeviceAction}>
-                        <input type="hidden" name="profileId" value={profile.id} />
-                        <input type="hidden" name="deviceId" value={device.deviceId} />
-                        <input type="hidden" name="action" value={isAssigned ? 'remove' : 'assign'} />
-                        <button type="submit" className={`btn btn-xs ${isAssigned ? 'btn-danger' : 'btn-primary'}`}>
-                          {isAssigned ? 'Remove' : 'Assign'}
-                        </button>
-                      </form>
-                    </div>
-                  )
-                })}
-              </div>
-            </div>
+            <AssignPanel
+              title="Group Level (Ticker)"
+              description="Device dalam grup terhubung akan mendapatkan running text profile ini."
+              targets={groupTargets}
+              profileId={profile.id}
+              assignAction={assignRunningGroupAction}
+              idFieldName="groupId"
+            />
+            <AssignPanel
+              title="Device Level Override (Ticker)"
+              description="Override khusus per device, melompati aturan grup."
+              targets={deviceTargets}
+              profileId={profile.id}
+              assignAction={assignRunningDeviceAction}
+              idFieldName="deviceId"
+            />
           </div>
         </div>
       )
@@ -785,11 +457,14 @@ export default async function BroadcastPage({
         <TabsNavigation activeTab={activeTab} />
 
         {hasNotif && (
-          <div className="p-3.5 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs font-semibold animate-fade-in">
-            {sp.created && 'Running Text Profile baru berhasil dibuat.'}
-            {sp.deleted && 'Profile berhasil dihapus.'}
-            {sp.globalSet && 'Global Running Text profile berhasil diperbarui.'}
-          </div>
+          <NotificationBar
+            message={
+              sp.created ? 'Running Text Profile baru berhasil dibuat.'
+              : sp.deleted ? 'Profile berhasil dihapus.'
+              : sp.globalSet ? 'Global Running Text profile berhasil diperbarui.'
+              : ''
+            }
+          />
         )}
 
         <div className="grid grid-cols-1 xl:grid-cols-[340px_minmax(0,1fr)] gap-6 items-start animate-fade-in">
@@ -818,6 +493,8 @@ export default async function BroadcastPage({
             ) : (
               runningProfiles.map((p) => {
                 const isGlobal = globalRunningProfileId === p.id
+                const assignedGroupCount = Object.values(groupRunningProfileMap).filter((pid) => pid === p.id).length
+                const assignedDeviceCount = Object.values(deviceRunningProfileMap).filter((pid) => pid === p.id).length
                 return (
                   <ProfileCardItem
                     key={p.id}
@@ -827,6 +504,8 @@ export default async function BroadcastPage({
                     assignHref={`/dashboard/broadcast?tab=ticker&assignRunningProfile=${p.id}`}
                     deleteAction={deleteRunningProfileAction}
                     setGlobalAction={setRunningGlobalAction}
+                    assignedGroupCount={assignedGroupCount}
+                    assignedDeviceCount={assignedDeviceCount}
                   />
                 )
               })
@@ -836,116 +515,4 @@ export default async function BroadcastPage({
       </div>
     )
   }
-}
-
-// ── Shared Subcomponents ──────────────────────────────────────────────────────
-
-function TabsNavigation({ activeTab }: { activeTab: string }) {
-  return (
-    <div className="space-y-6">
-      <PageHeader
-        title="Live Broadcast"
-        description="Buat profile siaran Video Broadcast dan Running Text Ticker secara mandiri, lalu tautkan ke masing-masing group atau device."
-        badge="DSA & GPMC Mode"
-      />
-      <div className="flex items-center gap-1 p-1 rounded-xl bg-accent/30 border border-border w-fit">
-        <a
-          href="/dashboard/broadcast?tab=video"
-          className={`px-4 py-2 rounded-lg text-xs font-semibold transition-all ${
-            activeTab === 'video'
-              ? 'bg-primary/15 text-primary border border-primary/20'
-              : 'text-muted-foreground hover:text-foreground'
-          }`}
-        >
-          📹 Video Broadcast Profiles
-        </a>
-        <a
-          href="/dashboard/broadcast?tab=ticker"
-          className={`px-4 py-2 rounded-lg text-xs font-semibold transition-all ${
-            activeTab === 'ticker'
-              ? 'bg-primary/15 text-primary border border-primary/20'
-              : 'text-muted-foreground hover:text-foreground'
-          }`}
-        >
-          📢 Running Text Profiles
-        </a>
-      </div>
-    </div>
-  )
-}
-
-function ProfileCardItem({
-  profile,
-  isGlobal,
-  editHref,
-  assignHref,
-  deleteAction,
-  setGlobalAction,
-}: {
-  profile: { id: string; name: string; description?: string }
-  isGlobal: boolean
-  editHref: string
-  assignHref: string
-  deleteAction: (fd: FormData) => Promise<void>
-  setGlobalAction: (fd: FormData) => Promise<void>
-}) {
-  return (
-    <div className={`card rounded-2xl overflow-hidden border border-border bg-card p-4 flex items-center justify-between gap-3 transition-all ${
-      isGlobal ? 'ring-2 ring-primary/30' : ''
-    }`}>
-      <div className="flex items-center gap-3 min-w-0">
-        <div className={`w-8 h-8 rounded-xl flex items-center justify-center text-sm ${
-          isGlobal ? 'bg-primary/15 border border-primary/20 text-primary' : 'bg-accent/30 border border-border text-muted-foreground'
-        }`}>
-          {isGlobal ? '🌐' : '📋'}
-        </div>
-        <div className="min-w-0">
-          <div className="flex items-center gap-2">
-            <span className="text-sm font-semibold text-foreground truncate">{profile.name}</span>
-            {isGlobal && <span className="badge badge-primary text-[9px]">Global Base</span>}
-          </div>
-          {profile.description && (
-            <p className="text-[10px] text-muted-foreground truncate mt-0.5">{profile.description}</p>
-          )}
-        </div>
-      </div>
-
-      <div className="flex items-center gap-2 shrink-0">
-        <a href={assignHref} className="btn btn-xs border border-border text-muted-foreground hover:text-foreground hover:bg-accent/50">
-          Assign
-        </a>
-        <a href={editHref} className="btn btn-xs border border-primary/20 text-primary hover:bg-primary/10">
-          Edit Config
-        </a>
-        <ConfirmForm action={deleteAction} message={`Hapus profile "${profile.name}"? Semua mapping yang menggunakan profile ini akan dibersihkan.`}>
-          <input type="hidden" name="profileId" value={profile.id} />
-          <button type="submit" className="p-1.5 text-rose-450 hover:text-rose-350 border border-rose-500/10 hover:bg-rose-500/10 rounded-lg transition-all">
-            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0" />
-            </svg>
-          </button>
-        </ConfirmForm>
-
-        {!isGlobal && (
-          <form action={setGlobalAction}>
-            <input type="hidden" name="profileId" value={profile.id} />
-            <button type="submit" className="btn btn-xs border border-border text-muted-foreground hover:text-foreground">
-              Set Global
-            </button>
-          </form>
-        )}
-      </div>
-    </div>
-  )
-}
-
-function parseRunningTextItems(formData: FormData): HomeExperienceRunningTextItem[] {
-  const raw = formData.get('rtItemsJson')
-  if (typeof raw === 'string') {
-    try {
-      const parsed = JSON.parse(raw)
-      if (Array.isArray(parsed)) return parsed
-    } catch { /* ignore */ }
-  }
-  return []
 }
