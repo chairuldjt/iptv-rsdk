@@ -1124,6 +1124,7 @@ function createDefaultMenu(id: string, index: number): HomeExperienceMenuItem {
     textColor: '#FFFFFF',
     borderColor: '#FFFFFF',
     accentColor: '#FFFFFF',
+    cardBackgroundColor: '',
     backgroundUrl: '',
     entertainmentItemId: 0,
     sortOrder: index * 10,
