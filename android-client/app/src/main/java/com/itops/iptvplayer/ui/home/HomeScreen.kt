@@ -1099,18 +1099,20 @@ private fun HospitalityMenuBar(
             }
             Spacer(modifier = Modifier.height(if (isUltraCompact) 4.dp else 8.dp))
         }
-        Text(
-            text = if (isUltraCompact) {
-                homeExperience.menuHintText.ifBlank { "Kiri/Kanan: Putar • OK: Pilih • Tahan OK 3s: Nama STB" }.let {
-                    if (it.length > 60) it.take(57) + "..." else it
-                }
-            } else homeExperience.menuHintText.ifBlank {
-                "Gunakan kiri/kanan remote untuk memutar menu, OK untuk memilih, tahan OK 3 detik untuk ubah nama STB"
-            },
-            color = Color.White.copy(alpha = 0.62f),
-            fontSize = if (isUltraCompact) 7.sp else if (isSmallScreen) 8.sp else 10.sp,
-            fontWeight = FontWeight.Medium
-        )
+        if (homeExperience.menuHintText.isNotBlank()) {
+            Text(
+                text = if (isUltraCompact) {
+                    homeExperience.menuHintText.let {
+                        if (it.length > 60) it.take(57) + "..." else it
+                    }
+                } else {
+                    homeExperience.menuHintText
+                },
+                color = Color.White.copy(alpha = 0.62f),
+                fontSize = if (isUltraCompact) 7.sp else if (isSmallScreen) 8.sp else 10.sp,
+                fontWeight = FontWeight.Medium
+            )
+        }
     }
 }
 
