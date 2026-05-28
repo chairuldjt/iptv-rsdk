@@ -233,6 +233,7 @@ export default async function BroadcastPage({
             initialVideoId={rawConfig.videoId}
             initialRepeatCount={rawConfig.repeatCount}
             initialItems={rawConfig.items || []}
+            initialOverlay={rawConfig.runningText}
             videos={broadcastVideos.map((v) => ({
               id: v.id,
               title: v.title,

@@ -21,6 +21,12 @@ type ParsedVideoItem = {
   repeatCount: number
 }
 
+type OverlayTextItem = {
+  id: string
+  text: string
+  enabled: boolean
+}
+
 function parseVideoItems(formData: FormData): ParsedVideoItem[] {
   const itemsJson = (formData.get('videoItemsJson') as string) || '[]'
   let items: ParsedVideoItem[] = []
@@ -47,6 +53,20 @@ function parseVideoItems(formData: FormData): ParsedVideoItem[] {
   }
 
   return []
+}
+
+function parseOverlayItems(formData: FormData): { enabled: boolean; items: OverlayTextItem[]; speed: number } {
+  const overlayEnabled = (formData.get('overlayEnabled') as string) === 'on'
+  const speed = Math.max(1, Math.min(600, parseInt((formData.get('overlaySpeed') as string) || '20', 10)))
+  const raw = formData.get('overlayItemsJson')
+  let items: OverlayTextItem[] = []
+  if (typeof raw === 'string') {
+    try {
+      const parsed = JSON.parse(raw)
+      if (Array.isArray(parsed)) items = parsed
+    } catch { /* ignore */ }
+  }
+  return { enabled: overlayEnabled, items, speed }
 }
 
 function redirectToVideoProfile(profileId: string, params: Record<string, string | number | null | undefined>) {
@@ -88,6 +108,7 @@ export async function saveVideoProfileConfigAction(formData: FormData) {
   if (!profileId) return
 
   const items = parseVideoItems(formData)
+  const overlay = parseOverlayItems(formData)
 
   const firstItem = items[0] || null
 
@@ -97,6 +118,11 @@ export async function saveVideoProfileConfigAction(formData: FormData) {
     videoId: firstItem ? firstItem.videoId : null,
     repeatCount: firstItem ? firstItem.repeatCount : 1,
     items,
+    runningText: {
+      enabled: overlay.enabled,
+      items: overlay.items,
+      speed: overlay.speed,
+    },
   })
 
   revalidatePath('/dashboard/broadcast')
@@ -155,6 +181,7 @@ export async function assignVideoDeviceAction(formData: FormData) {
 export async function playVideoBroadcastNowAction(formData: FormData) {
   const profileId = (formData.get('profileId') as string) || ''
   const items = parseVideoItems(formData)
+  const overlay = parseOverlayItems(formData)
 
   if (items.length === 0) {
     redirectToVideoProfile(profileId, {
@@ -193,6 +220,11 @@ export async function playVideoBroadcastNowAction(formData: FormData) {
 
   const firstVideo = resolvedVideos[0]
 
+  // Build active overlay text items
+  const activeOverlayItems = overlay.enabled
+    ? overlay.items.filter((i) => i.enabled && i.text.trim().length > 0)
+    : []
+
   const payload = {
     enabled: true,
     videoTitle: firstVideo.title,
@@ -200,6 +232,13 @@ export async function playVideoBroadcastNowAction(formData: FormData) {
     thumbnailUrl: firstVideo.thumbnailUrl,
     repeatCount: firstVideo.repeatCount,
     videos: resolvedVideos,
+    runningText: overlay.enabled && activeOverlayItems.length > 0
+      ? {
+          enabled: true,
+          items: activeOverlayItems,
+          speed: overlay.speed,
+        }
+      : { enabled: false, items: [], speed: 20 },
   }
 
   const recipients = await resolveProfileRecipientDevices(profileId, 'video')
@@ -233,6 +272,14 @@ export async function stopVideoBroadcastNowAction(formData: FormData) {
 
   for (const deviceId of recipients) {
     pushCommand(deviceId, 'STOP_VIDEO_BROADCAST')
+    // Also clear any running text overlay that was sent alongside the broadcast
+    pushCommand(deviceId, 'UPDATE_RUNNING_TEXT', JSON.stringify({
+      enabled: false,
+      items: [],
+      visibleCount: 1,
+      rotationSeconds: 10,
+      displaySeconds: 0,
+    }))
   }
 
   revalidatePath('/dashboard/broadcast')

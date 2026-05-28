@@ -64,6 +64,7 @@ import androidx.media3.ui.PlayerView
 import com.example.rsdkiptvplayer.util.VideoBroadcastProfile
 import com.example.rsdkiptvplayer.util.VideoBroadcastParser
 import com.example.rsdkiptvplayer.util.VideoItem
+import com.example.rsdkiptvplayer.util.BroadcastRunningText
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -419,6 +420,7 @@ class MainActivity : ComponentActivity() {
                             ForcedVideoOverlay(
                                 sessionKey = videoBroadcastSessionKey,
                                 videos = resolvedVideos,
+                                runningText = activeVideoBroadcast.runningText,
                                 onFinished = {
                                     showVideoBroadcastOverlay = false
                                     activeVideoBroadcast = VideoBroadcastProfile()
@@ -480,6 +482,7 @@ class MainActivity : ComponentActivity() {
 private fun ForcedVideoOverlay(
     sessionKey: Int,
     videos: List<VideoItem>,
+    runningText: BroadcastRunningText = BroadcastRunningText(),
     onFinished: () -> Unit
 ) {
     val context = androidx.compose.ui.platform.LocalContext.current
@@ -597,6 +600,35 @@ private fun ForcedVideoOverlay(
                     fontWeight = FontWeight.SemiBold,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
+                )
+            }
+        }
+
+        // Running text overlay di atas video broadcast
+        val activeOverlayItems = remember(runningText) {
+            runningText.items.filter { it.enabled && it.text.isNotBlank() }
+        }
+        if (runningText.enabled && activeOverlayItems.isNotEmpty()) {
+            Box(
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .fillMaxWidth()
+                    .padding(horizontal = 14.dp, vertical = 8.dp)
+            ) {
+                com.example.rsdkiptvplayer.ui.components.AppRunningTextBanner(
+                    runningText = com.example.rsdkiptvplayer.util.HomeExperienceRunningText(
+                        enabled = true,
+                        visibleCount = 1,
+                        rotationSeconds = runningText.speed,
+                        displaySeconds = 0,
+                        items = activeOverlayItems.map {
+                            com.example.rsdkiptvplayer.util.HomeExperienceRunningTextItem(
+                                id = it.id,
+                                text = it.text,
+                                enabled = it.enabled
+                            )
+                        }
+                    )
                 )
             }
         }

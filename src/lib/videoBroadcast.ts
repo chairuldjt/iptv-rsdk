@@ -15,12 +15,25 @@ export type VideoBroadcastItem = {
   repeatCount: number
 }
 
+export type VideoBroadcastOverlayItem = {
+  id: string
+  text: string
+  enabled: boolean
+}
+
+export type VideoBroadcastOverlay = {
+  enabled: boolean
+  items: VideoBroadcastOverlayItem[]
+  speed: number
+}
+
 export type VideoBroadcastConfig = {
   revision: number
   enabled: boolean
   videoId: number | null
   repeatCount: number
   items: VideoBroadcastItem[]
+  runningText: VideoBroadcastOverlay
 }
 
 export type ResolvedVideoBroadcastItem = {
@@ -44,6 +57,7 @@ export const FALLBACK_VIDEO_BROADCAST_CONFIG: VideoBroadcastConfig = {
   videoId: null,
   repeatCount: 1,
   items: [],
+  runningText: { enabled: false, items: [], speed: 20 },
 }
 
 const VIDEO_PROFILES_META_KEY = 'videoBroadcast.profiles'
@@ -249,12 +263,30 @@ export function normalizeVideoBroadcastConfig(value: unknown): VideoBroadcastCon
 
   const firstItem = items[0] || null
 
+  // Normalize runningText overlay
+  const rawRt = isRecord(source.runningText) ? source.runningText : {}
+  const rawRtItems = Array.isArray(rawRt.items) ? rawRt.items : []
+  const rtItems: VideoBroadcastOverlayItem[] = rawRtItems
+    .filter((i): i is Record<string, unknown> => isRecord(i))
+    .map((i) => ({
+      id: typeof i.id === 'string' ? i.id : `ot_${Math.random().toString(36).slice(2)}`,
+      text: typeof i.text === 'string' ? i.text : '',
+      enabled: typeof i.enabled === 'boolean' ? i.enabled : true,
+    }))
+
+  const runningText: VideoBroadcastOverlay = {
+    enabled: safeBoolean(rawRt.enabled, false),
+    items: rtItems,
+    speed: clampInt(rawRt.speed, 1, 600, 20),
+  }
+
   return {
     revision: clampInt(source.revision, 1, 100_000, FALLBACK_VIDEO_BROADCAST_CONFIG.revision),
     enabled: safeBoolean(source.enabled, FALLBACK_VIDEO_BROADCAST_CONFIG.enabled),
     videoId: firstItem ? firstItem.videoId : null,
     repeatCount: firstItem ? firstItem.repeatCount : FALLBACK_VIDEO_BROADCAST_CONFIG.repeatCount,
     items,
+    runningText,
   }
 }
 

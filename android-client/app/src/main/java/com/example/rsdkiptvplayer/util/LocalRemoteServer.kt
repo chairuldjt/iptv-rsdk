@@ -1,6 +1,5 @@
 package com.example.rsdkiptvplayer.util
 
-import android.app.Instrumentation
 import android.content.Context
 import android.content.Intent
 import android.media.AudioManager
@@ -197,15 +196,29 @@ class LocalRemoteServer(
 }
 
 object RemoteKeyInjector {
-    private val inst = Instrumentation()
-    
     fun injectKey(keyCode: Int) {
-        Thread {
+        val activity = com.example.rsdkiptvplayer.IptvApplication.instance.currentActivity ?: return
+        activity.runOnUiThread {
             try {
-                inst.sendKeyDownUpSync(keyCode)
+                val downEvent = KeyEvent(
+                    android.os.SystemClock.uptimeMillis(),
+                    android.os.SystemClock.uptimeMillis(),
+                    KeyEvent.ACTION_DOWN,
+                    keyCode,
+                    0
+                )
+                val upEvent = KeyEvent(
+                    android.os.SystemClock.uptimeMillis(),
+                    android.os.SystemClock.uptimeMillis(),
+                    KeyEvent.ACTION_UP,
+                    keyCode,
+                    0
+                )
+                activity.dispatchKeyEvent(downEvent)
+                activity.dispatchKeyEvent(upEvent)
             } catch (e: Exception) {
                 e.printStackTrace()
             }
-        }.start()
+        }
     }
 }

@@ -11,12 +11,19 @@ type VideoOption = {
   isPublished: boolean
 }
 
+type OverlayTextItem = {
+  id: string
+  text: string
+  enabled: boolean
+}
+
 type VideoBroadcastManagerProps = {
   profileId: string
   profileName: string
   initialVideoId: number | null
   initialRepeatCount: number
   initialItems?: { videoId: number; repeatCount: number }[]
+  initialOverlay?: { enabled: boolean; items: OverlayTextItem[]; speed: number }
   videos: VideoOption[]
   isGlobal: boolean
   assignedGroupCount: number
@@ -34,6 +41,7 @@ export default function VideoBroadcastManager({
   initialVideoId,
   initialRepeatCount,
   initialItems = [],
+  initialOverlay,
   videos,
   isGlobal,
   assignedGroupCount,
@@ -56,6 +64,15 @@ export default function VideoBroadcastManager({
   // Local addition form states
   const [selectedAddVideoId, setSelectedAddVideoId] = useState<string>('')
   const [addRepeatCount, setAddRepeatCount] = useState<number>(1)
+
+  // Running text overlay state — load from saved config if available
+  const [overlayEnabled, setOverlayEnabled] = useState(initialOverlay?.enabled ?? false)
+  const [overlayItems, setOverlayItems] = useState<OverlayTextItem[]>(
+    initialOverlay?.items && initialOverlay.items.length > 0
+      ? initialOverlay.items
+      : [{ id: `ot_${Date.now()}`, text: '', enabled: true }]
+  )
+  const [overlaySpeed, setOverlaySpeed] = useState(initialOverlay?.speed ?? 20)
 
   // Confirmation modals state
   const [showPlayConfirm, setShowPlayConfirm] = useState(false)
@@ -106,6 +123,23 @@ export default function VideoBroadcastManager({
     setItems((prev) =>
       prev.map((item, idx) => (idx === index ? { ...item, repeatCount: count } : item))
     )
+  }
+
+  const handleAddOverlayItem = () => {
+    setOverlayItems((prev) => [
+      ...prev,
+      { id: `ot_${Date.now()}`, text: '', enabled: true },
+    ])
+  }
+
+  const handleUpdateOverlayItem = (id: string, patch: Partial<OverlayTextItem>) => {
+    setOverlayItems((prev) =>
+      prev.map((item) => (item.id === id ? { ...item, ...patch } : item))
+    )
+  }
+
+  const handleDeleteOverlayItem = (id: string) => {
+    setOverlayItems((prev) => prev.filter((item) => item.id !== id))
   }
 
   const sortedVideos = useMemo(
@@ -247,6 +281,10 @@ export default function VideoBroadcastManager({
           {/* Legacy fallback inputs */}
           <input type="hidden" name="videoId" value={fallbackVideoId} />
           <input type="hidden" name="repeatCount" value={fallbackRepeatCount} />
+          {/* Running text overlay inputs */}
+          <input type="hidden" name="overlayEnabled" value={overlayEnabled ? 'on' : 'off'} />
+          <input type="hidden" name="overlayItemsJson" value={JSON.stringify(overlayItems)} />
+          <input type="hidden" name="overlaySpeed" value={overlaySpeed} />
 
           {/* Main settings row: Add Item Form */}
           <div className="grid grid-cols-1 sm:grid-cols-[1fr_130px_auto] gap-4 p-4 rounded-xl bg-accent/15 border border-border/80 items-end">
@@ -410,6 +448,133 @@ export default function VideoBroadcastManager({
             </div>
           )}
 
+          {/* Running Text Overlay Panel */}
+          <div className="rounded-2xl border border-amber-500/20 bg-amber-500/5 p-4 space-y-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <div className="text-[10px] font-bold uppercase tracking-[0.2em] text-amber-400">Running Text Overlay</div>
+                <p className="mt-0.5 text-[11px] text-muted-foreground">
+                  Teks berjalan yang menumpuki video broadcast secara bersamaan.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setOverlayEnabled((v) => !v)}
+                className={`rounded-xl px-3 py-1.5 text-[11px] font-bold border transition-all select-none cursor-pointer ${
+                  overlayEnabled
+                    ? 'bg-amber-500/15 border-amber-500/30 text-amber-300 hover:bg-amber-500/25'
+                    : 'bg-muted/10 border-border text-muted-foreground hover:bg-muted/20'
+                }`}
+              >
+                {overlayEnabled ? 'Aktif' : 'Nonaktif'}
+              </button>
+            </div>
+
+            {overlayEnabled && (
+              <div className="space-y-3">
+                {/* Speed setting */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 p-3 rounded-xl bg-accent/10 border border-border/60">
+                  <label>
+                    <span className="block text-[9px] font-bold uppercase tracking-wider text-muted-foreground mb-1.5">
+                      Speed Marquee (detik per loop)
+                    </span>
+                    <input
+                      type="number"
+                      value={overlaySpeed}
+                      onChange={(e) => setOverlaySpeed(Math.max(1, Math.min(600, parseInt(e.target.value) || 20)))}
+                      min={1}
+                      max={600}
+                      className="field-input py-1.5 text-xs w-full"
+                    />
+                  </label>
+                  <div className="flex items-end">
+                    <div className="rounded-xl border border-amber-500/15 bg-amber-500/5 px-3 py-2 text-[11px] text-amber-200/80 w-full">
+                      Teks akan berjalan di bagian bawah layar selama video broadcast berlangsung.
+                    </div>
+                  </div>
+                </div>
+
+                {/* Overlay items list */}
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+                      Daftar Pesan Overlay
+                    </span>
+                    <button
+                      type="button"
+                      onClick={handleAddOverlayItem}
+                      className="rounded-lg border border-amber-500/20 bg-amber-500/10 hover:bg-amber-500/20 px-2.5 py-1 text-[10px] font-bold text-amber-300 transition-all select-none cursor-pointer"
+                    >
+                      + Tambah Pesan
+                    </button>
+                  </div>
+
+                  {overlayItems.length === 0 ? (
+                    <div className="rounded-xl border border-dashed border-border px-4 py-6 text-center text-[11px] text-muted-foreground bg-accent/5">
+                      Belum ada pesan overlay. Klik <strong>+ Tambah Pesan</strong> untuk menambahkan.
+                    </div>
+                  ) : (
+                    overlayItems.map((item, idx) => (
+                      <div
+                        key={item.id}
+                        className="rounded-xl border border-border bg-accent/5 p-3 flex gap-3 items-center hover:border-amber-500/20 hover:bg-accent/10 transition-all"
+                      >
+                        <div className="flex items-center justify-center font-mono text-[10px] font-bold text-muted-foreground bg-accent/20 w-7 h-7 rounded-lg border border-border shrink-0 select-none">
+                          {idx + 1}
+                        </div>
+                        <div className="flex-1">
+                          <textarea
+                            value={item.text}
+                            onChange={(e) => handleUpdateOverlayItem(item.id, { text: e.target.value })}
+                            className="field-input py-1.5 px-3 text-xs w-full min-h-[38px] resize-none"
+                            placeholder="Ketik isi running text overlay di sini..."
+                            rows={1}
+                          />
+                        </div>
+                        <div className="flex items-center gap-2 shrink-0">
+                          <button
+                            type="button"
+                            onClick={() => handleUpdateOverlayItem(item.id, { enabled: !item.enabled })}
+                            className={`rounded-lg px-2.5 py-1.5 text-[10px] font-bold border transition-all select-none cursor-pointer ${
+                              item.enabled
+                                ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400 hover:bg-emerald-500/25'
+                                : 'bg-muted/10 border-border text-muted-foreground hover:bg-muted/20'
+                            }`}
+                          >
+                            {item.enabled ? 'Aktif' : 'Nonaktif'}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteOverlayItem(item.id)}
+                            className="rounded-lg border border-rose-500/20 bg-rose-500/5 hover:bg-rose-500/10 px-2.5 py-1.5 text-[10px] font-bold text-rose-400 transition-all select-none cursor-pointer"
+                          >
+                            Hapus
+                          </button>
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+
+                {/* Preview */}
+                {overlayItems.some((i) => i.enabled && i.text.trim()) && (
+                  <div className="rounded-xl bg-black/40 border border-amber-500/20 p-3 space-y-1">
+                    <div className="text-[9px] font-bold uppercase tracking-wider text-amber-400">Preview Overlay</div>
+                    <div className="rounded-lg border border-white/5 bg-black/30 px-3 py-2 overflow-hidden">
+                      <div className="text-[9px] uppercase tracking-[0.24em] text-amber-300/80">Live Ticker</div>
+                      <div className="mt-1 overflow-hidden whitespace-nowrap text-xs font-medium text-amber-100">
+                        {overlayItems
+                          .filter((i) => i.enabled && i.text.trim())
+                          .map((i) => i.text)
+                          .join('   |   ')}
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+
           <div className="flex gap-3 pt-4 border-t border-border">
             <button
               type="submit"
@@ -496,6 +661,10 @@ export default function VideoBroadcastManager({
           <input type="hidden" name="videoId" value={fallbackVideoId} />
           <input type="hidden" name="repeatCount" value={fallbackRepeatCount} />
           <input type="hidden" name="enabled" value="on" />
+          {/* Running text overlay inputs */}
+          <input type="hidden" name="overlayEnabled" value={overlayEnabled ? 'on' : 'off'} />
+          <input type="hidden" name="overlayItemsJson" value={JSON.stringify(overlayItems)} />
+          <input type="hidden" name="overlaySpeed" value={overlaySpeed} />
 
           <div>
             <h3 className="text-sm font-semibold text-foreground mb-1">Broadcast Live ke Device</h3>
