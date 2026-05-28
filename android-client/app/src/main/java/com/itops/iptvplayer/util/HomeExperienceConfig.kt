@@ -206,6 +206,7 @@ object HomeExperienceParser {
             val clean = hex.removePrefix("#")
             when (clean.length) {
                 6 -> Color(android.graphics.Color.parseColor("#$clean"))
+                8 -> Color(java.lang.Long.parseLong(clean, 16).toInt())
                 else -> fallback
             }
         } catch (_: Exception) {
@@ -218,6 +219,7 @@ object HomeExperienceParser {
             val clean = hex.removePrefix("#")
             when (clean.length) {
                 6 -> Color(android.graphics.Color.parseColor("#$clean"))
+                8 -> Color(java.lang.Long.parseLong(clean, 16).toInt())
                 else -> fallback
             }
         } catch (_: Exception) {

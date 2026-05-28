@@ -477,17 +477,57 @@ export default function HomeExperienceForm({
                             <ColorField label="Accent" value={menu.accentColor} onChange={(value) => updateMenu(setMenus, menu.id, { accentColor: value })} />
                           </div>
                           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <div className="space-y-1">
-                              <label className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">Card Background Color</label>
-                              <p className="text-[10px] text-muted-foreground">Warna background kartu carousel. Kosongkan untuk pakai default gelap.</p>
-                              <input
-                                type="text"
-                                value={menu.cardBackgroundColor ?? ''}
-                                onChange={(e) => updateMenu(setMenus, menu.id, { cardBackgroundColor: e.target.value })}
-                                className="field-input font-mono"
-                                placeholder="#142331 atau kosong"
-                              />
-                            </div>
+                            <Field label="Card Background Color">
+                              <div className="space-y-2">
+                                <div className="flex items-center gap-2">
+                                  <input
+                                    type="color"
+                                    value={`#${(menu.cardBackgroundColor || '#142331').replace('#', '').slice(-6)}`}
+                                    onChange={(e) => {
+                                      const hex = e.target.value.replace('#', '')
+                                      const current = menu.cardBackgroundColor || ''
+                                      const alpha = current.length === 9 ? current.slice(1, 3) : 'FF'
+                                      updateMenu(setMenus, menu.id, { cardBackgroundColor: `#${alpha}${hex.toUpperCase()}` })
+                                    }}
+                                    className="h-11 w-14 rounded-xl border border-border bg-background px-1"
+                                  />
+                                  <input
+                                    type="text"
+                                    value={menu.cardBackgroundColor ?? ''}
+                                    onChange={(e) => updateMenu(setMenus, menu.id, { cardBackgroundColor: e.target.value.toUpperCase() })}
+                                    className="field-input font-mono"
+                                    placeholder="#142331 atau kosong"
+                                  />
+                                </div>
+                                <div className="flex items-center gap-3">
+                                  <span className="text-[10px] text-muted-foreground w-16 shrink-0">Opacity</span>
+                                  <input
+                                    type="range"
+                                    min={0}
+                                    max={255}
+                                    value={(() => {
+                                      const c = menu.cardBackgroundColor || ''
+                                      if (c.length === 9) return parseInt(c.slice(1, 3), 16)
+                                      return 255
+                                    })()}
+                                    onChange={(e) => {
+                                      const alpha = parseInt(e.target.value).toString(16).padStart(2, '0').toUpperCase()
+                                      const hex = (menu.cardBackgroundColor || '#142331').replace('#', '').slice(-6)
+                                      updateMenu(setMenus, menu.id, { cardBackgroundColor: `#${alpha}${hex.toUpperCase()}` })
+                                    }}
+                                    className="flex-1 accent-primary"
+                                  />
+                                  <span className="text-[10px] font-mono text-muted-foreground w-8 text-right">
+                                    {Math.round(((() => {
+                                      const c = menu.cardBackgroundColor || ''
+                                      if (c.length === 9) return parseInt(c.slice(1, 3), 16)
+                                      return 255
+                                    })() / 255) * 100)}%
+                                  </span>
+                                </div>
+                                <p className="text-[10px] text-muted-foreground">Format #AARRGGBB. Kosongkan untuk pakai default gelap.</p>
+                              </div>
+                            </Field>
                           </div>
                           <AssetUpload
                             label="Background Image"
