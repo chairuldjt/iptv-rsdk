@@ -844,6 +844,7 @@ private fun HospitalityMenuBar(
                 subtitle = subtitle,
                 accent = HomeExperienceParser.colorOrDefault(menu.accentColorHex, Color(0xFFFFE9A6)),
                 textColor = HomeExperienceParser.colorOrDefault(menu.textColorHex, Color.White),
+                cardBackgroundColor = if (menu.cardBackgroundColorHex.isNotBlank()) HomeExperienceParser.colorOrDefault(menu.cardBackgroundColorHex, null) else null,
                 backgroundRes = defaultBackgroundForMenuType(menu.type),
                 backgroundUrl = menu.backgroundUrl,
                 action = action
@@ -875,6 +876,7 @@ private fun HospitalityMenuBar(
                     subtitle = subtitle,
                     accent = HomeExperienceParser.colorOrDefault(menu.accentColorHex, Color(0xFFFFE9A6)),
                     textColor = HomeExperienceParser.colorOrDefault(menu.textColorHex, Color.White),
+                    cardBackgroundColor = if (menu.cardBackgroundColorHex.isNotBlank()) HomeExperienceParser.colorOrDefault(menu.cardBackgroundColorHex, null) else null,
                     backgroundRes = defaultBackgroundForMenuType(menu.type),
                     backgroundUrl = menu.backgroundUrl,
                     action = action
@@ -1124,6 +1126,7 @@ private data class HospitalityCarouselItem(
     val subtitle: String,
     val accent: Color,
     val textColor: Color,
+    val cardBackgroundColor: Color?,
     val backgroundRes: Int,
     val backgroundUrl: String,
     val action: () -> Unit
@@ -1448,7 +1451,7 @@ private fun HospitalityCarouselCard(
                     )
                     .clip(cardShape)
                     .background(
-                        if (isActive) Color(0xFF142331) else Color(0xFF101A24)
+                        item.cardBackgroundColor ?: if (isActive) Color(0xFF142331) else Color(0xFF101A24)
                     )
                     .border(
                         BorderStroke(
@@ -1466,8 +1469,8 @@ private fun HospitalityCarouselCard(
                             Brush.verticalGradient(
                                 colors = listOf(
                                     item.accent.copy(alpha = if (isActive) 0.16f else 0.08f),
-                                    Color(0xFF142331).copy(alpha = if (isActive) 0.96f else 0.92f),
-                                    Color(0xFF0F1822)
+                                    (item.cardBackgroundColor ?: Color(0xFF142331)).copy(alpha = if (isActive) 0.96f else 0.92f),
+                                    item.cardBackgroundColor ?: Color(0xFF0F1822)
                                 )
                             )
                         )

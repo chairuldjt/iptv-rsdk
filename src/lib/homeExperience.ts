@@ -29,6 +29,7 @@ export type HomeExperienceMenuItem = {
   textColor: string
   borderColor: string
   accentColor: string
+  cardBackgroundColor: string
   backgroundUrl: string
   entertainmentItemId: number
   targetPackage?: string
@@ -132,6 +133,7 @@ export type HomeExperienceMenuPatch = {
   textColor?: string
   borderColor?: string
   accentColor?: string
+  cardBackgroundColor?: string
   backgroundUrl?: string
   entertainmentItemId?: number
   targetPackage?: string
@@ -366,6 +368,7 @@ export const FALLBACK_HOME_EXPERIENCE_CONFIG: HomeExperienceResolvedConfig = {
       textColor: '#FFFFFF',
       borderColor: '#FFE9A6',
       accentColor: '#FFE9A6',
+      cardBackgroundColor: '',
       backgroundUrl: '',
       entertainmentItemId: 0,
       sortOrder: 10,
@@ -380,6 +383,7 @@ export const FALLBACK_HOME_EXPERIENCE_CONFIG: HomeExperienceResolvedConfig = {
       textColor: '#FFFFFF',
       borderColor: '#86EFAC',
       accentColor: '#86EFAC',
+      cardBackgroundColor: '',
       backgroundUrl: '',
       entertainmentItemId: 0,
       sortOrder: 30,
@@ -394,6 +398,7 @@ export const FALLBACK_HOME_EXPERIENCE_CONFIG: HomeExperienceResolvedConfig = {
       textColor: '#FFFFFF',
       borderColor: '#FF9A76',
       accentColor: '#FF9A76',
+      cardBackgroundColor: '',
       backgroundUrl: '',
       entertainmentItemId: 0,
       sortOrder: 40,
@@ -408,6 +413,7 @@ export const FALLBACK_HOME_EXPERIENCE_CONFIG: HomeExperienceResolvedConfig = {
       textColor: '#FFFFFF',
       borderColor: '#C084FC',
       accentColor: '#C084FC',
+      cardBackgroundColor: '',
       backgroundUrl: '',
       entertainmentItemId: 0,
       sortOrder: 50,
@@ -422,6 +428,7 @@ export const FALLBACK_HOME_EXPERIENCE_CONFIG: HomeExperienceResolvedConfig = {
       textColor: '#FFFFFF',
       borderColor: '#7DD3FC',
       accentColor: '#7DD3FC',
+      cardBackgroundColor: '',
       backgroundUrl: '',
       entertainmentItemId: 0,
       sortOrder: 60,
@@ -436,6 +443,7 @@ export const FALLBACK_HOME_EXPERIENCE_CONFIG: HomeExperienceResolvedConfig = {
       textColor: '#FFFFFF',
       borderColor: '#FCA5A5',
       accentColor: '#FCA5A5',
+      cardBackgroundColor: '',
       backgroundUrl: '',
       entertainmentItemId: 0,
       sortOrder: 70,
@@ -915,6 +923,7 @@ function normalizeMenus(value: unknown): HomeExperienceMenuItem[] {
       textColor: normalizeHexColor(entry.textColor, '#FFFFFF'),
       borderColor: normalizeHexColor(entry.borderColor, '#FFFFFF'),
       accentColor: normalizeHexColor(entry.accentColor, '#FFFFFF'),
+      cardBackgroundColor: normalizeHexColor(entry.cardBackgroundColor, ''),
       backgroundUrl: safeString(entry.backgroundUrl, ''),
       entertainmentItemId: clampInt(entry.entertainmentItemId, 0, 1_000_000, 0),
       targetPackage: safeString(entry.targetPackage, ''),
@@ -988,6 +997,7 @@ function normalizeMenuPatches(value: unknown): HomeExperienceMenuPatch[] {
       if (hasOwn(entry, 'textColor')) patch.textColor = normalizeHexColor(entry.textColor, '#FFFFFF')
       if (hasOwn(entry, 'borderColor')) patch.borderColor = normalizeHexColor(entry.borderColor, '#FFFFFF')
       if (hasOwn(entry, 'accentColor')) patch.accentColor = normalizeHexColor(entry.accentColor, '#FFFFFF')
+      if (hasOwn(entry, 'cardBackgroundColor')) patch.cardBackgroundColor = normalizeHexColor(entry.cardBackgroundColor, '')
       if (hasOwn(entry, 'backgroundUrl')) patch.backgroundUrl = safeString(entry.backgroundUrl, '')
       if (hasOwn(entry, 'entertainmentItemId')) patch.entertainmentItemId = clampInt(entry.entertainmentItemId, 0, 1_000_000, 0)
       if (hasOwn(entry, 'targetPackage')) patch.targetPackage = safeString(entry.targetPackage, '')
@@ -1056,6 +1066,7 @@ function compactMenuPatches(patches?: HomeExperienceMenuPatch[]): HomeExperience
       if (patch.textColor !== undefined && patch.textColor !== fallback.textColor) compact.textColor = patch.textColor
       if (patch.borderColor !== undefined && patch.borderColor !== fallback.borderColor) compact.borderColor = patch.borderColor
       if (patch.accentColor !== undefined && patch.accentColor !== fallback.accentColor) compact.accentColor = patch.accentColor
+      if (patch.cardBackgroundColor !== undefined && patch.cardBackgroundColor !== fallback.cardBackgroundColor) compact.cardBackgroundColor = patch.cardBackgroundColor
       if (patch.backgroundUrl !== undefined && patch.backgroundUrl !== fallback.backgroundUrl) compact.backgroundUrl = patch.backgroundUrl
       if (patch.entertainmentItemId !== undefined && patch.entertainmentItemId !== fallback.entertainmentItemId) compact.entertainmentItemId = patch.entertainmentItemId
       if (patch.targetPackage !== undefined && patch.targetPackage !== (fallback.targetPackage ?? '')) compact.targetPackage = patch.targetPackage

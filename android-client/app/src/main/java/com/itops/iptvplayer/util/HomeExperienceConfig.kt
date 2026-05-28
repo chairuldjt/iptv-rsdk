@@ -26,6 +26,7 @@ data class HomeExperienceMenu(
     val textColorHex: String,
     val borderColorHex: String,
     val accentColorHex: String,
+    val cardBackgroundColorHex: String,
     val backgroundUrl: String,
     val entertainmentItemId: Int,
     val targetPackage: String,
@@ -160,32 +161,32 @@ object HomeExperienceParser {
         HomeExperienceMenu(
             id = "tv", enabled = true, type = "tv", title = "TV CHANNEL", subtitle = "Live TV",
             icon = "live_tv", textColorHex = "#FFFFFF", borderColorHex = "#FFE9A6", accentColorHex = "#FFE9A6",
-            backgroundUrl = "", entertainmentItemId = 0, targetPackage = "", useAppIcon = false, sortOrder = 10
+            cardBackgroundColorHex = "", backgroundUrl = "", entertainmentItemId = 0, targetPackage = "", useAppIcon = false, sortOrder = 10
         ),
         HomeExperienceMenu(
             id = "education", enabled = true, type = "education", title = "EDUKASI", subtitle = "Video RS",
             icon = "menu_book", textColorHex = "#FFFFFF", borderColorHex = "#86EFAC", accentColorHex = "#86EFAC",
-            backgroundUrl = "", entertainmentItemId = 0, targetPackage = "", useAppIcon = false, sortOrder = 30
+            cardBackgroundColorHex = "", backgroundUrl = "", entertainmentItemId = 0, targetPackage = "", useAppIcon = false, sortOrder = 30
         ),
         HomeExperienceMenu(
             id = "entertainment", enabled = true, type = "entertainment", title = "HIBURAN", subtitle = "Konten & Musik",
             icon = "movie", textColorHex = "#FFFFFF", borderColorHex = "#FF9A76", accentColorHex = "#FF9A76",
-            backgroundUrl = "", entertainmentItemId = 0, targetPackage = "", useAppIcon = false, sortOrder = 40
+            cardBackgroundColorHex = "", backgroundUrl = "", entertainmentItemId = 0, targetPackage = "", useAppIcon = false, sortOrder = 40
         ),
         HomeExperienceMenu(
             id = "info", enabled = true, type = "info_dialog", title = "INFO APLIKASI", subtitle = "Cek Pembaruan",
             icon = "info", textColorHex = "#FFFFFF", borderColorHex = "#C084FC", accentColorHex = "#C084FC",
-            backgroundUrl = "", entertainmentItemId = 0, targetPackage = "", useAppIcon = false, sortOrder = 50
+            cardBackgroundColorHex = "", backgroundUrl = "", entertainmentItemId = 0, targetPackage = "", useAppIcon = false, sortOrder = 50
         ),
         HomeExperienceMenu(
             id = "settings", enabled = true, type = "settings", title = "SETTING", subtitle = "Sistem",
             icon = "settings", textColorHex = "#FFFFFF", borderColorHex = "#7DD3FC", accentColorHex = "#7DD3FC",
-            backgroundUrl = "", entertainmentItemId = 0, targetPackage = "", useAppIcon = false, sortOrder = 60
+            cardBackgroundColorHex = "", backgroundUrl = "", entertainmentItemId = 0, targetPackage = "", useAppIcon = false, sortOrder = 60
         ),
         HomeExperienceMenu(
             id = "app_drawer", enabled = true, type = "app_drawer", title = "SEMUA APLIKASI", subtitle = "App Drawer",
             icon = "apps", textColorHex = "#FFFFFF", borderColorHex = "#FCA5A5", accentColorHex = "#FCA5A5",
-            backgroundUrl = "", entertainmentItemId = 0, targetPackage = "", useAppIcon = false, sortOrder = 70
+            cardBackgroundColorHex = "", backgroundUrl = "", entertainmentItemId = 0, targetPackage = "", useAppIcon = false, sortOrder = 70
         )
     )
 
@@ -201,6 +202,18 @@ object HomeExperienceParser {
     }
 
     fun colorOrDefault(hex: String, fallback: Color): Color {
+        return try {
+            val clean = hex.removePrefix("#")
+            when (clean.length) {
+                6 -> Color(android.graphics.Color.parseColor("#$clean"))
+                else -> fallback
+            }
+        } catch (_: Exception) {
+            fallback
+        }
+    }
+
+    fun colorOrDefault(hex: String, fallback: Color?): Color? {
         return try {
             val clean = hex.removePrefix("#")
             when (clean.length) {
@@ -261,6 +274,7 @@ object HomeExperienceParser {
                         textColorHex = item.optString("textColor", "#FFFFFF"),
                         borderColorHex = item.optString("borderColor", "#FFFFFF"),
                         accentColorHex = item.optString("accentColor", "#FFFFFF"),
+                        cardBackgroundColorHex = item.optString("cardBackgroundColor", ""),
                         backgroundUrl = item.optString("backgroundUrl", ""),
                         entertainmentItemId = item.optInt("entertainmentItemId", 0),
                         targetPackage = item.optString("targetPackage", ""),

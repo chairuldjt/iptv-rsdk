@@ -476,6 +476,19 @@ export default function HomeExperienceForm({
                             <ColorField label="Border" value={menu.borderColor} onChange={(value) => updateMenu(setMenus, menu.id, { borderColor: value })} />
                             <ColorField label="Accent" value={menu.accentColor} onChange={(value) => updateMenu(setMenus, menu.id, { accentColor: value })} />
                           </div>
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div className="space-y-1">
+                              <label className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">Card Background Color</label>
+                              <p className="text-[10px] text-muted-foreground">Warna background kartu carousel. Kosongkan untuk pakai default gelap.</p>
+                              <input
+                                type="text"
+                                value={menu.cardBackgroundColor ?? ''}
+                                onChange={(e) => updateMenu(setMenus, menu.id, { cardBackgroundColor: e.target.value })}
+                                className="field-input font-mono"
+                                placeholder="#142331 atau kosong"
+                              />
+                            </div>
+                          </div>
                           <AssetUpload
                             label="Background Image"
                             fileFieldName={`menuBackgroundFile__${menu.id}`}
