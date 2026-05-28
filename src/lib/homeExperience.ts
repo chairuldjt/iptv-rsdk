@@ -1166,7 +1166,7 @@ function safeBoolean(value: unknown, fallback: boolean): boolean {
 function normalizeHexColor(value: unknown, fallback: string): string {
   if (typeof value !== 'string') return fallback
   const trimmed = value.trim()
-  return /^#[0-9a-fA-F]{6}$/.test(trimmed) ? trimmed.toUpperCase() : fallback
+  return /^#[0-9a-fA-F]{6}$/.test(trimmed) || /^#[0-9a-fA-F]{8}$/.test(trimmed) ? trimmed.toUpperCase() : fallback
 }
 
 function clampInt(value: unknown, min: number, max: number, fallback: number): number {
