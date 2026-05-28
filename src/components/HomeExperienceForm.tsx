@@ -322,6 +322,7 @@ export default function HomeExperienceForm({
                   textColor: '#FFFFFF',
                   borderColor: '#FFFFFF',
                   accentColor: '#FFFFFF',
+                  cardBackgroundColor: '',
                   backgroundUrl: '',
                   entertainmentItemId: 0,
                   sortOrder: (current.at(-1)?.sortOrder || 0) + 10,
