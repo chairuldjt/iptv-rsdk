@@ -2,7 +2,7 @@ import prisma from '@/lib/db'
 import { getDeviceGroupForDevice } from '@/lib/deviceGroups'
 
 const GLOBAL_HOME_EXPERIENCE_KEY = 'homeExperience.global'
-const HOME_EXPERIENCE_MENU_TYPES = ['tv', 'education', 'entertainment', 'settings', 'info_dialog', 'konten', 'recommendations', 'favorites', 'search'] as const
+const HOME_EXPERIENCE_MENU_TYPES = ['tv', 'education', 'entertainment', 'settings', 'info_dialog', 'konten', 'recommendations', 'favorites', 'search', 'app_drawer', 'launch_app'] as const
 
 export type HomeExperienceScope = 'global' | 'group' | 'device' | 'profile'
 
@@ -16,6 +16,8 @@ export type HomeExperienceMenuType =
   | 'recommendations'
   | 'favorites'
   | 'search'
+  | 'app_drawer'
+  | 'launch_app'
 
 export type HomeExperienceMenuItem = {
   id: string
@@ -29,6 +31,8 @@ export type HomeExperienceMenuItem = {
   accentColor: string
   backgroundUrl: string
   entertainmentItemId: number
+  targetPackage?: string
+  useAppIcon?: boolean
   sortOrder: number
   isPinned?: boolean
   badge?: {
@@ -85,6 +89,8 @@ export type HomeExperienceMenuPatch = {
   accentColor?: string
   backgroundUrl?: string
   entertainmentItemId?: number
+  targetPackage?: string
+  useAppIcon?: boolean
   sortOrder?: number
   isPinned?: boolean
   badge?: {
@@ -183,6 +189,20 @@ export const FALLBACK_HOME_EXPERIENCE_CONFIG: HomeExperienceResolvedConfig = {
       backgroundUrl: '',
       entertainmentItemId: 0,
       sortOrder: 60,
+    },
+    {
+      id: 'app_drawer',
+      enabled: true,
+      type: 'app_drawer',
+      title: 'SEMUA APLIKASI',
+      subtitle: 'App Drawer',
+      icon: 'apps',
+      textColor: '#FFFFFF',
+      borderColor: '#FCA5A5',
+      accentColor: '#FCA5A5',
+      backgroundUrl: '',
+      entertainmentItemId: 0,
+      sortOrder: 70,
     },
   ],
   splash: {
@@ -653,6 +673,8 @@ function normalizeMenus(value: unknown): HomeExperienceMenuItem[] {
       accentColor: normalizeHexColor(entry.accentColor, '#FFFFFF'),
       backgroundUrl: safeString(entry.backgroundUrl, ''),
       entertainmentItemId: clampInt(entry.entertainmentItemId, 0, 1_000_000, 0),
+      targetPackage: safeString(entry.targetPackage, ''),
+      useAppIcon: safeBoolean(entry.useAppIcon, false),
       sortOrder: clampInt(entry.sortOrder, 0, 9999, index * 10),
     }))
     .sort((a, b) => a.sortOrder - b.sortOrder)
@@ -724,6 +746,8 @@ function normalizeMenuPatches(value: unknown): HomeExperienceMenuPatch[] {
       if (hasOwn(entry, 'accentColor')) patch.accentColor = normalizeHexColor(entry.accentColor, '#FFFFFF')
       if (hasOwn(entry, 'backgroundUrl')) patch.backgroundUrl = safeString(entry.backgroundUrl, '')
       if (hasOwn(entry, 'entertainmentItemId')) patch.entertainmentItemId = clampInt(entry.entertainmentItemId, 0, 1_000_000, 0)
+      if (hasOwn(entry, 'targetPackage')) patch.targetPackage = safeString(entry.targetPackage, '')
+      if (hasOwn(entry, 'useAppIcon')) patch.useAppIcon = safeBoolean(entry.useAppIcon, false)
       if (hasOwn(entry, 'sortOrder')) patch.sortOrder = clampInt(entry.sortOrder, 0, 9999, index * 10)
       return patch
     })
@@ -783,6 +807,8 @@ function compactMenuPatches(patches?: HomeExperienceMenuPatch[]): HomeExperience
       if (patch.accentColor !== undefined && patch.accentColor !== fallback.accentColor) compact.accentColor = patch.accentColor
       if (patch.backgroundUrl !== undefined && patch.backgroundUrl !== fallback.backgroundUrl) compact.backgroundUrl = patch.backgroundUrl
       if (patch.entertainmentItemId !== undefined && patch.entertainmentItemId !== fallback.entertainmentItemId) compact.entertainmentItemId = patch.entertainmentItemId
+      if (patch.targetPackage !== undefined && patch.targetPackage !== (fallback.targetPackage ?? '')) compact.targetPackage = patch.targetPackage
+      if (patch.useAppIcon !== undefined && patch.useAppIcon !== (fallback.useAppIcon ?? false)) compact.useAppIcon = patch.useAppIcon
       if (patch.sortOrder !== undefined && patch.sortOrder !== fallback.sortOrder) compact.sortOrder = patch.sortOrder
       return compact
     })

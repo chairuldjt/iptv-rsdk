@@ -25,6 +25,7 @@ import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.foundation.focusable
 import com.example.rsdkiptvplayer.theme.RSDKIPTVPlayerTheme
+import com.example.rsdkiptvplayer.ui.appdrawer.AppDrawerScreen
 import com.example.rsdkiptvplayer.ui.channels.ChannelBrowserScreen
 import com.example.rsdkiptvplayer.ui.components.AppRunningTextBanner
 import com.example.rsdkiptvplayer.ui.education.EducationScreen
@@ -220,7 +221,16 @@ class MainActivity : ComponentActivity() {
                                     onNavigateToSettings = { tabIdx ->
                                         activeSettingsTab = tabIdx
                                         currentScreen = "settings"
-                                    }
+                                    },
+                                    onNavigateToAppDrawer = { currentScreen = "app_drawer" }
+                                )
+                            }
+                            "app_drawer" -> {
+                                BackHandler {
+                                    currentScreen = "home"
+                                }
+                                AppDrawerScreen(
+                                    onBack = { currentScreen = "home" }
                                 )
                             }
                             "channels" -> {

@@ -1,7 +1,7 @@
 'use client'
 
-import type { Dispatch, SetStateAction } from 'react'
-import { useMemo, useState } from 'react'
+import React, { type Dispatch, type SetStateAction, useMemo, useState, useEffect, useRef } from 'react'
+import { createPortal } from 'react-dom'
 import type {
   HomeExperienceConfig,
   HomeExperienceMenuItem,
@@ -37,9 +37,53 @@ const MENU_TYPE_OPTIONS = [
   { value: 'recommendations', label: 'Recommendations' },
   { value: 'favorites', label: 'Favorites' },
   { value: 'search', label: 'Search' },
+  { value: 'app_drawer', label: 'App Drawer' },
+  { value: 'launch_app', label: 'Launch App' },
 ] as const
 
-const ICON_OPTIONS = ['live_tv', 'menu_book', 'movie', 'settings', 'info', 'room_service', 'star', 'bookmark', 'search']
+const ICON_OPTIONS = ['live_tv', 'menu_book', 'movie', 'settings', 'info', 'room_service', 'star', 'bookmark', 'search', 'apps']
+
+// Full Material Symbols icon library grouped by category
+const MATERIAL_ICONS_LIBRARY: { category: string; icons: string[] }[] = [
+  {
+    category: 'Media & Entertainment',
+    icons: ['live_tv', 'tv', 'movie', 'theaters', 'music_note', 'headphones', 'radio', 'podcast', 'videocam', 'play_circle', 'pause_circle', 'stop_circle', 'replay', 'shuffle', 'queue_music', 'album', 'mic', 'speaker', 'volume_up', 'cast', 'screen_share', 'sports_esports', 'sports', 'casino', 'toys'],
+  },
+  {
+    category: 'Education & Info',
+    icons: ['menu_book', 'school', 'book', 'library_books', 'auto_stories', 'article', 'description', 'assignment', 'quiz', 'science', 'biotech', 'calculate', 'history_edu', 'psychology', 'info', 'help', 'help_outline', 'announcement', 'campaign', 'notifications', 'tips_and_updates'],
+  },
+  {
+    category: 'Health & Medical',
+    icons: ['local_hospital', 'medical_services', 'health_and_safety', 'medication', 'vaccines', 'monitor_heart', 'ecg_heart', 'bloodtype', 'emergency', 'healing', 'personal_injury', 'elderly', 'accessible', 'wheelchair_pickup', 'stethoscope', 'thermometer', 'nutrition', 'fitness_center', 'spa', 'self_improvement'],
+  },
+  {
+    category: 'Navigation & UI',
+    icons: ['home', 'dashboard', 'menu', 'apps', 'grid_view', 'view_list', 'view_module', 'widgets', 'layers', 'map', 'navigation', 'explore', 'near_me', 'place', 'location_on', 'directions', 'arrow_forward', 'arrow_back', 'open_in_new', 'launch', 'link', 'share'],
+  },
+  {
+    category: 'Communication',
+    icons: ['chat', 'message', 'email', 'phone', 'call', 'video_call', 'forum', 'comment', 'feedback', 'support_agent', 'contact_support', 'contacts', 'person', 'group', 'groups', 'people', 'supervisor_account', 'manage_accounts', 'badge', 'face'],
+  },
+  {
+    category: 'Food & Hospitality',
+    icons: ['room_service', 'restaurant', 'local_cafe', 'local_bar', 'local_dining', 'fastfood', 'lunch_dining', 'dinner_dining', 'breakfast_dining', 'bakery_dining', 'hotel', 'bed', 'bathtub', 'cleaning_services', 'dry_cleaning', 'laundry', 'kitchen', 'microwave', 'coffee_maker', 'blender'],
+  },
+  {
+    category: 'Settings & System',
+    icons: ['settings', 'tune', 'build', 'construction', 'handyman', 'engineering', 'admin_panel_settings', 'manage_accounts', 'security', 'lock', 'lock_open', 'key', 'password', 'vpn_key', 'shield', 'verified_user', 'privacy_tip', 'policy', 'gpp_good', 'https'],
+  },
+  {
+    category: 'Files & Data',
+    icons: ['folder', 'folder_open', 'cloud', 'cloud_upload', 'cloud_download', 'upload', 'download', 'save', 'backup', 'storage', 'database', 'sd_card', 'usb', 'attach_file', 'insert_drive_file', 'picture_as_pdf', 'image', 'photo', 'photo_library', 'collections'],
+  },
+  {
+    category: 'Stars & Misc',
+    icons: ['star', 'star_border', 'favorite', 'favorite_border', 'thumb_up', 'thumb_down', 'emoji_events', 'military_tech', 'workspace_premium', 'verified', 'new_releases', 'bolt', 'whatshot', 'local_fire_department', 'celebration', 'cake', 'gift', 'redeem', 'loyalty', 'sell'],
+  },
+]
+
+const ALL_MATERIAL_ICONS = MATERIAL_ICONS_LIBRARY.flatMap((g) => g.icons)
 
 // Mirrors src/lib/assetValidation.ts — kept here for accept attributes & UI hints.
 const IMAGE_ACCEPT = 'image/png,image/jpeg,image/webp,image/gif,image/avif,image/heic,image/heif,image/svg+xml'
@@ -78,7 +122,7 @@ export default function HomeExperienceForm({
   const [startScreenContentId, setStartScreenContentId] = useState<number | null>(config.startScreenContentId ?? null)
   const [expandedSections, setExpandedSections] = useState<Record<string, Record<string, boolean>>>({})
   const [enabledSections, setEnabledSections] = useState<Record<string, Record<string, boolean>>>({})
-
+  const [iconPickerMenuId, setIconPickerMenuId] = useState<string | null>(null)
   // Top-level section expand/collapse state. Sections are always "enabled" —
   // their values are part of the saved config (splash.enabled is the dedicated
   // toggle for splash). Persisting a UI-only "section disabled" flag caused
@@ -290,10 +334,14 @@ export default function HomeExperienceForm({
                 {/* Header */}
                 <div className="flex items-center justify-between gap-3">
                   <div className="flex items-center gap-3">
-                    <div className={`flex h-10 w-10 items-center justify-center rounded-xl font-bold text-sm ${
-                      menu.enabled ? 'bg-primary/10 text-primary' : 'bg-muted/40 text-muted-foreground'
+                    <div className={`flex h-10 w-10 items-center justify-center rounded-xl ${
+                      menu.enabled ? 'bg-primary/10' : 'bg-muted/40'
                     }`}>
-                      {menu.icon || '📋'}
+                      <span className={`material-symbols-rounded text-xl leading-none ${
+                        menu.enabled ? 'text-primary' : 'text-muted-foreground'
+                      }`}>
+                        {menu.icon || 'info'}
+                      </span>
                     </div>
                     <div>
                       <div className={`text-sm font-semibold ${menu.enabled ? 'text-foreground' : 'text-muted-foreground line-through decoration-rose-500/60'}`}>
@@ -361,11 +409,15 @@ export default function HomeExperienceForm({
                         <input type="text" value={menu.subtitle} onChange={(e) => updateMenu(setMenus, menu.id, { subtitle: e.target.value })} className="field-input" placeholder="e.g., Live TV" />
                       </Field>
                       <Field label="Icon">
-                        <select value={menu.icon} onChange={(e) => updateMenu(setMenus, menu.id, { icon: e.target.value })} className="field-input py-2">
-                          {ICON_OPTIONS.map((option) => (
-                            <option key={option} value={option}>{option}</option>
-                          ))}
-                        </select>
+                        <button
+                          type="button"
+                          onClick={() => setIconPickerMenuId(menu.id)}
+                          className="field-input flex items-center gap-2 text-left hover:border-primary/50 transition-colors"
+                        >
+                          <span className="material-symbols-rounded text-lg text-primary leading-none">{menu.icon || 'info'}</span>
+                          <span className="font-mono text-sm flex-1">{menu.icon || 'info'}</span>
+                          <span className="text-[10px] text-muted-foreground shrink-0">Pilih →</span>
+                        </button>
                       </Field>
                       <Field label="Sort Order (Urutan)">
                         <input type="number" value={menu.sortOrder} onChange={(e) => updateMenu(setMenus, menu.id, { sortOrder: Number.parseInt(e.target.value || '0', 10) || 0 })} className="field-input" placeholder="10, 20, 30..." />
@@ -480,6 +532,39 @@ export default function HomeExperienceForm({
                                 </p>
                               )}
                             </Field>
+                          )}
+                          {menu.type === 'launch_app' && (
+                            <Field label="Package Name Aplikasi" wide>
+                              <input
+                                type="text"
+                                value={menu.targetPackage || ''}
+                                onChange={(e) => updateMenu(setMenus, menu.id, { targetPackage: e.target.value.trim() })}
+                                className="field-input font-mono"
+                                placeholder="com.contoh.aplikasi"
+                              />
+                              <p className="mt-1 text-[10px] text-muted-foreground">
+                                Nama paket aplikasi Android yang akan dibuka. Jika tidak terinstall, akan diarahkan ke Play Store.
+                                Contoh: <span className="font-mono text-primary">com.google.android.youtube</span>
+                              </p>
+                            </Field>
+                          )}
+                          {menu.type === 'launch_app' && (
+                            <div className="md:col-span-2">
+                              <label className="flex cursor-pointer items-center gap-3 rounded-xl border border-border bg-accent/30 p-3 hover:bg-accent/50 transition-colors">
+                                <input
+                                  type="checkbox"
+                                  checked={menu.useAppIcon ?? false}
+                                  onChange={(e) => updateMenu(setMenus, menu.id, { useAppIcon: e.target.checked })}
+                                  className="h-4 w-4 rounded accent-primary"
+                                />
+                                <span>
+                                  <span className="block text-xs font-semibold text-foreground">Gunakan Icon Bawaan Aplikasi</span>
+                                  <span className="text-[10px] text-muted-foreground">
+                                    Jika aktif, icon diambil dari aplikasi yang terinstall di device. Jika belum terinstall, fallback ke icon yang dipilih di atas.
+                                  </span>
+                                </span>
+                              </label>
+                            </div>
                           )}
                           <div className="space-y-3">
                             <ToggleInline checked={menu.isPinned || false} onChange={(checked) => updateMenu(setMenus, menu.id, { isPinned: checked })} title="Pinned ⭐" description="Pin menu ke posisi teratas" />
@@ -662,6 +747,15 @@ export default function HomeExperienceForm({
           {scope === 'global' ? 'Reset Global Profile ke Fallback Bawaan' : 'Clear Override Scope Ini'}
         </button>
       </form>
+
+      {/* Icon Picker Modal */}
+      {iconPickerMenuId && (
+        <IconPickerModal
+          value={menus.find((m) => m.id === iconPickerMenuId)?.icon || ''}
+          onChange={(icon) => updateMenu(setMenus, iconPickerMenuId, { icon })}
+          onClose={() => setIconPickerMenuId(null)}
+        />
+      )}
     </div>
   )
 }
@@ -827,6 +921,138 @@ function AssetUpload({
 
       <div className="text-[10px] text-muted-foreground/80">{hint}</div>
     </div>
+  )
+}
+
+function IconPickerModal({
+  value,
+  onChange,
+  onClose,
+}: {
+  value: string
+  onChange: (icon: string) => void
+  onClose: () => void
+}) {
+  const [search, setSearch] = useState('')
+  const [mounted, setMounted] = useState(false)
+  const searchRef = useRef<HTMLInputElement>(null)
+
+  useEffect(() => {
+    setMounted(true)
+    return () => setMounted(false)
+  }, [])
+
+  useEffect(() => {
+    if (mounted) {
+      setTimeout(() => searchRef.current?.focus(), 50)
+    }
+  }, [mounted])
+
+  // Close on Escape
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
+    window.addEventListener('keydown', handler)
+    return () => window.removeEventListener('keydown', handler)
+  }, [onClose])
+
+  const filtered = useMemo(() => {
+    const q = search.trim().toLowerCase()
+    if (!q) return MATERIAL_ICONS_LIBRARY
+    return MATERIAL_ICONS_LIBRARY
+      .map((group) => ({
+        ...group,
+        icons: group.icons.filter((icon) => icon.includes(q)),
+      }))
+      .filter((group) => group.icons.length > 0)
+  }, [search])
+
+  if (!mounted) return null
+
+  return createPortal(
+    <div
+      className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/75 backdrop-blur-sm"
+      onClick={onClose}
+    >
+      <div
+        className="relative flex flex-col w-full max-w-2xl max-h-[80vh] mx-4 rounded-2xl border border-white/10 bg-[#0d1520] shadow-2xl"
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* Header */}
+        <div className="flex items-center justify-between gap-3 px-5 py-4 border-b border-white/8 shrink-0">
+          <div>
+            <div className="text-sm font-semibold text-foreground">Pilih Icon</div>
+            <div className="text-[10px] text-muted-foreground mt-0.5">Material Symbols — klik untuk memilih</div>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-lg border border-border px-3 py-1.5 text-xs text-muted-foreground hover:bg-accent/50 transition-colors"
+          >
+            Tutup ✕
+          </button>
+        </div>
+
+        {/* Search */}
+        <div className="px-5 py-3 border-b border-white/8 shrink-0">
+          <input
+            ref={searchRef}
+            type="text"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Cari icon... (contoh: home, star, medical)"
+            className="field-input w-full"
+          />
+        </div>
+
+        {/* Selected preview */}
+        {value && (
+          <div className="flex items-center gap-3 px-5 py-2.5 border-b border-white/8 bg-primary/5 shrink-0">
+            <span className="material-symbols-rounded text-2xl text-primary leading-none">{value}</span>
+            <span className="text-xs text-muted-foreground">Terpilih: <span className="font-mono text-foreground">{value}</span></span>
+          </div>
+        )}
+
+        {/* Icon grid */}
+        <div className="flex-1 overflow-y-auto px-5 py-4 space-y-5">
+          {filtered.length === 0 ? (
+            <div className="text-center text-xs text-muted-foreground py-8">
+              Tidak ada icon ditemukan untuk &quot;{search}&quot;
+            </div>
+          ) : (
+            filtered.map((group) => (
+              <div key={group.category}>
+                <div className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground mb-2">
+                  {group.category}
+                </div>
+                <div className="grid grid-cols-8 sm:grid-cols-10 md:grid-cols-12 gap-1.5">
+                  {group.icons.map((icon) => (
+                    <button
+                      key={icon}
+                      type="button"
+                      title={icon}
+                      onClick={() => { onChange(icon); onClose() }}
+                      className={`flex flex-col items-center gap-1 rounded-xl p-2 transition-all hover:bg-primary/10 group ${
+                        value === icon ? 'bg-primary/15 ring-1 ring-primary/40' : 'bg-white/[0.03]'
+                      }`}
+                    >
+                      <span className={`material-symbols-rounded text-xl leading-none ${
+                        value === icon ? 'text-primary' : 'text-muted-foreground group-hover:text-foreground'
+                      }`}>
+                        {icon}
+                      </span>
+                      <span className="text-[8px] text-muted-foreground truncate w-full text-center leading-tight hidden sm:block">
+                        {icon.replace(/_/g, ' ')}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+      </div>
+    </div>,
+    document.body
   )
 }
 
@@ -999,10 +1225,15 @@ export function HomeExperiencePreview({ config }: { config: HomeExperienceConfig
                     {menu.isPinned && (
                       <div className="absolute top-2 left-2 text-yellow-400 text-sm">⭐</div>
                     )}
-                    <div className="text-[10px] font-semibold uppercase tracking-[0.18em]" style={{ color: menu.borderColor }}>
-                      {menu.icon}
+                    <div className="flex items-center gap-2">
+                      <span
+                        className="material-symbols-rounded text-2xl leading-none"
+                        style={{ color: menu.borderColor }}
+                      >
+                        {menu.icon || 'info'}
+                      </span>
                     </div>
-                    <div className="mt-6 text-base font-bold" style={{ color: menu.textColor }}>{menu.title}</div>
+                    <div className="mt-4 text-base font-bold" style={{ color: menu.textColor }}>{menu.title}</div>
                     <div className="mt-1 text-xs text-white/75">{menu.subtitle}</div>
                     <div className="mt-5 h-1 rounded-full" style={{ backgroundColor: menu.accentColor }} />
                   </div>
@@ -1033,6 +1264,10 @@ function defaultMenuBackgroundForType(type: HomeExperienceMenuItem['type']): str
       return '/home_bg_settings.webp'
     case 'info_dialog':
       return '/home_bg_info.webp'
+    case 'app_drawer':
+      return '/home_bg_settings.webp'
+    case 'launch_app':
+      return '/home_bg_services.webp'
     default:
       return '/home_bg_services.webp'
   }

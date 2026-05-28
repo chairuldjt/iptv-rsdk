@@ -26,6 +26,8 @@ data class HomeExperienceMenu(
     val accentColorHex: String,
     val backgroundUrl: String,
     val entertainmentItemId: Int,
+    val targetPackage: String,
+    val useAppIcon: Boolean,
     val sortOrder: Int
 )
 
@@ -92,74 +94,34 @@ object HomeExperienceParser {
      */
     fun defaultMenus(): List<HomeExperienceMenu> = listOf(
         HomeExperienceMenu(
-            id = "tv",
-            enabled = true,
-            type = "tv",
-            title = "TV CHANNEL",
-            subtitle = "Live TV",
-            icon = "live_tv",
-            textColorHex = "#FFFFFF",
-            borderColorHex = "#FFE9A6",
-            accentColorHex = "#FFE9A6",
-            backgroundUrl = "",
-            entertainmentItemId = 0,
-            sortOrder = 10
+            id = "tv", enabled = true, type = "tv", title = "TV CHANNEL", subtitle = "Live TV",
+            icon = "live_tv", textColorHex = "#FFFFFF", borderColorHex = "#FFE9A6", accentColorHex = "#FFE9A6",
+            backgroundUrl = "", entertainmentItemId = 0, targetPackage = "", useAppIcon = false, sortOrder = 10
         ),
         HomeExperienceMenu(
-            id = "education",
-            enabled = true,
-            type = "education",
-            title = "EDUKASI",
-            subtitle = "Video RS",
-            icon = "menu_book",
-            textColorHex = "#FFFFFF",
-            borderColorHex = "#86EFAC",
-            accentColorHex = "#86EFAC",
-            backgroundUrl = "",
-            entertainmentItemId = 0,
-            sortOrder = 30
+            id = "education", enabled = true, type = "education", title = "EDUKASI", subtitle = "Video RS",
+            icon = "menu_book", textColorHex = "#FFFFFF", borderColorHex = "#86EFAC", accentColorHex = "#86EFAC",
+            backgroundUrl = "", entertainmentItemId = 0, targetPackage = "", useAppIcon = false, sortOrder = 30
         ),
         HomeExperienceMenu(
-            id = "entertainment",
-            enabled = true,
-            type = "entertainment",
-            title = "HIBURAN",
-            subtitle = "Konten & Musik",
-            icon = "movie",
-            textColorHex = "#FFFFFF",
-            borderColorHex = "#FF9A76",
-            accentColorHex = "#FF9A76",
-            backgroundUrl = "",
-            entertainmentItemId = 0,
-            sortOrder = 40
+            id = "entertainment", enabled = true, type = "entertainment", title = "HIBURAN", subtitle = "Konten & Musik",
+            icon = "movie", textColorHex = "#FFFFFF", borderColorHex = "#FF9A76", accentColorHex = "#FF9A76",
+            backgroundUrl = "", entertainmentItemId = 0, targetPackage = "", useAppIcon = false, sortOrder = 40
         ),
         HomeExperienceMenu(
-            id = "info",
-            enabled = true,
-            type = "info_dialog",
-            title = "INFO APLIKASI",
-            subtitle = "Cek Pembaruan",
-            icon = "info",
-            textColorHex = "#FFFFFF",
-            borderColorHex = "#C084FC",
-            accentColorHex = "#C084FC",
-            backgroundUrl = "",
-            entertainmentItemId = 0,
-            sortOrder = 50
+            id = "info", enabled = true, type = "info_dialog", title = "INFO APLIKASI", subtitle = "Cek Pembaruan",
+            icon = "info", textColorHex = "#FFFFFF", borderColorHex = "#C084FC", accentColorHex = "#C084FC",
+            backgroundUrl = "", entertainmentItemId = 0, targetPackage = "", useAppIcon = false, sortOrder = 50
         ),
         HomeExperienceMenu(
-            id = "settings",
-            enabled = true,
-            type = "settings",
-            title = "SETTING",
-            subtitle = "Sistem",
-            icon = "settings",
-            textColorHex = "#FFFFFF",
-            borderColorHex = "#7DD3FC",
-            accentColorHex = "#7DD3FC",
-            backgroundUrl = "",
-            entertainmentItemId = 0,
-            sortOrder = 60
+            id = "settings", enabled = true, type = "settings", title = "SETTING", subtitle = "Sistem",
+            icon = "settings", textColorHex = "#FFFFFF", borderColorHex = "#7DD3FC", accentColorHex = "#7DD3FC",
+            backgroundUrl = "", entertainmentItemId = 0, targetPackage = "", useAppIcon = false, sortOrder = 60
+        ),
+        HomeExperienceMenu(
+            id = "app_drawer", enabled = true, type = "app_drawer", title = "SEMUA APLIKASI", subtitle = "App Drawer",
+            icon = "apps", textColorHex = "#FFFFFF", borderColorHex = "#FCA5A5", accentColorHex = "#FCA5A5",
+            backgroundUrl = "", entertainmentItemId = 0, targetPackage = "", useAppIcon = false, sortOrder = 70
         )
     )
 
@@ -205,6 +167,8 @@ object HomeExperienceParser {
                         accentColorHex = item.optString("accentColor", "#FFFFFF"),
                         backgroundUrl = item.optString("backgroundUrl", ""),
                         entertainmentItemId = item.optInt("entertainmentItemId", 0),
+                        targetPackage = item.optString("targetPackage", ""),
+                        useAppIcon = item.optBoolean("useAppIcon", false),
                         sortOrder = item.optInt("sortOrder", index * 10)
                     )
                 )

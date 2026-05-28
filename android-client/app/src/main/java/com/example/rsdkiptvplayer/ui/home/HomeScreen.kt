@@ -25,11 +25,89 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.MenuBook
+import androidx.compose.material.icons.rounded.Apps
+import androidx.compose.material.icons.rounded.Bookmark
+import androidx.compose.material.icons.rounded.Build
+import androidx.compose.material.icons.rounded.Cake
+import androidx.compose.material.icons.rounded.Call
+import androidx.compose.material.icons.rounded.Casino
+import androidx.compose.material.icons.rounded.Chat
+import androidx.compose.material.icons.rounded.Cloud
+import androidx.compose.material.icons.rounded.CloudDownload
+import androidx.compose.material.icons.rounded.CloudUpload
+import androidx.compose.material.icons.rounded.Contacts
+import androidx.compose.material.icons.rounded.Dashboard
+import androidx.compose.material.icons.rounded.Download
+import androidx.compose.material.icons.rounded.Email
+import androidx.compose.material.icons.rounded.Explore
+import androidx.compose.material.icons.rounded.Favorite
+import androidx.compose.material.icons.rounded.FavoriteBorder
+import androidx.compose.material.icons.rounded.Feedback
+import androidx.compose.material.icons.rounded.Folder
+import androidx.compose.material.icons.rounded.FolderOpen
+import androidx.compose.material.icons.rounded.Forum
+import androidx.compose.material.icons.rounded.GridView
+import androidx.compose.material.icons.rounded.Group
+import androidx.compose.material.icons.rounded.Groups
+import androidx.compose.material.icons.rounded.Headphones
+import androidx.compose.material.icons.rounded.Help
+import androidx.compose.material.icons.rounded.Home
+import androidx.compose.material.icons.rounded.Hotel
+import androidx.compose.material.icons.rounded.Image
 import androidx.compose.material.icons.rounded.Info
+import androidx.compose.material.icons.rounded.Key
+import androidx.compose.material.icons.rounded.Launch
+import androidx.compose.material.icons.rounded.Layers
+import androidx.compose.material.icons.rounded.Link
 import androidx.compose.material.icons.rounded.LiveTv
+import androidx.compose.material.icons.rounded.Lock
+import androidx.compose.material.icons.rounded.LockOpen
+import androidx.compose.material.icons.rounded.Map
+import androidx.compose.material.icons.rounded.Menu
+import androidx.compose.material.icons.rounded.Message
+import androidx.compose.material.icons.rounded.Mic
+import androidx.compose.material.icons.rounded.MilitaryTech
 import androidx.compose.material.icons.rounded.Movie
+import androidx.compose.material.icons.rounded.MusicNote
+import androidx.compose.material.icons.rounded.Navigation
+import androidx.compose.material.icons.rounded.NearMe
+import androidx.compose.material.icons.rounded.Notifications
+import androidx.compose.material.icons.rounded.People
+import androidx.compose.material.icons.rounded.Person
+import androidx.compose.material.icons.rounded.Phone
+import androidx.compose.material.icons.rounded.Photo
+import androidx.compose.material.icons.rounded.PhotoLibrary
+import androidx.compose.material.icons.rounded.Place
+import androidx.compose.material.icons.rounded.PlayCircle
+import androidx.compose.material.icons.rounded.Radio
+import androidx.compose.material.icons.rounded.Replay
+import androidx.compose.material.icons.rounded.Restaurant
 import androidx.compose.material.icons.rounded.RoomService
+import androidx.compose.material.icons.rounded.Save
+import androidx.compose.material.icons.rounded.School
+import androidx.compose.material.icons.rounded.Science
+import androidx.compose.material.icons.rounded.Search
+import androidx.compose.material.icons.rounded.Security
 import androidx.compose.material.icons.rounded.Settings
+import androidx.compose.material.icons.rounded.Share
+import androidx.compose.material.icons.rounded.Shield
+import androidx.compose.material.icons.rounded.Shuffle
+import androidx.compose.material.icons.rounded.Spa
+import androidx.compose.material.icons.rounded.Speaker
+import androidx.compose.material.icons.rounded.Star
+import androidx.compose.material.icons.rounded.StarBorder
+import androidx.compose.material.icons.rounded.Storage
+import androidx.compose.material.icons.rounded.ThumbDown
+import androidx.compose.material.icons.rounded.ThumbUp
+import androidx.compose.material.icons.rounded.Toys
+import androidx.compose.material.icons.rounded.Tune
+import androidx.compose.material.icons.rounded.Upload
+import androidx.compose.material.icons.rounded.Verified
+import androidx.compose.material.icons.rounded.Videocam
+import androidx.compose.material.icons.rounded.ViewList
+import androidx.compose.material.icons.rounded.ViewModule
+import androidx.compose.material.icons.rounded.VolumeUp
+import androidx.compose.material.icons.rounded.Widgets
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -37,6 +115,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.viewinterop.AndroidView
 import androidx.compose.ui.zIndex
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
@@ -95,6 +174,7 @@ fun HomeScreen(
     onNavigateToEntertainment: () -> Unit,
     onNavigateToEntertainmentItem: (Int) -> Unit,
     onNavigateToSettings: (activeTab: Int) -> Unit,
+    onNavigateToAppDrawer: () -> Unit,
     playerViewModel: PlayerViewModel = viewModel()
 ) {
     val context = LocalContext.current
@@ -388,6 +468,7 @@ fun HomeScreen(
                 onEntertainmentItemClick = onNavigateToEntertainmentItem,
                 onSettingsClick = { onNavigateToSettings(0) },
                 onInfoClick = { showInfoDialog = true },
+                onAppDrawerClick = onNavigateToAppDrawer,
                 onOpenStbNameMenu = { showStbNameDialog = true },
                 menuFocusRequester = menuFocusRequester,
                 showFiveItems = showFiveItems,
@@ -607,6 +688,7 @@ private fun HospitalityMenuBar(
     onEntertainmentItemClick: (Int) -> Unit,
     onSettingsClick: () -> Unit,
     onInfoClick: () -> Unit,
+    onAppDrawerClick: () -> Unit,
     onOpenStbNameMenu: () -> Unit,
     menuFocusRequester: FocusRequester,
     showFiveItems: Boolean,
@@ -672,11 +754,71 @@ private fun HospitalityMenuBar(
                     if (itemId <= 0) return@mapNotNull null
                     ({ onEntertainmentItemClick(itemId) })
                 }
+                "app_drawer" -> onAppDrawerClick
+                "launch_app" -> ({
+                    val pkg = menu.targetPackage.trim()
+                    if (pkg.isBlank()) {
+                        Toast.makeText(context, "Package name belum diisi.", Toast.LENGTH_SHORT).show()
+                    } else {
+                        val launchIntent = context.packageManager.getLaunchIntentForPackage(pkg)
+                        if (launchIntent != null) {
+                            launchIntent.flags = android.content.Intent.FLAG_ACTIVITY_NEW_TASK
+                            context.startActivity(launchIntent)
+                        } else {
+                            var opened = false
+                            try {
+                                val playIntent = android.content.Intent(
+                                    android.content.Intent.ACTION_VIEW,
+                                    android.net.Uri.parse("market://details?id=$pkg")
+                                ).apply {
+                                    setPackage("com.android.vending")
+                                    flags = android.content.Intent.FLAG_ACTIVITY_NEW_TASK
+                                }
+                                context.startActivity(playIntent)
+                                opened = true
+                            } catch (_: Exception) {}
+
+                            if (!opened) {
+                                try {
+                                    val playIntent = android.content.Intent(
+                                        android.content.Intent.ACTION_VIEW,
+                                        android.net.Uri.parse("market://details?id=$pkg")
+                                    ).apply { flags = android.content.Intent.FLAG_ACTIVITY_NEW_TASK }
+                                    context.startActivity(playIntent)
+                                    opened = true
+                                } catch (_: Exception) {}
+                            }
+
+                            if (!opened) {
+                                try {
+                                    val webIntent = android.content.Intent(
+                                        android.content.Intent.ACTION_VIEW,
+                                        android.net.Uri.parse("https://play.google.com/store/apps/details?id=$pkg")
+                                    ).apply { flags = android.content.Intent.FLAG_ACTIVITY_NEW_TASK }
+                                    context.startActivity(webIntent)
+                                    opened = true
+                                } catch (_: Exception) {}
+                            }
+
+                            if (!opened) {
+                                Toast.makeText(context, "Tidak dapat membuka Play Store untuk: $pkg", Toast.LENGTH_SHORT).show()
+                            }
+                        }
+                    }
+                })
                 else -> onServiceClick
             }
 
+            // Resolve app icon only if useAppIcon is enabled and app is installed
+            val appIconDrawable = if (menu.type == "launch_app" && menu.useAppIcon && menu.targetPackage.isNotBlank()) {
+                try {
+                    context.packageManager.getApplicationIcon(menu.targetPackage)
+                } catch (_: Exception) { null }
+            } else null
+
             HospitalityCarouselItem(
                 icon = resolveHomeIcon(menu.icon),
+                appIconDrawable = appIconDrawable,
                 title = menu.title,
                 subtitle = subtitle,
                 accent = HomeExperienceParser.colorOrDefault(menu.accentColorHex, Color(0xFFFFE9A6)),
@@ -949,6 +1091,7 @@ private fun HospitalityMenuBar(
 
 private data class HospitalityCarouselItem(
     val icon: ImageVector,
+    val appIconDrawable: android.graphics.drawable.Drawable? = null,
     val title: String,
     val subtitle: String,
     val accent: Color,
@@ -960,11 +1103,111 @@ private data class HospitalityCarouselItem(
 
 private fun resolveHomeIcon(name: String): ImageVector {
     return when (name.lowercase()) {
+        // Media & Entertainment
         "live_tv" -> Icons.Rounded.LiveTv
-        "menu_book" -> Icons.AutoMirrored.Rounded.MenuBook
+        "tv" -> Icons.Rounded.LiveTv
         "movie" -> Icons.Rounded.Movie
-        "settings" -> Icons.Rounded.Settings
+        "theaters" -> Icons.Rounded.Movie
+        "music_note" -> Icons.Rounded.MusicNote
+        "headphones" -> Icons.Rounded.Headphones
+        "radio" -> Icons.Rounded.Radio
+        "podcast" -> Icons.Rounded.Radio
+        "videocam" -> Icons.Rounded.Videocam
+        "play_circle" -> Icons.Rounded.PlayCircle
+        "replay" -> Icons.Rounded.Replay
+        "shuffle" -> Icons.Rounded.Shuffle
+        "mic" -> Icons.Rounded.Mic
+        "speaker" -> Icons.Rounded.Speaker
+        "volume_up" -> Icons.Rounded.VolumeUp
+        "sports_esports" -> Icons.Rounded.Toys
+        "casino" -> Icons.Rounded.Casino
+        "toys" -> Icons.Rounded.Toys
+        // Education & Info
+        "menu_book" -> Icons.AutoMirrored.Rounded.MenuBook
+        "school" -> Icons.Rounded.School
+        "book" -> Icons.AutoMirrored.Rounded.MenuBook
+        "library_books" -> Icons.AutoMirrored.Rounded.MenuBook
+        "science" -> Icons.Rounded.Science
+        "info" -> Icons.Rounded.Info
+        "help" -> Icons.Rounded.Help
+        "help_outline" -> Icons.Rounded.Help
+        "notifications" -> Icons.Rounded.Notifications
+        "feedback" -> Icons.Rounded.Feedback
+        // Health & Medical
+        "local_hospital" -> Icons.Rounded.Favorite
+        "medical_services" -> Icons.Rounded.Favorite
+        "health_and_safety" -> Icons.Rounded.Shield
+        "healing" -> Icons.Rounded.Favorite
+        "spa" -> Icons.Rounded.Spa
+        // Navigation & UI
+        "home" -> Icons.Rounded.Home
+        "dashboard" -> Icons.Rounded.Dashboard
+        "menu" -> Icons.Rounded.Menu
+        "apps" -> Icons.Rounded.Apps
+        "grid_view" -> Icons.Rounded.GridView
+        "view_list" -> Icons.Rounded.ViewList
+        "view_module" -> Icons.Rounded.ViewModule
+        "widgets" -> Icons.Rounded.Widgets
+        "layers" -> Icons.Rounded.Layers
+        "map" -> Icons.Rounded.Map
+        "navigation" -> Icons.Rounded.Navigation
+        "explore" -> Icons.Rounded.Explore
+        "near_me" -> Icons.Rounded.NearMe
+        "place" -> Icons.Rounded.Place
+        "location_on" -> Icons.Rounded.Place
+        "launch" -> Icons.Rounded.Launch
+        "link" -> Icons.Rounded.Link
+        "share" -> Icons.Rounded.Share
+        // Communication
+        "chat" -> Icons.Rounded.Chat
+        "message" -> Icons.Rounded.Message
+        "email" -> Icons.Rounded.Email
+        "phone" -> Icons.Rounded.Phone
+        "call" -> Icons.Rounded.Call
+        "forum" -> Icons.Rounded.Forum
+        "contacts" -> Icons.Rounded.Contacts
+        "person" -> Icons.Rounded.Person
+        "group" -> Icons.Rounded.Group
+        "groups" -> Icons.Rounded.Groups
+        "people" -> Icons.Rounded.People
+        // Food & Hospitality
         "room_service" -> Icons.Rounded.RoomService
+        "restaurant" -> Icons.Rounded.Restaurant
+        "hotel" -> Icons.Rounded.Hotel
+        // Settings & System
+        "settings" -> Icons.Rounded.Settings
+        "tune" -> Icons.Rounded.Tune
+        "build" -> Icons.Rounded.Build
+        "security" -> Icons.Rounded.Security
+        "lock" -> Icons.Rounded.Lock
+        "lock_open" -> Icons.Rounded.LockOpen
+        "key" -> Icons.Rounded.Key
+        "shield" -> Icons.Rounded.Shield
+        // Files & Data
+        "folder" -> Icons.Rounded.Folder
+        "folder_open" -> Icons.Rounded.FolderOpen
+        "cloud" -> Icons.Rounded.Cloud
+        "cloud_upload" -> Icons.Rounded.CloudUpload
+        "cloud_download" -> Icons.Rounded.CloudDownload
+        "upload" -> Icons.Rounded.Upload
+        "download" -> Icons.Rounded.Download
+        "save" -> Icons.Rounded.Save
+        "storage" -> Icons.Rounded.Storage
+        "image" -> Icons.Rounded.Image
+        "photo" -> Icons.Rounded.Photo
+        "photo_library" -> Icons.Rounded.PhotoLibrary
+        // Stars & Misc
+        "star" -> Icons.Rounded.Star
+        "star_border" -> Icons.Rounded.StarBorder
+        "favorite" -> Icons.Rounded.Favorite
+        "favorite_border" -> Icons.Rounded.FavoriteBorder
+        "thumb_up" -> Icons.Rounded.ThumbUp
+        "thumb_down" -> Icons.Rounded.ThumbDown
+        "military_tech" -> Icons.Rounded.MilitaryTech
+        "verified" -> Icons.Rounded.Verified
+        "search" -> Icons.Rounded.Search
+        "bookmark" -> Icons.Rounded.Bookmark
+        "cake" -> Icons.Rounded.Cake
         else -> Icons.Rounded.Info
     }
 }
@@ -974,7 +1217,7 @@ private fun defaultBackgroundForMenuType(type: String): Int {
         "tv" -> R.drawable.home_bg_tv
         "education" -> R.drawable.home_bg_education
         "entertainment", "konten" -> R.drawable.home_bg_youtube
-        "settings" -> R.drawable.home_bg_settings
+        "settings", "app_drawer" -> R.drawable.home_bg_settings
         else -> R.drawable.home_bg_info
     }
 }
@@ -1223,14 +1466,28 @@ private fun HospitalityCarouselCard(
                         .clip(RoundedCornerShape(999.dp))
                         .background(item.accent.copy(alpha = if (isActive) 0.78f else 0.36f))
                 )
-                Icon(
-                    imageVector = item.icon,
-                    contentDescription = item.title,
-                    tint = Color.White.copy(alpha = if (isActive) 0.98f else 0.78f),
-                    modifier = Modifier
-                        .size(iconPlateSize)
-                        .offset(y = if (isActive) (-2).dp else 0.dp)
-                )
+                if (item.appIconDrawable != null) {
+                    AndroidView(
+                        factory = { ctx ->
+                            android.widget.ImageView(ctx).apply {
+                                scaleType = android.widget.ImageView.ScaleType.FIT_CENTER
+                                setImageDrawable(item.appIconDrawable)
+                            }
+                        },
+                        modifier = Modifier
+                            .size(iconPlateSize)
+                            .offset(y = if (isActive) (-2).dp else 0.dp)
+                    )
+                } else {
+                    Icon(
+                        imageVector = item.icon,
+                        contentDescription = item.title,
+                        tint = Color.White.copy(alpha = if (isActive) 0.98f else 0.78f),
+                        modifier = Modifier
+                            .size(iconPlateSize)
+                            .offset(y = if (isActive) (-2).dp else 0.dp)
+                    )
+                }
             }
 
             Spacer(modifier = Modifier.height(if (isActive) (if (isUltraCompact) 4.dp else 8.dp) else (if (isUltraCompact) 2.dp else 4.dp)))
@@ -1394,18 +1651,36 @@ private fun HospitalityCarouselCard(
                             )
                         )
                 )
-                Icon(
-                    imageVector = item.icon,
-                    contentDescription = item.title,
-                    tint = Color.White.copy(alpha = if (isActive) 1f else 0.76f),
-                    modifier = Modifier.size(
-                        when (distance) {
-                            0 -> if (isUltraCompact) 26.dp else if (isSmallScreen) 34.dp else 48.dp
-                            1 -> if (isUltraCompact) 18.dp else if (isSmallScreen) 24.dp else 32.dp
-                            else -> if (isUltraCompact) 14.dp else if (isSmallScreen) 18.dp else 24.dp
-                        }
+                if (item.appIconDrawable != null) {
+                    AndroidView(
+                        factory = { ctx ->
+                            android.widget.ImageView(ctx).apply {
+                                scaleType = android.widget.ImageView.ScaleType.FIT_CENTER
+                                setImageDrawable(item.appIconDrawable)
+                            }
+                        },
+                        modifier = Modifier.size(
+                            when (distance) {
+                                0 -> if (isUltraCompact) 26.dp else if (isSmallScreen) 34.dp else 48.dp
+                                1 -> if (isUltraCompact) 18.dp else if (isSmallScreen) 24.dp else 32.dp
+                                else -> if (isUltraCompact) 14.dp else if (isSmallScreen) 18.dp else 24.dp
+                            }
+                        )
                     )
-                )
+                } else {
+                    Icon(
+                        imageVector = item.icon,
+                        contentDescription = item.title,
+                        tint = Color.White.copy(alpha = if (isActive) 1f else 0.76f),
+                        modifier = Modifier.size(
+                            when (distance) {
+                                0 -> if (isUltraCompact) 26.dp else if (isSmallScreen) 34.dp else 48.dp
+                                1 -> if (isUltraCompact) 18.dp else if (isSmallScreen) 24.dp else 32.dp
+                                else -> if (isUltraCompact) 14.dp else if (isSmallScreen) 18.dp else 24.dp
+                            }
+                        )
+                    )
+                }
             }
         }
         val textSpacerHeight by animateDpAsState(
