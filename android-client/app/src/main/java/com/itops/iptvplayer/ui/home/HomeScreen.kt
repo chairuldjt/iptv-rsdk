@@ -603,7 +603,8 @@ private fun HospitalityHeader(
                         contentDescription = "Hospitality IPTV",
                         modifier = Modifier
                             .size(if (isMediumHeight) 48.dp else 72.dp)
-                            .shadow(12.dp, RoundedCornerShape(16.dp))
+                            .clip(RoundedCornerShape(16.dp)),
+                        contentScale = ContentScale.Fit
                     )
                 } else {
                     Image(
@@ -611,7 +612,7 @@ private fun HospitalityHeader(
                         contentDescription = "Hospitality IPTV",
                         modifier = Modifier
                             .size(if (isMediumHeight) 48.dp else 72.dp)
-                            .shadow(12.dp, RoundedCornerShape(16.dp))
+                            .clip(RoundedCornerShape(16.dp))
                     )
                 }
                 Spacer(modifier = Modifier.height(if (isMediumHeight) 4.dp else 8.dp))
