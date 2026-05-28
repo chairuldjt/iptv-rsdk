@@ -498,6 +498,14 @@ export default function HomeExperienceForm({
                                     className="field-input font-mono"
                                     placeholder="#142331 atau kosong"
                                   />
+                                  <button
+                                    type="button"
+                                    onClick={() => updateMenu(setMenus, menu.id, { cardBackgroundColor: '#00000000' })}
+                                    className="shrink-0 rounded-lg border border-border px-2 py-1 text-[10px] font-semibold text-muted-foreground hover:bg-accent/50 transition-colors"
+                                    title="Set transparan"
+                                  >
+                                    Transparan
+                                  </button>
                                 </div>
                                 <div className="flex items-center gap-3">
                                   <span className="text-[10px] text-muted-foreground w-16 shrink-0">Opacity</span>
