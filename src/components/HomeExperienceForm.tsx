@@ -1452,15 +1452,7 @@ export function HomeExperiencePreview({ config }: { config: HomeExperienceConfig
 
           {/* Centered logo + title + subtitle + spinner */}
           <div className="absolute inset-0 flex flex-col items-center justify-center px-8 text-center">
-            <div
-              className="flex h-28 w-28 items-center justify-center rounded-full border-2 p-3 shadow-2xl"
-              style={{
-                backgroundColor: '#071217',
-                borderColor: 'rgba(255,255,255,0.24)',
-                boxShadow:
-                  '0 28px 60px -10px rgba(46,230,198,0.34), 0 28px 60px -10px rgba(255,209,102,0.30)',
-              }}
-            >
+            <div className="flex h-28 w-28 items-center justify-center p-3">
               <img src={splashLogo} alt="Splash Logo" className="h-full w-full object-contain" />
             </div>
 
