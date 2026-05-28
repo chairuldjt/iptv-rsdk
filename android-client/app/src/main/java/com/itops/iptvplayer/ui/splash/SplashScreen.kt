@@ -216,14 +216,6 @@ fun SplashScreen(
             Box(
                 modifier = Modifier
                     .size(176.dp)
-                    .shadow(
-                        elevation = 28.dp,
-                        shape = CircleShape,
-                        ambientColor = Color(0xFF2EE6C6).copy(alpha = 0.34f),
-                        spotColor = Color(0xFFFFD166).copy(alpha = 0.30f)
-                    )
-                    .background(Color(0xFF071217), CircleShape)
-                    .border(2.dp, Color.White.copy(alpha = 0.24f), CircleShape)
                     .padding(14.dp),
                 contentAlignment = Alignment.Center
             ) {
