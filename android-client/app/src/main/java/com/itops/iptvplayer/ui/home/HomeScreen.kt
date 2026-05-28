@@ -2520,7 +2520,7 @@ private fun HomeOverlayWidget(
                     modifier = Modifier
                         .width(scaledImageWidth)
                         .height(scaledImageHeight)
-                        .shadow(12.dp, RoundedCornerShape(scaledCornerRadius)),
+                        .clip(RoundedCornerShape(scaledCornerRadius)),
                     contentScale = ContentScale.Fit
                 )
             } else if (overlay.type == HomeOverlayType.APP_LOGO) {
@@ -2531,7 +2531,7 @@ private fun HomeOverlayWidget(
                     modifier = Modifier
                         .width(scaledImageWidth)
                         .height(scaledImageHeight)
-                        .shadow(12.dp, RoundedCornerShape(scaledCornerRadius)),
+                        .clip(RoundedCornerShape(scaledCornerRadius)),
                     contentScale = ContentScale.Fit
                 )
             } else if (displayText != null && displayText.isNotBlank()) {
