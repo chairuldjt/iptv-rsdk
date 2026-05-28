@@ -68,10 +68,10 @@ val gitVersionName: String = try {
 }
 
 android {
-    namespace = "com.example.rsdkiptvplayer"
+    namespace = "com.itops.iptvplayer"
     compileSdk = 36
     defaultConfig {
-        applicationId = "com.example.rsdkiptvplayer"
+        applicationId = "com.itops.iptvplayer"
         minSdk = 23
         targetSdk = 36
         versionCode = gitVersionCode
