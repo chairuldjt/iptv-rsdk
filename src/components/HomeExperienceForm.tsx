@@ -1334,8 +1334,17 @@ function OverlayEditor({
                   <input type="number" value={overlay.imageHeight ?? 60} onChange={(e) => onChange({ imageHeight: Number(e.target.value) })} className="field-input" min={16} max={600} />
                 </Field>
               </div>
+              <AssetUpload
+                label="Gambar Overlay"
+                fileFieldName={`overlayImageFile__${overlay.id}`}
+                currentUrl={overlay.imageUrl ?? ''}
+                onClear={() => onChange({ imageUrl: '' })}
+                accept={IMAGE_ACCEPT}
+                hint="PNG/JPEG/WebP/GIF/AVIF • max 1 MB • akan dikonversi ke PNG"
+                kind="image"
+              />
               <div className="rounded-xl border border-border bg-accent/20 p-3 space-y-2">
-                <div className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">URL Gambar</div>
+                <div className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Atau masukkan URL langsung</div>
                 <input
                   type="text"
                   value={overlay.imageUrl ?? ''}
@@ -1343,7 +1352,6 @@ function OverlayEditor({
                   className="field-input font-mono text-xs"
                   placeholder="https://... atau /uploads/..."
                 />
-                <p className="text-[10px] text-muted-foreground">Masukkan URL gambar langsung. Gunakan upload di Branding untuk mendapatkan URL.</p>
               </div>
             </div>
           )}
