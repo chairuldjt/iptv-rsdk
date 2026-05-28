@@ -156,6 +156,9 @@ import java.util.*
 import android.widget.Toast
 import com.example.rsdkiptvplayer.util.UpdateManager
 import com.example.rsdkiptvplayer.util.HomeExperienceParser
+import com.example.rsdkiptvplayer.util.HomeOverlayItem
+import com.example.rsdkiptvplayer.util.HomeOverlayPosition
+import com.example.rsdkiptvplayer.util.HomeOverlayType
 import com.example.rsdkiptvplayer.util.RemoteAudioPlayer
 import com.example.rsdkiptvplayer.data.api.RetrofitClient
 import com.example.rsdkiptvplayer.util.NtpTimeProvider
@@ -415,17 +418,21 @@ fun HomeScreen(
                     vertical = if (isUltraCompact) 6.dp else if (isSmallScreen) 10.dp else 18.dp
                 )
         ) {
-            HospitalityHeader(
-                logoUrl = homeExperience.logoUrl,
-                stbName = displayedStbName,
-                deviceId = resolvedDeviceId,
-                ipAddress = localIpAddress,
-                channelCount = channels.size,
-                time = timeString,
-                date = dateString,
-                version = versionText,
-                weather = weatherText
-            )
+            // Jika ada overlay dari server, header hardcode disembunyikan —
+            // overlay system yang mengambil alih rendering elemen header.
+            if (homeExperience.overlays.isEmpty()) {
+                HospitalityHeader(
+                    logoUrl = homeExperience.logoUrl,
+                    stbName = displayedStbName,
+                    deviceId = resolvedDeviceId,
+                    ipAddress = localIpAddress,
+                    channelCount = channels.size,
+                    time = timeString,
+                    date = dateString,
+                    version = versionText,
+                    weather = weatherText
+                )
+            }
 
             Spacer(modifier = Modifier.weight(1f))
 
@@ -478,6 +485,19 @@ fun HomeScreen(
                     selectedHomeBackground = item.backgroundRes
                     selectedHomeBackgroundUrl = item.backgroundUrl
                 }
+            )
+        }
+
+        // Render home screen overlays (text, logo, clock, date, weather, etc.)
+        if (homeExperience.overlays.isNotEmpty()) {
+            HomeScreenOverlays(
+                overlays = homeExperience.overlays,
+                deviceName = displayedStbName,
+                channelCount = channels.size,
+                timeString = timeString,
+                dateString = dateString,
+                weatherText = weatherText,
+                appLogoUrl = homeExperience.logoUrl,
             )
         }
 
@@ -1080,8 +1100,13 @@ private fun HospitalityMenuBar(
             Spacer(modifier = Modifier.height(if (isUltraCompact) 4.dp else 8.dp))
         }
         Text(
-            text = if (isUltraCompact) "Kiri/Kanan: Putar • OK: Pilih • Tahan OK 3s: Nama STB"
-                   else "Gunakan kiri/kanan remote untuk memutar menu, OK untuk memilih, tahan OK 3 detik untuk ubah nama STB",
+            text = if (isUltraCompact) {
+                homeExperience.menuHintText.ifBlank { "Kiri/Kanan: Putar • OK: Pilih • Tahan OK 3s: Nama STB" }.let {
+                    if (it.length > 60) it.take(57) + "..." else it
+                }
+            } else homeExperience.menuHintText.ifBlank {
+                "Gunakan kiri/kanan remote untuk memutar menu, OK untuk memilih, tahan OK 3 detik untuk ubah nama STB"
+            },
             color = Color.White.copy(alpha = 0.62f),
             fontSize = if (isUltraCompact) 7.sp else if (isSmallScreen) 8.sp else 10.sp,
             fontWeight = FontWeight.Medium
@@ -2362,5 +2387,160 @@ private fun InfoRow(label: String, value: String) {
     ) {
         Text(text = label, color = Color.White.copy(alpha = 0.5f), fontSize = 12.sp, fontWeight = FontWeight.Medium)
         Text(text = value, color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+    }
+}
+
+@Composable
+private fun HomeScreenOverlays(
+    overlays: List<HomeOverlayItem>,
+    deviceName: String,
+    channelCount: Int,
+    timeString: String,
+    dateString: String,
+    weatherText: String,
+    appLogoUrl: String,
+) {
+    Box(modifier = Modifier.fillMaxSize()) {
+        overlays.forEach { overlay ->
+            HomeOverlayWidget(
+                overlay = overlay,
+                deviceName = deviceName,
+                channelCount = channelCount,
+                timeString = timeString,
+                dateString = dateString,
+                weatherText = weatherText,
+                appLogoUrl = appLogoUrl,
+            )
+        }
+    }
+}
+
+@Composable
+private fun HomeOverlayWidget(
+    overlay: HomeOverlayItem,
+    deviceName: String,
+    channelCount: Int,
+    timeString: String,
+    dateString: String,
+    weatherText: String,
+    appLogoUrl: String,
+) {
+    val configuration = androidx.compose.ui.platform.LocalConfiguration.current
+    val screenWidth = configuration.screenWidthDp
+    val screenHeight = configuration.screenHeightDp
+    val isSmallScreen = screenWidth < 760 || screenHeight < 500
+    val isUltraCompact = screenWidth < 600 || screenHeight < 400
+
+    // Scale factor: 1.0 = normal (large TV), 0.75 = small, 0.55 = ultracompact
+    val scaleFactor = when {
+        isUltraCompact -> 0.55f
+        isSmallScreen -> 0.75f
+        else -> 1.0f
+    }
+
+    val alignment = when (overlay.position) {
+        HomeOverlayPosition.TOP_LEFT -> Alignment.TopStart
+        HomeOverlayPosition.TOP_CENTER -> Alignment.TopCenter
+        HomeOverlayPosition.TOP_RIGHT -> Alignment.TopEnd
+        HomeOverlayPosition.MIDDLE_LEFT -> Alignment.CenterStart
+        HomeOverlayPosition.MIDDLE_CENTER -> Alignment.Center
+        HomeOverlayPosition.MIDDLE_RIGHT -> Alignment.CenterEnd
+        HomeOverlayPosition.BOTTOM_LEFT -> Alignment.BottomStart
+        HomeOverlayPosition.BOTTOM_CENTER -> Alignment.BottomCenter
+        HomeOverlayPosition.BOTTOM_RIGHT -> Alignment.BottomEnd
+    }
+
+    val textColor = try {
+        Color(android.graphics.Color.parseColor(overlay.textColor.ifBlank { "#FFFFFF" }))
+    } catch (_: Exception) { Color.White }
+
+    val bgColor = if (overlay.backgroundColor.isNotBlank()) {
+        try { Color(java.lang.Long.parseLong(overlay.backgroundColor.removePrefix("#"), 16).toInt()) }
+        catch (_: Exception) { Color.Transparent }
+    } else Color.Transparent
+
+    val fontWeight = when (overlay.fontWeight) {
+        "bold" -> FontWeight.Bold
+        "extrabold" -> FontWeight.ExtraBold
+        else -> FontWeight.Normal
+    }
+
+    val displayText = when (overlay.type) {
+        HomeOverlayType.TEXT -> overlay.text
+        HomeOverlayType.CLOCK -> timeString
+        HomeOverlayType.DATE -> dateString
+        HomeOverlayType.WEATHER -> weatherText
+        HomeOverlayType.DEVICE_NAME -> deviceName
+        HomeOverlayType.CHANNEL_COUNT -> "$channelCount Saluran"
+        HomeOverlayType.LOGO -> null
+        HomeOverlayType.APP_LOGO -> null
+    }
+
+    // Resolve logo URL: APP_LOGO uses homeExperience.logoUrl, LOGO uses overlay.imageUrl
+    val resolvedLogoUrl = when (overlay.type) {
+        HomeOverlayType.APP_LOGO -> appLogoUrl
+        HomeOverlayType.LOGO -> overlay.imageUrl
+        else -> ""
+    }
+
+    // Scale font size and offsets based on screen size
+    val scaledFontSize = (overlay.textSize * scaleFactor).sp
+    val scaledOffsetX = (overlay.offsetX * scaleFactor).dp
+    val scaledOffsetY = (overlay.offsetY * scaleFactor).dp
+    val scaledPaddingH = (overlay.paddingH * scaleFactor).dp
+    val scaledPaddingV = (overlay.paddingV * scaleFactor).dp
+    val scaledCornerRadius = (overlay.cornerRadius * scaleFactor).dp
+    val scaledImageWidth = (overlay.imageWidth * scaleFactor).dp
+    val scaledImageHeight = (overlay.imageHeight * scaleFactor).dp
+
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .safeDrawingPadding()
+            .padding(
+                horizontal = if (isUltraCompact) 12.dp else if (isSmallScreen) 18.dp else 34.dp,
+                vertical = if (isUltraCompact) 6.dp else if (isSmallScreen) 10.dp else 18.dp
+            ),
+        contentAlignment = alignment
+    ) {
+        Box(
+            modifier = Modifier
+                .offset(x = scaledOffsetX, y = scaledOffsetY)
+                .clip(RoundedCornerShape(scaledCornerRadius))
+                .background(bgColor)
+                .padding(horizontal = scaledPaddingH, vertical = scaledPaddingV)
+        ) {
+            if ((overlay.type == HomeOverlayType.LOGO || overlay.type == HomeOverlayType.APP_LOGO) && resolvedLogoUrl.isNotBlank()) {
+                AsyncImage(
+                    model = resolvedLogoUrl,
+                    contentDescription = "Overlay logo",
+                    modifier = Modifier
+                        .width(scaledImageWidth)
+                        .height(scaledImageHeight)
+                        .shadow(12.dp, RoundedCornerShape(scaledCornerRadius)),
+                    contentScale = ContentScale.Fit
+                )
+            } else if (overlay.type == HomeOverlayType.APP_LOGO) {
+                // Fallback to built-in drawable when no logoUrl configured
+                Image(
+                    painter = painterResource(id = R.drawable.ic_global_iptv),
+                    contentDescription = "App Logo",
+                    modifier = Modifier
+                        .width(scaledImageWidth)
+                        .height(scaledImageHeight)
+                        .shadow(12.dp, RoundedCornerShape(scaledCornerRadius)),
+                    contentScale = ContentScale.Fit
+                )
+            } else if (displayText != null && displayText.isNotBlank()) {
+                Text(
+                    text = displayText,
+                    color = textColor,
+                    fontSize = scaledFontSize,
+                    fontWeight = fontWeight,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+        }
     }
 }

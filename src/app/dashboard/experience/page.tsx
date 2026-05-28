@@ -66,6 +66,20 @@ async function saveProfileConfigAction(formData: FormData) {
         ),
       }))
     )
+    config.overlays = await Promise.all(
+      config.overlays.map(async (overlay) => ({
+        ...overlay,
+        imageUrl: overlay.type === 'logo'
+          ? await resolveImageAsset(
+              formData,
+              `overlayImageFile__${overlay.id}`,
+              `overlay-img-${overlay.id}`,
+              'logo',
+              overlay.imageUrl ?? ''
+            )
+          : (overlay.imageUrl ?? ''),
+      }))
+    )
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Upload gagal divalidasi.'
     revalidatePath('/dashboard/experience')

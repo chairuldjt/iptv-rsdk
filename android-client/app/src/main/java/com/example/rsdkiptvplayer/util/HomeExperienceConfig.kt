@@ -10,6 +10,8 @@ data class HomeExperienceProfile(
     val startScreen: String = "home_screen",
     val startScreenContentId: Int? = null,
     val menus: List<HomeExperienceMenu> = emptyList(),
+    val overlays: List<HomeOverlayItem> = emptyList(),
+    val menuHintText: String = "Gunakan kiri/kanan remote untuk memutar menu, OK untuk memilih, tahan OK 3 detik untuk ubah nama STB",
     val splash: HomeExperienceSplash = HomeExperienceSplash(),
     val sounds: HomeExperienceSounds = HomeExperienceSounds()
 )
@@ -29,6 +31,66 @@ data class HomeExperienceMenu(
     val targetPackage: String,
     val useAppIcon: Boolean,
     val sortOrder: Int
+)
+
+// ── Overlay models ────────────────────────────────────────────────────────────
+
+enum class HomeOverlayType {
+    TEXT, LOGO, APP_LOGO, CLOCK, DATE, WEATHER, DEVICE_NAME, CHANNEL_COUNT;
+    companion object {
+        fun from(s: String) = when (s.lowercase()) {
+            "text" -> TEXT
+            "logo" -> LOGO
+            "app_logo" -> APP_LOGO
+            "clock" -> CLOCK
+            "date" -> DATE
+            "weather" -> WEATHER
+            "device_name" -> DEVICE_NAME
+            "channel_count" -> CHANNEL_COUNT
+            else -> TEXT
+        }
+    }
+}
+
+enum class HomeOverlayPosition {
+    TOP_LEFT, TOP_CENTER, TOP_RIGHT,
+    MIDDLE_LEFT, MIDDLE_CENTER, MIDDLE_RIGHT,
+    BOTTOM_LEFT, BOTTOM_CENTER, BOTTOM_RIGHT;
+    companion object {
+        fun from(s: String) = when (s.lowercase()) {
+            "top-left" -> TOP_LEFT
+            "top-center" -> TOP_CENTER
+            "top-right" -> TOP_RIGHT
+            "middle-left" -> MIDDLE_LEFT
+            "middle-center" -> MIDDLE_CENTER
+            "middle-right" -> MIDDLE_RIGHT
+            "bottom-left" -> BOTTOM_LEFT
+            "bottom-center" -> BOTTOM_CENTER
+            "bottom-right" -> BOTTOM_RIGHT
+            else -> TOP_LEFT
+        }
+    }
+}
+
+data class HomeOverlayItem(
+    val id: String,
+    val enabled: Boolean = true,
+    val type: HomeOverlayType = HomeOverlayType.TEXT,
+    val position: HomeOverlayPosition = HomeOverlayPosition.TOP_LEFT,
+    val text: String = "",
+    val imageUrl: String = "",
+    val imageWidth: Int = 120,
+    val imageHeight: Int = 60,
+    val textColor: String = "#FFFFFF",
+    val textSize: Int = 14,
+    val fontWeight: String = "normal",   // normal | bold | extrabold
+    val backgroundColor: String = "",    // #AARRGGBB or empty
+    val paddingH: Int = 8,
+    val paddingV: Int = 4,
+    val cornerRadius: Int = 6,
+    val offsetX: Int = 0,
+    val offsetY: Int = 0,
+    val sortOrder: Int = 0
 )
 
 data class HomeExperienceRunningText(
@@ -78,6 +140,8 @@ object HomeExperienceParser {
                 startScreen = startScreen,
                 startScreenContentId = startScreenContentId,
                 menus = parseMenus(root.optJSONArray("menus")),
+                overlays = parseOverlays(root.optJSONArray("overlays")),
+                menuHintText = root.optString("menuHintText", "Gunakan kiri/kanan remote untuk memutar menu, OK untuk memilih, tahan OK 3 detik untuk ubah nama STB"),
                 splash = parseSplash(root.optJSONObject("splash")),
                 sounds = parseSounds(root.optJSONObject("sounds"))
             )
@@ -146,6 +210,38 @@ object HomeExperienceParser {
         } catch (_: Exception) {
             fallback
         }
+    }
+
+    private fun parseOverlays(array: JSONArray?): List<HomeOverlayItem> {
+        if (array == null) return emptyList()
+        return buildList {
+            for (i in 0 until array.length()) {
+                val item = array.optJSONObject(i) ?: continue
+                if (!item.optBoolean("enabled", true)) continue
+                add(
+                    HomeOverlayItem(
+                        id = item.optString("id", "overlay_$i"),
+                        enabled = true,
+                        type = HomeOverlayType.from(item.optString("type", "text")),
+                        position = HomeOverlayPosition.from(item.optString("position", "top-left")),
+                        text = item.optString("text", ""),
+                        imageUrl = item.optString("imageUrl", ""),
+                        imageWidth = item.optInt("imageWidth", 120).coerceIn(16, 800),
+                        imageHeight = item.optInt("imageHeight", 60).coerceIn(16, 600),
+                        textColor = item.optString("textColor", "#FFFFFF"),
+                        textSize = item.optInt("textSize", 14).coerceIn(8, 72),
+                        fontWeight = item.optString("fontWeight", "normal"),
+                        backgroundColor = item.optString("backgroundColor", ""),
+                        paddingH = item.optInt("paddingH", 8).coerceIn(0, 120),
+                        paddingV = item.optInt("paddingV", 4).coerceIn(0, 120),
+                        cornerRadius = item.optInt("cornerRadius", 6).coerceIn(0, 64),
+                        offsetX = item.optInt("offsetX", 0).coerceIn(-500, 500),
+                        offsetY = item.optInt("offsetY", 0).coerceIn(-500, 500),
+                        sortOrder = item.optInt("sortOrder", i * 10)
+                    )
+                )
+            }
+        }.sortedBy { it.sortOrder }
     }
 
     private fun parseMenus(array: JSONArray?): List<HomeExperienceMenu> {

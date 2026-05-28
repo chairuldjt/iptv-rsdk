@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 
 import React, { type Dispatch, type SetStateAction, useMemo, useState, useEffect, useRef } from 'react'
 import { createPortal } from 'react-dom'
@@ -6,9 +6,16 @@ import type {
   HomeExperienceConfig,
   HomeExperienceMenuItem,
   HomeExperienceScope,
+  HomeOverlayItem,
+  HomeOverlayPosition,
+  HomeOverlayType,
   StartScreenValue,
 } from '@/lib/homeExperience'
-import { START_SCREEN_VALUES } from '@/lib/homeExperience'
+import {
+  HOME_OVERLAY_POSITIONS,
+  HOME_OVERLAY_TYPES,
+  START_SCREEN_VALUES,
+} from '@/lib/homeExperience'
 
 export type EntertainmentItemOption = {
   id: number
@@ -104,6 +111,7 @@ export default function HomeExperienceForm({
   onResetAction,
 }: HomeExperienceFormProps) {
   const [menus, setMenus] = useState<HomeExperienceMenuItem[]>(config.menus)
+  const [overlays, setOverlays] = useState<HomeOverlayItem[]>(config.overlays ?? [])
   const [logoUrl, setLogoUrl] = useState(config.logoUrl)
   const [homeBackgroundUrl, setHomeBackgroundUrl] = useState(config.homeBackgroundUrl)
   const [splashEnabled, setSplashEnabled] = useState(config.splash.enabled)
@@ -120,6 +128,7 @@ export default function HomeExperienceForm({
   const [selectionSoundUrl, setSelectionSoundUrl] = useState(config.sounds.selectionSoundUrl)
   const [startScreen, setStartScreen] = useState<StartScreenValue>(config.startScreen)
   const [startScreenContentId, setStartScreenContentId] = useState<number | null>(config.startScreenContentId ?? null)
+  const [menuHintText, setMenuHintText] = useState(config.menuHintText ?? '')
   const [expandedSections, setExpandedSections] = useState<Record<string, Record<string, boolean>>>({})
   const [enabledSections, setEnabledSections] = useState<Record<string, Record<string, boolean>>>({})
   const [iconPickerMenuId, setIconPickerMenuId] = useState<string | null>(null)
@@ -131,6 +140,7 @@ export default function HomeExperienceForm({
     branding: false,
     splash: false,
     homeMenu: false,
+    overlays: false,
     sound: false,
     livePreview: false,
   })
@@ -202,6 +212,7 @@ export default function HomeExperienceForm({
         <input type="hidden" name="targetId" value={targetId} />
         <input type="hidden" name="revision" value={String(config.revision + 1)} />
         <input type="hidden" name="menusJson" value={JSON.stringify(menus)} />
+        <input type="hidden" name="overlaysJson" value={JSON.stringify(overlays)} />
 
         <CollapsibleSection
           id="branding"
@@ -639,6 +650,78 @@ export default function HomeExperienceForm({
         </CollapsibleSection>
 
         <CollapsibleSection
+          id="overlays"
+          title="Overlay Home Screen"
+          description="Tambahkan teks, logo, jam, tanggal, cuaca, dan widget lain yang tampil di atas home screen Android."
+          expanded={topLevelExpanded.overlays}
+          onToggleExpanded={(expanded) => setTopLevelExpanded(prev => ({ ...prev, overlays: expanded }))}
+        >
+          <div className="flex items-center justify-end gap-4 mb-4">
+            <button
+              type="button"
+              onClick={() => setOverlays(current => [
+                ...current,
+                {
+                  id: `overlay_${Date.now()}`,
+                  enabled: true,
+                  type: 'text',
+                  position: 'top-left',
+                  text: 'Teks Overlay',
+                  imageUrl: '',
+                  imageWidth: 120,
+                  imageHeight: 60,
+                  textColor: '#FFFFFF',
+                  textSize: 14,
+                  fontWeight: 'normal',
+                  backgroundColor: '',
+                  paddingH: 8,
+                  paddingV: 4,
+                  cornerRadius: 6,
+                  offsetX: 0,
+                  offsetY: 0,
+                  sortOrder: (current.at(-1)?.sortOrder ?? 0) + 10,
+                } satisfies HomeOverlayItem,
+              ])}
+              className="rounded-xl border border-primary/20 px-3 py-2 text-xs font-semibold text-primary hover:bg-primary/10"
+            >
+              + Tambah Overlay
+            </button>
+          </div>
+
+          {overlays.length === 0 && (
+            <div className="rounded-2xl border border-dashed border-border bg-accent/10 p-8 text-center text-xs text-muted-foreground">
+              Belum ada overlay. Klik &quot;+ Tambah Overlay&quot; untuk menambahkan teks, logo, jam, atau widget lainnya.
+            </div>
+          )}
+
+          <div className="space-y-4">
+            {overlays.map((overlay, index) => (
+              <OverlayEditor
+                key={overlay.id}
+                overlay={overlay}
+                index={index}
+                onChange={(patch: Partial<HomeOverlayItem>) => setOverlays(current =>
+                  current.map(o => o.id === overlay.id ? { ...o, ...patch } : o)
+                )}
+                onDelete={() => setOverlays(current => current.filter(o => o.id !== overlay.id))}
+                onMoveUp={() => setOverlays(current => {
+                  const arr = [...current]
+                  if (index === 0) return arr
+                  ;[arr[index - 1], arr[index]] = [arr[index], arr[index - 1]]
+                  return arr
+                })}
+                onMoveDown={() => setOverlays(current => {
+                  const arr = [...current]
+                  if (index === arr.length - 1) return arr
+                  ;[arr[index], arr[index + 1]] = [arr[index + 1], arr[index]]
+                  return arr
+                })}
+              />
+            ))}
+          </div>
+        </CollapsibleSection>
+
+        <CollapsibleSection
           id="sound"
           title="Sound Effect"
           description="Untuk saat ini profile mengatur enable / disable built-in splash dan selection sound di shell Android."
@@ -733,6 +816,21 @@ export default function HomeExperienceForm({
               </select>
             </div>
           )}
+        </div>
+
+        <div className="border-t border-border pt-5 space-y-3">
+          <div>
+            <label className="mb-1.5 block text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Teks Hint Menu</label>
+            <p className="text-[10px] text-muted-foreground mb-2">Teks kecil di bawah carousel menu home screen. Kosongkan untuk menyembunyikan.</p>
+            <input type="hidden" name="menuHintText" value={menuHintText} />
+            <input
+              type="text"
+              value={menuHintText}
+              onChange={(e) => setMenuHintText(e.target.value)}
+              className="field-input w-full"
+              placeholder="Gunakan kiri/kanan remote untuk memutar menu..."
+            />
+          </div>
         </div>
 
         <div className="flex flex-col sm:flex-row gap-3 border-t border-border pt-6">
@@ -1064,6 +1162,214 @@ function updateMenu(
   setMenus((current) => current.map((item) => (item.id === id ? { ...item, ...patch } : item)))
 }
 
+
+function OverlayEditor({
+  overlay,
+  index,
+  onChange,
+  onDelete,
+  onMoveUp,
+  onMoveDown,
+}: {
+  overlay: HomeOverlayItem
+  index: number
+  onChange: (patch: Partial<HomeOverlayItem>) => void
+  onDelete: () => void
+  onMoveUp: () => void
+  onMoveDown: () => void
+}) {
+  const [expanded, setExpanded] = useState(true)
+
+  const OVERLAY_TYPE_LABELS: Record<HomeOverlayType, string> = {
+    text: 'Teks Statis',
+    logo: 'Logo / Gambar Custom',
+    app_logo: 'Logo Aplikasi (dari Branding)',
+    clock: 'Jam (Otomatis)',
+    date: 'Tanggal (Otomatis)',
+    weather: 'Cuaca (Otomatis)',
+    device_name: 'Nama Perangkat',
+    channel_count: 'Jumlah Channel',
+  }
+
+  const POSITION_LABELS: Record<HomeOverlayPosition, string> = {
+    'top-left': 'Atas Kiri',
+    'top-center': 'Atas Tengah',
+    'top-right': 'Atas Kanan',
+    'middle-left': 'Tengah Kiri',
+    'middle-center': 'Tengah',
+    'middle-right': 'Tengah Kanan',
+    'bottom-left': 'Bawah Kiri',
+    'bottom-center': 'Bawah Tengah',
+    'bottom-right': 'Bawah Kanan',
+  }
+
+  const typeIcon = overlay.type === 'text' ? 'title'
+    : overlay.type === 'logo' ? 'image'
+    : overlay.type === 'app_logo' ? 'add_photo_alternate'
+    : overlay.type === 'clock' ? 'schedule'
+    : overlay.type === 'date' ? 'calendar_today'
+    : overlay.type === 'weather' ? 'wb_sunny'
+    : overlay.type === 'device_name' ? 'tv'
+    : 'tag'
+
+  return (
+    <div className={`rounded-2xl border p-5 space-y-4 transition-colors ${overlay.enabled ? 'border-border bg-accent/20' : 'border-rose-500/30 bg-rose-500/5'}`}>
+      <div className="flex items-center justify-between gap-3">
+        <div className="flex items-center gap-3">
+          <div className={`flex h-9 w-9 items-center justify-center rounded-xl ${overlay.enabled ? 'bg-primary/10' : 'bg-muted/40'}`}>
+            <span className={`material-symbols-rounded text-lg leading-none ${overlay.enabled ? 'text-primary' : 'text-muted-foreground'}`}>{typeIcon}</span>
+          </div>
+          <div>
+            <div className={`text-sm font-semibold ${overlay.enabled ? 'text-foreground' : 'text-muted-foreground line-through decoration-rose-500/60'}`}>
+              {OVERLAY_TYPE_LABELS[overlay.type]} — {POSITION_LABELS[overlay.position]}
+            </div>
+            <div className="text-[10px] text-muted-foreground font-mono">{overlay.id}</div>
+          </div>
+        </div>
+        <div className="flex items-center gap-2 flex-wrap justify-end">
+          <button type="button" onClick={onMoveUp} title="Naik" className="rounded-lg border border-border px-2 py-1.5 text-[10px] text-muted-foreground hover:bg-accent/50 transition-colors">↑</button>
+          <button type="button" onClick={onMoveDown} title="Turun" className="rounded-lg border border-border px-2 py-1.5 text-[10px] text-muted-foreground hover:bg-accent/50 transition-colors">↓</button>
+          <label className="flex cursor-pointer items-center gap-2 rounded-lg border border-border bg-background/40 px-3 py-1.5 hover:bg-accent/50 transition-colors">
+            <input type="checkbox" checked={overlay.enabled} onChange={(e) => onChange({ enabled: e.target.checked })} className="h-4 w-4 rounded accent-primary" />
+            <span className="text-[11px] font-semibold text-foreground select-none">{overlay.enabled ? 'Visible' : 'Hidden'}</span>
+          </label>
+          <button type="button" onClick={() => setExpanded(v => !v)} className="rounded-lg border border-border px-3 py-1.5 text-[10px] text-muted-foreground hover:bg-accent/50 transition-colors">{expanded ? '▼ Collapse' : '▶ Expand'}</button>
+          <button type="button" onClick={onDelete} className="rounded-lg border border-rose-500/20 px-3 py-1.5 text-[10px] font-semibold text-rose-400 hover:bg-rose-500/10 transition-colors">Hapus</button>
+        </div>
+      </div>
+
+      {expanded && (
+        <div className="space-y-4 animate-in fade-in duration-200">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <Field label="Tipe Overlay">
+              <select value={overlay.type} onChange={(e) => onChange({ type: e.target.value as HomeOverlayType })} className="field-input py-2">
+                {HOME_OVERLAY_TYPES.map(t => (
+                  <option key={t} value={t}>{OVERLAY_TYPE_LABELS[t]}</option>
+                ))}
+              </select>
+            </Field>
+            <Field label="Posisi di Layar">
+              <select value={overlay.position} onChange={(e) => onChange({ position: e.target.value as HomeOverlayPosition })} className="field-input py-2">
+                {HOME_OVERLAY_POSITIONS.map(p => (
+                  <option key={p} value={p}>{POSITION_LABELS[p]}</option>
+                ))}
+              </select>
+            </Field>
+          </div>
+
+          {overlay.type === 'text' && (
+            <Field label="Teks Konten" wide>
+              <input type="text" value={overlay.text ?? ''} onChange={(e) => onChange({ text: e.target.value })} className="field-input" placeholder="Contoh: Selamat Datang di RS Kami" />
+            </Field>
+          )}
+
+          {overlay.type === 'logo' && (
+            <div className="space-y-3">
+              <div className="grid grid-cols-2 gap-4">
+                <Field label="Lebar Gambar (dp)">
+                  <input type="number" value={overlay.imageWidth ?? 120} onChange={(e) => onChange({ imageWidth: Number(e.target.value) })} className="field-input" min={16} max={800} />
+                </Field>
+                <Field label="Tinggi Gambar (dp)">
+                  <input type="number" value={overlay.imageHeight ?? 60} onChange={(e) => onChange({ imageHeight: Number(e.target.value) })} className="field-input" min={16} max={600} />
+                </Field>
+              </div>
+              <div className="rounded-xl border border-border bg-accent/20 p-3 space-y-2">
+                <div className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">URL Gambar</div>
+                <input
+                  type="text"
+                  value={overlay.imageUrl ?? ''}
+                  onChange={(e) => onChange({ imageUrl: e.target.value })}
+                  className="field-input font-mono text-xs"
+                  placeholder="https://... atau /uploads/..."
+                />
+                <p className="text-[10px] text-muted-foreground">Masukkan URL gambar langsung. Gunakan upload di Branding untuk mendapatkan URL.</p>
+              </div>
+            </div>
+          )}
+
+          {overlay.type === 'app_logo' && (
+            <div className="space-y-3">
+              <div className="rounded-xl border border-primary/20 bg-primary/5 p-3 space-y-2">
+                <div className="flex items-center gap-2">
+                  <span className="material-symbols-rounded text-base text-primary leading-none">info</span>
+                  <div className="text-[11px] font-semibold text-primary">Logo diambil dari Branding</div>
+                </div>
+                <p className="text-[10px] text-muted-foreground">
+                  Overlay ini otomatis menggunakan <span className="font-semibold text-foreground">Logo Aplikasi</span> yang diupload di section <span className="font-semibold text-foreground">Branding &amp; Background</span> di atas.
+                  Jika belum diupload, akan menggunakan logo bawaan aplikasi.
+                </p>
+                <a href="#branding" className="inline-block text-[10px] font-semibold text-primary hover:underline">
+                  → Atur logo di Branding
+                </a>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <Field label="Lebar Logo (dp)">
+                  <input type="number" value={overlay.imageWidth ?? 72} onChange={(e) => onChange({ imageWidth: Number(e.target.value) })} className="field-input" min={16} max={400} />
+                </Field>
+                <Field label="Tinggi Logo (dp)">
+                  <input type="number" value={overlay.imageHeight ?? 72} onChange={(e) => onChange({ imageHeight: Number(e.target.value) })} className="field-input" min={16} max={400} />
+                </Field>
+              </div>
+            </div>
+          )}
+
+          <div className="pt-3 border-t border-border/50 space-y-3">
+            <div className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Gaya Teks</div>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <ColorField label="Warna Teks" value={overlay.textColor ?? '#FFFFFF'} onChange={(v) => onChange({ textColor: v })} />
+              <Field label="Ukuran Teks (sp)">
+                <input type="number" value={overlay.textSize ?? 14} onChange={(e) => onChange({ textSize: Number(e.target.value) })} className="field-input" min={8} max={72} />
+              </Field>
+              <Field label="Ketebalan Font">
+                <select value={overlay.fontWeight ?? 'normal'} onChange={(e) => onChange({ fontWeight: e.target.value as 'normal' | 'bold' | 'extrabold' })} className="field-input py-2">
+                  <option value="normal">Normal</option>
+                  <option value="bold">Bold</option>
+                  <option value="extrabold">Extra Bold</option>
+                </select>
+              </Field>
+            </div>
+          </div>
+
+          <div className="pt-3 border-t border-border/50 space-y-3">
+            <div className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Background & Padding</div>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+              <Field label="BG Color (#AARRGGBB)" wide>
+                <input type="text" value={overlay.backgroundColor ?? ''} onChange={(e) => onChange({ backgroundColor: e.target.value })} className="field-input font-mono" placeholder="#80000000 atau kosong" />
+              </Field>
+              <Field label="Padding H (dp)">
+                <input type="number" value={overlay.paddingH ?? 8} onChange={(e) => onChange({ paddingH: Number(e.target.value) })} className="field-input" min={0} max={120} />
+              </Field>
+              <Field label="Padding V (dp)">
+                <input type="number" value={overlay.paddingV ?? 4} onChange={(e) => onChange({ paddingV: Number(e.target.value) })} className="field-input" min={0} max={120} />
+              </Field>
+              <Field label="Corner Radius (dp)">
+                <input type="number" value={overlay.cornerRadius ?? 6} onChange={(e) => onChange({ cornerRadius: Number(e.target.value) })} className="field-input" min={0} max={64} />
+              </Field>
+            </div>
+          </div>
+
+          <div className="pt-3 border-t border-border/50 space-y-3">
+            <div className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Offset Posisi (dp)</div>
+            <div className="grid grid-cols-2 gap-4">
+              <Field label="Offset X (kiri/kanan)">
+                <input type="number" value={overlay.offsetX ?? 0} onChange={(e) => onChange({ offsetX: Number(e.target.value) })} className="field-input" min={-500} max={500} />
+              </Field>
+              <Field label="Offset Y (atas/bawah)">
+                <input type="number" value={overlay.offsetY ?? 0} onChange={(e) => onChange({ offsetY: Number(e.target.value) })} className="field-input" min={-500} max={500} />
+              </Field>
+            </div>
+          </div>
+
+          <div className="pt-3 border-t border-border/50">
+            <Field label="Sort Order (urutan render)">
+              <input type="number" value={overlay.sortOrder} onChange={(e) => onChange({ sortOrder: Number(e.target.value) })} className="field-input" min={0} max={9999} />
+            </Field>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
 function CollapsibleSection({
   title,
   description,

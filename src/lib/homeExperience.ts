@@ -52,6 +52,49 @@ export type StartScreenValue = 'live_tv' | 'category_list' | 'home_screen' | 'en
 
 export const START_SCREEN_VALUES: readonly StartScreenValue[] = ['live_tv', 'category_list', 'home_screen', 'entertainment', 'education']
 
+// ── Overlay types ─────────────────────────────────────────────────────────────
+
+export type HomeOverlayPosition =
+  | 'top-left' | 'top-center' | 'top-right'
+  | 'middle-left' | 'middle-center' | 'middle-right'
+  | 'bottom-left' | 'bottom-center' | 'bottom-right'
+
+export type HomeOverlayType = 'text' | 'logo' | 'app_logo' | 'clock' | 'date' | 'weather' | 'device_name' | 'channel_count'
+
+export type HomeOverlayItem = {
+  id: string
+  enabled: boolean
+  type: HomeOverlayType
+  position: HomeOverlayPosition
+  // text overlay
+  text?: string
+  // logo overlay
+  imageUrl?: string
+  imageWidth?: number   // dp
+  imageHeight?: number  // dp
+  // shared style
+  textColor?: string
+  textSize?: number     // sp
+  fontWeight?: 'normal' | 'bold' | 'extrabold'
+  backgroundColor?: string  // hex with alpha e.g. #80000000
+  paddingH?: number     // dp
+  paddingV?: number     // dp
+  cornerRadius?: number // dp
+  offsetX?: number      // dp, fine-tune from anchor
+  offsetY?: number      // dp
+  sortOrder: number
+}
+
+export const HOME_OVERLAY_TYPES: readonly HomeOverlayType[] = [
+  'text', 'logo', 'app_logo', 'clock', 'date', 'weather', 'device_name', 'channel_count',
+]
+
+export const HOME_OVERLAY_POSITIONS: readonly HomeOverlayPosition[] = [
+  'top-left', 'top-center', 'top-right',
+  'middle-left', 'middle-center', 'middle-right',
+  'bottom-left', 'bottom-center', 'bottom-right',
+]
+
 export type HomeExperienceResolvedConfig = {
   revision: number
   logoUrl: string
@@ -59,6 +102,8 @@ export type HomeExperienceResolvedConfig = {
   startScreen: StartScreenValue
   startScreenContentId: number | null
   menus: HomeExperienceMenuItem[]
+  overlays: HomeOverlayItem[]
+  menuHintText: string
   splash: {
     enabled: boolean
     backgroundUrl: string
@@ -107,6 +152,8 @@ export type HomeExperiencePatch = {
   startScreen?: StartScreenValue
   startScreenContentId?: number | null
   menus?: HomeExperienceMenuPatch[]
+  overlays?: HomeOverlayItem[]
+  menuHintText?: string
   splash?: Partial<HomeExperienceResolvedConfig['splash']>
   sounds?: Partial<HomeExperienceResolvedConfig['sounds']>
 }
@@ -119,6 +166,195 @@ export const FALLBACK_HOME_EXPERIENCE_CONFIG: HomeExperienceResolvedConfig = {
   homeBackgroundUrl: '',
   startScreen: 'home_screen',
   startScreenContentId: null,
+  menuHintText: 'Gunakan kiri/kanan remote untuk memutar menu, OK untuk memilih, tahan OK 3 detik untuk ubah nama STB',
+  overlays: [
+    // ── Kiri atas — mirrors HospitalityHeader left column ─────────────────────
+    // verticalArrangement = spacedBy(4.dp), fontSize normal=17/12/10sp
+    {
+      id: 'overlay_welcome',
+      enabled: true,
+      type: 'text',
+      position: 'top-left',
+      text: 'Selamat Datang',
+      imageUrl: '',
+      imageWidth: 120,
+      imageHeight: 60,
+      textColor: '#FFFFFF',
+      textSize: 17,
+      fontWeight: 'bold',
+      backgroundColor: '',
+      paddingH: 0,
+      paddingV: 0,
+      cornerRadius: 0,
+      offsetX: 0,
+      offsetY: 0,
+      sortOrder: 10,
+    },
+    {
+      id: 'overlay_tagline',
+      enabled: true,
+      type: 'text',
+      position: 'top-left',
+      text: 'Premium IPTV Hospitality',
+      imageUrl: '',
+      imageWidth: 120,
+      imageHeight: 60,
+      textColor: '#E7D8A0',
+      textSize: 12,
+      fontWeight: 'normal',
+      backgroundColor: '',
+      paddingH: 0,
+      paddingV: 0,
+      cornerRadius: 0,
+      offsetX: 0,
+      offsetY: 25,
+      sortOrder: 20,
+    },
+    {
+      id: 'overlay_device_name',
+      enabled: true,
+      type: 'device_name',
+      position: 'top-left',
+      text: '',
+      imageUrl: '',
+      imageWidth: 120,
+      imageHeight: 60,
+      textColor: '#E0E0E0',
+      textSize: 10,
+      fontWeight: 'bold',
+      backgroundColor: '',
+      paddingH: 0,
+      paddingV: 0,
+      cornerRadius: 0,
+      offsetX: 0,
+      offsetY: 43,
+      sortOrder: 30,
+    },
+    // ── Tengah atas — mirrors HospitalityHeader center column ─────────────────
+    // logo 72dp + spacer 8dp = 80dp, title 22sp ~27dp, spacer implicit ~4dp
+    {
+      id: 'overlay_app_logo',
+      enabled: true,
+      type: 'app_logo',
+      position: 'top-center',
+      text: '',
+      imageUrl: '',
+      imageWidth: 72,
+      imageHeight: 72,
+      textColor: '#FFFFFF',
+      textSize: 14,
+      fontWeight: 'normal',
+      backgroundColor: '',
+      paddingH: 0,
+      paddingV: 0,
+      cornerRadius: 16,
+      offsetX: 0,
+      offsetY: 0,
+      sortOrder: 35,
+    },
+    {
+      id: 'overlay_app_title',
+      enabled: true,
+      type: 'text',
+      position: 'top-center',
+      text: 'Hospitality IPTV',
+      imageUrl: '',
+      imageWidth: 120,
+      imageHeight: 60,
+      textColor: '#FFE9A6',
+      textSize: 22,
+      fontWeight: 'extrabold',
+      backgroundColor: '',
+      paddingH: 0,
+      paddingV: 0,
+      cornerRadius: 0,
+      offsetX: 0,
+      offsetY: 80,
+      sortOrder: 40,
+    },
+    {
+      id: 'overlay_app_subtitle',
+      enabled: true,
+      type: 'text',
+      position: 'top-center',
+      text: 'Live TV \u2022 Education \u2022 Guest Services',
+      imageUrl: '',
+      imageWidth: 120,
+      imageHeight: 60,
+      textColor: '#E0E0E0',
+      textSize: 11,
+      fontWeight: 'normal',
+      backgroundColor: '',
+      paddingH: 0,
+      paddingV: 0,
+      cornerRadius: 0,
+      offsetX: 0,
+      offsetY: 107,
+      sortOrder: 50,
+    },
+    // ── Kanan atas — mirrors HospitalityHeader right column ───────────────────
+    // clock 30sp ~36dp, date 11sp ~14dp gap 4dp, weather 10sp gap 4dp
+    {
+      id: 'overlay_clock',
+      enabled: true,
+      type: 'clock',
+      position: 'top-right',
+      text: '',
+      imageUrl: '',
+      imageWidth: 120,
+      imageHeight: 60,
+      textColor: '#FFFFFF',
+      textSize: 30,
+      fontWeight: 'extrabold',
+      backgroundColor: '',
+      paddingH: 0,
+      paddingV: 0,
+      cornerRadius: 0,
+      offsetX: 0,
+      offsetY: 0,
+      sortOrder: 60,
+    },
+    {
+      id: 'overlay_date',
+      enabled: true,
+      type: 'date',
+      position: 'top-right',
+      text: '',
+      imageUrl: '',
+      imageWidth: 120,
+      imageHeight: 60,
+      textColor: '#D1D5DB',
+      textSize: 11,
+      fontWeight: 'normal',
+      backgroundColor: '',
+      paddingH: 0,
+      paddingV: 0,
+      cornerRadius: 0,
+      offsetX: 0,
+      offsetY: 38,
+      sortOrder: 70,
+    },
+    {
+      id: 'overlay_weather',
+      enabled: true,
+      type: 'weather',
+      position: 'top-right',
+      text: '',
+      imageUrl: '',
+      imageWidth: 120,
+      imageHeight: 60,
+      textColor: '#FFE9A6',
+      textSize: 10,
+      fontWeight: 'bold',
+      backgroundColor: '',
+      paddingH: 0,
+      paddingV: 0,
+      cornerRadius: 0,
+      offsetX: 0,
+      offsetY: 56,
+      sortOrder: 80,
+    },
+  ],
   menus: [
     {
       id: 'tv',
@@ -344,6 +580,8 @@ export function homeExperienceFromFormData(formData: FormData): HomeExperienceRe
       return Number.isFinite(n) && n > 0 ? n : null
     })(),
     menus: parseJsonArray(formData.get('menusJson'), FALLBACK_HOME_EXPERIENCE_CONFIG.menus),
+    overlays: parseJsonArray(formData.get('overlaysJson'), FALLBACK_HOME_EXPERIENCE_CONFIG.overlays),
+    menuHintText: formData.get('menuHintText'),
     splash: {
       enabled: formData.get('splashEnabled') === 'on',
       backgroundUrl: formData.get('splashBackgroundUrl'),
@@ -373,6 +611,8 @@ export function normalizeHomeExperienceConfig(value: unknown): HomeExperienceRes
     startScreen: oneOf(source.startScreen, START_SCREEN_VALUES, FALLBACK_HOME_EXPERIENCE_CONFIG.startScreen),
     startScreenContentId: safeNullableInt(source.startScreenContentId),
     menus: normalizeMenus(source.menus),
+    overlays: normalizeOverlays(source.overlays),
+    menuHintText: safeString(source.menuHintText, FALLBACK_HOME_EXPERIENCE_CONFIG.menuHintText),
     splash: normalizeSplash(source.splash),
     sounds: normalizeSounds(source.sounds),
   }
@@ -388,6 +628,8 @@ export function normalizeHomeExperiencePatch(value: unknown): HomeExperiencePatc
   if (hasOwn(source, 'startScreen')) patch.startScreen = oneOf(source.startScreen, START_SCREEN_VALUES, FALLBACK_HOME_EXPERIENCE_CONFIG.startScreen)
   if (hasOwn(source, 'startScreenContentId')) patch.startScreenContentId = safeNullableInt(source.startScreenContentId)
   if (hasOwn(source, 'menus')) patch.menus = normalizeMenuPatches(source.menus)
+  if (hasOwn(source, 'overlays')) patch.overlays = normalizeOverlays(source.overlays)
+  if (hasOwn(source, 'menuHintText')) patch.menuHintText = safeString(source.menuHintText, FALLBACK_HOME_EXPERIENCE_CONFIG.menuHintText)
   if (hasOwn(source, 'splash')) patch.splash = normalizeSplashPatch(source.splash)
   if (hasOwn(source, 'sounds')) patch.sounds = normalizeSoundsPatch(source.sounds)
 
@@ -407,6 +649,8 @@ export function applyHomeExperiencePatch(
     homeBackgroundUrl: patch.homeBackgroundUrl ?? base.homeBackgroundUrl,
     startScreen: patch.startScreen ?? base.startScreen,
     startScreenContentId: hasOwn(patch as Record<string, unknown>, 'startScreenContentId') ? patch.startScreenContentId : base.startScreenContentId,
+    overlays: patch.overlays ?? base.overlays,
+    menuHintText: patch.menuHintText ?? base.menuHintText,
     splash: {
       ...base.splash,
       ...(patch.splash ?? {}),
@@ -781,6 +1025,13 @@ function compactHomeExperiencePatch(patch: HomeExperiencePatch): HomeExperienceP
   const compactMenus = compactMenuPatches(patch.menus)
   if (compactMenus.length > 0) compacted.menus = compactMenus
 
+  // Overlays: store as-is when non-empty (they are always fully replaced, not merged)
+  if (patch.overlays !== undefined && patch.overlays.length > 0) compacted.overlays = patch.overlays
+
+  if (patch.menuHintText !== undefined && patch.menuHintText !== FALLBACK_HOME_EXPERIENCE_CONFIG.menuHintText) {
+    compacted.menuHintText = patch.menuHintText
+  }
+
   const compactSplash = compactObjectPatch(patch.splash, FALLBACK_HOME_EXPERIENCE_CONFIG.splash)
   if (Object.keys(compactSplash).length > 0) compacted.splash = compactSplash
 
@@ -813,6 +1064,33 @@ function compactMenuPatches(patches?: HomeExperienceMenuPatch[]): HomeExperience
       return compact
     })
     .filter((patch) => Object.keys(patch).length > 1)
+}
+
+function normalizeOverlays(value: unknown): HomeOverlayItem[] {
+  if (!Array.isArray(value)) return []
+  return value
+    .filter((entry): entry is Record<string, unknown> => isRecord(entry))
+    .map((entry, index) => ({
+      id: safeString(entry.id, `overlay_${index}`),
+      enabled: safeBoolean(entry.enabled, true),
+      type: oneOf(entry.type, HOME_OVERLAY_TYPES, 'text'),
+      position: oneOf(entry.position, HOME_OVERLAY_POSITIONS, 'top-left'),
+      text: safeString(entry.text, ''),
+      imageUrl: safeString(entry.imageUrl, ''),
+      imageWidth: clampInt(entry.imageWidth, 16, 800, 120),
+      imageHeight: clampInt(entry.imageHeight, 16, 600, 60),
+      textColor: normalizeHexColor(entry.textColor, '#FFFFFF'),
+      textSize: clampInt(entry.textSize, 8, 72, 14),
+      fontWeight: oneOf(entry.fontWeight, ['normal', 'bold', 'extrabold'] as const, 'normal'),
+      backgroundColor: safeString(entry.backgroundColor, ''),
+      paddingH: clampInt(entry.paddingH, 0, 120, 8),
+      paddingV: clampInt(entry.paddingV, 0, 120, 4),
+      cornerRadius: clampInt(entry.cornerRadius, 0, 64, 6),
+      offsetX: typeof entry.offsetX === 'number' ? Math.max(-500, Math.min(500, Math.floor(entry.offsetX))) : 0,
+      offsetY: typeof entry.offsetY === 'number' ? Math.max(-500, Math.min(500, Math.floor(entry.offsetY))) : 0,
+      sortOrder: clampInt(entry.sortOrder, 0, 9999, index * 10),
+    }))
+    .sort((a, b) => a.sortOrder - b.sortOrder)
 }
 
 function compactObjectPatch<T extends Record<string, unknown>>(patch: Partial<T> | undefined, fallback: T): Partial<T> {
@@ -920,6 +1198,10 @@ export function absolutizeHomeExperienceUrls(
     menus: config.menus.map((menu) => ({
       ...menu,
       backgroundUrl: rewrite(menu.backgroundUrl),
+    })),
+    overlays: config.overlays.map((overlay) => ({
+      ...overlay,
+      imageUrl: rewrite(overlay.imageUrl ?? ''),
     })),
     splash: {
       ...config.splash,

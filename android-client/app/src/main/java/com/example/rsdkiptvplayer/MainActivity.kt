@@ -348,7 +348,7 @@ class MainActivity : ComponentActivity() {
                                     horizontalAlignment = Alignment.CenterHorizontally
                                 ) {
                                     Text(
-                                        text = "Keluar Aplikasi?",
+                                        text = "Restart Aplikasi?",
                                         color = Color.White,
                                         fontSize = 20.sp,
                                         fontWeight = FontWeight.Bold
@@ -357,7 +357,7 @@ class MainActivity : ComponentActivity() {
                                     Spacer(modifier = Modifier.height(12.dp))
                                     
                                     Text(
-                                        text = "Apakah Anda yakin ingin keluar dari RSDK IPTV Player?",
+                                        text = "Aplikasi akan ditutup dan dibuka ulang secara otomatis.",
                                         color = Color.White.copy(alpha = 0.7f),
                                         fontSize = 14.sp,
                                         textAlign = androidx.compose.ui.text.style.TextAlign.Center
@@ -370,9 +370,12 @@ class MainActivity : ComponentActivity() {
                                         horizontalArrangement = Arrangement.spacedBy(12.dp)
                                     ) {
                                         ExitDialogButton(
-                                            text = "Ya",
+                                            text = "Restart",
                                             onClick = {
-                                                finishAndRemoveTask()
+                                                val intent = packageManager.getLaunchIntentForPackage(packageName)
+                                                val restartIntent = android.content.Intent.makeRestartActivityTask(intent?.component)
+                                                startActivity(restartIntent)
+                                                Runtime.getRuntime().exit(0)
                                             },
                                             modifier = Modifier
                                                 .weight(1f)
@@ -380,7 +383,7 @@ class MainActivity : ComponentActivity() {
                                         )
                                         
                                         ExitDialogButton(
-                                            text = "Tidak",
+                                            text = "Batal",
                                             primary = true,
                                             focusRequester = confirmNoFocusRequester,
                                             onClick = {
