@@ -96,6 +96,7 @@ log "Ensuring directory structures and write permissions"
 mkdir -p public/uploads/videos
 mkdir -p public/uploads/video-thumbnails
 mkdir -p public/uploads/apk
+mkdir -p public/uploads/home-experience
 mkdir -p public/relay
 mkdir -p logs
 chmod +x deploy.sh scripts/*.sh || true
