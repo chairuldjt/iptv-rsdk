@@ -87,6 +87,10 @@ class IptvRepository(
                 dataStoreManager.addLog("Registration result: ${resBody.message}")
                 if (resBody.status && resBody.data != null) {
                     dataStoreManager.setSyncInterval(resBody.data.sync_interval)
+                    // Flag device baru agar SplashScreen trigger auto-restart
+                    if (resBody.data.is_new_device) {
+                        dataStoreManager.setNewlyRegistered()
+                    }
                     resBody.data.active
                 } else {
                     dataStoreManager.addLog("Registration successful (default active)")

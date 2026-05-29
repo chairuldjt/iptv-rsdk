@@ -33,7 +33,8 @@ data class RegisterResponse(
 data class RegisterData(
     val device_id: String,
     val active: Boolean,
-    val sync_interval: Int
+    val sync_interval: Int,
+    val is_new_device: Boolean = false
 )
 
 data class ConfigResponse(

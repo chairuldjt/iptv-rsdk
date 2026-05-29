@@ -45,6 +45,7 @@ class DataStoreManager(private val context: Context) {
         val VIDEO_BROADCAST_JSON = stringPreferencesKey("video_broadcast_json")
         val RUNNING_TEXT_OVERRIDE_JSON = stringPreferencesKey("running_text_override_json")
         val RUNNING_TEXT_OVERRIDE_EXPIRES_AT = longPreferencesKey("running_text_override_expires_at")
+        val NEWLY_REGISTERED = booleanPreferencesKey("newly_registered")
     }
 
     // Generate or get existing Device ID
@@ -568,5 +569,28 @@ class DataStoreManager(private val context: Context) {
             prefs.clear()
         }
         addLog("Factory Reset completed!")
+    }
+
+    // Newly registered flag — set saat device baru pertama kali register ke server.
+    // SplashScreen mengkonsumsi flag ini (read + clear atomik) untuk trigger auto-restart
+    // agar boot berikutnya berjalan dengan config fresh dari server.
+    suspend fun setNewlyRegistered() {
+        context.dataStore.edit { prefs ->
+            prefs[NEWLY_REGISTERED] = true
+        }
+        addLog("Device newly registered — will restart on next splash.")
+    }
+
+    /**
+     * Read-and-clear: returns true jika device baru saja register, lalu reset flag ke false.
+     * Dipanggil sekali di SplashScreen — setelah dikonsumsi flag tidak akan trigger restart lagi.
+     */
+    suspend fun consumeNewlyRegistered(): Boolean {
+        val prefs = context.dataStore.data.first()
+        val isNew = prefs[NEWLY_REGISTERED] ?: false
+        if (isNew) {
+            context.dataStore.edit { it.remove(NEWLY_REGISTERED) }
+        }
+        return isNew
     }
 }

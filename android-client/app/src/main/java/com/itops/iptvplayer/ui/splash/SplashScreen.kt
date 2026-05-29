@@ -126,6 +126,19 @@ fun SplashScreen(
         loadingProgress = 0.50f
         // syncChannels continues in background — don't await
 
+        // Jika device baru saja register ke server untuk pertama kali,
+        // restart app sekarang agar boot berikutnya berjalan dengan config
+        // fresh dari server (preload, home experience, dll semua ter-inisialisasi).
+        val isNewlyRegistered = app.dataStoreManager.consumeNewlyRegistered()
+        if (isNewlyRegistered) {
+            app.dataStoreManager.addLog("Newly registered device detected — restarting app for fresh boot.")
+            val launchIntent = context.packageManager.getLaunchIntentForPackage(context.packageName)
+            val restartIntent = android.content.Intent.makeRestartActivityTask(launchIntent?.component)
+            context.startActivity(restartIntent)
+            Runtime.getRuntime().exit(0)
+            return@LaunchedEffect
+        }
+
         // After sync, fetch the server-side preload manifest which includes ALL
         // asset URLs (images + sounds) resolved for this device — including overlay
         // images that the local parser would miss. Falls back to local parsing if

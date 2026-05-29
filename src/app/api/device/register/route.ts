@@ -91,6 +91,7 @@ export async function POST(request: Request) {
           device_name: device.deviceName,
           active: device.isActive,
           sync_interval: device.config?.syncInterval ?? 1800,
+          is_new_device: true,
         },
       })
     } else {
