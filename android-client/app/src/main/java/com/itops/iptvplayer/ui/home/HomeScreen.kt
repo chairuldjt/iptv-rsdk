@@ -391,9 +391,24 @@ fun HomeScreen(
         val configuration = androidx.compose.ui.platform.LocalConfiguration.current
         val screenWidth = configuration.screenWidthDp
         val screenHeight = configuration.screenHeightDp
-        val isSmallScreen = screenWidth < 760 || screenHeight < 500
-        val isUltraCompact = screenWidth < 600 || screenHeight < 400
-        val showFiveItems = screenWidth >= 560 && screenHeight >= 360
+        val scale = homeExperience.displayScale
+        val isSmallScreen = when (scale.forceDisplayMode) {
+            "normal" -> false
+            "small" -> true
+            "ultra_compact" -> false
+            else -> screenWidth < scale.smallScreenWidthDp || screenHeight < scale.smallScreenHeightDp
+        }
+        val isUltraCompact = when (scale.forceDisplayMode) {
+            "normal" -> false
+            "small" -> false
+            "ultra_compact" -> true
+            else -> screenWidth < scale.ultraCompactWidthDp || screenHeight < scale.ultraCompactHeightDp
+        }
+        val showFiveItems = when (scale.forceDisplayMode) {
+            "normal" -> true
+            "ultra_compact" -> false
+            else -> screenWidth >= (scale.ultraCompactWidthDp - 40) && screenHeight >= (scale.ultraCompactHeightDp - 40)
+        }
 
         Box(
             modifier = Modifier
@@ -430,7 +445,9 @@ fun HomeScreen(
                     time = timeString,
                     date = dateString,
                     version = versionText,
-                    weather = weatherText
+                    weather = weatherText,
+                    isSmallScreen = isSmallScreen,
+                    isUltraCompact = isUltraCompact
                 )
             }
 
@@ -479,6 +496,7 @@ fun HomeScreen(
                 onOpenStbNameMenu = { showStbNameDialog = true },
                 menuFocusRequester = menuFocusRequester,
                 showFiveItems = showFiveItems,
+                isSmallScreen = isSmallScreen,
                 isUltraCompact = isUltraCompact,
                 homeExperienceJson = homeExperienceJson,
                 onSelectionChanged = { item ->
@@ -508,6 +526,7 @@ fun HomeScreen(
                 serverUrl = serverUrl,
                 currentVersionCode = currentVersionCode,
                 currentVersionName = currentVersionName,
+                isSmallScreen = isSmallScreen,
                 onDismiss = { showInfoDialog = false }
             )
         }
@@ -544,14 +563,14 @@ private fun HospitalityHeader(
     time: String,
     date: String,
     version: String,
-    weather: String
+    weather: String,
+    isSmallScreen: Boolean,
+    isUltraCompact: Boolean
 ) {
     val configuration = androidx.compose.ui.platform.LocalConfiguration.current
     val screenWidth = configuration.screenWidthDp
     val screenHeight = configuration.screenHeightDp
-    val isSmallScreen = screenWidth < 760 || screenHeight < 500
-    val isUltraCompact = screenWidth < 600 || screenHeight < 400
-    val showCenterHeader = screenWidth >= 600 && screenHeight >= 400
+    val showCenterHeader = !isUltraCompact
 
     Row(
         modifier = Modifier.fillMaxWidth(),
@@ -713,6 +732,7 @@ private fun HospitalityMenuBar(
     onOpenStbNameMenu: () -> Unit,
     menuFocusRequester: FocusRequester,
     showFiveItems: Boolean,
+    isSmallScreen: Boolean,
     isUltraCompact: Boolean,
     homeExperienceJson: String,
     onSelectionChanged: (HospitalityCarouselItem) -> Unit
@@ -720,10 +740,6 @@ private fun HospitalityMenuBar(
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
     val homeExperience = remember(homeExperienceJson) { HomeExperienceParser.parse(homeExperienceJson) }
-    val configuration = androidx.compose.ui.platform.LocalConfiguration.current
-    val screenWidth = configuration.screenWidthDp
-    val screenHeight = configuration.screenHeightDp
-    val isSmallScreen = screenWidth < 760 || screenHeight < 500
     val lowEffectMode = BuildConfig.HOME_LOW_EFFECT_MODE
     var hasPlayedSelectionSound by remember { mutableStateOf(false) }
     val soundPool = remember {
@@ -1922,6 +1938,7 @@ private fun InfoAplikasiDialog(
     serverUrl: String,
     currentVersionCode: Int,
     currentVersionName: String,
+    isSmallScreen: Boolean,
     onDismiss: () -> Unit
 ) {
     BackHandler {
@@ -1929,8 +1946,6 @@ private fun InfoAplikasiDialog(
     }
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
-    val configuration = androidx.compose.ui.platform.LocalConfiguration.current
-    val isSmallScreen = configuration.screenWidthDp < 760 || configuration.screenHeightDp < 500
 
     var checkingState by remember { mutableStateOf("idle") } // idle, checking, update_available, no_update, error
     var statusMessage by remember { mutableStateOf("") }

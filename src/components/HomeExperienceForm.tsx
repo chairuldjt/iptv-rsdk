@@ -126,6 +126,11 @@ export default function HomeExperienceForm({
   const [enableSelectionSound, setEnableSelectionSound] = useState(config.sounds.enableSelectionSound)
   const [enableSplashSound, setEnableSplashSound] = useState(config.sounds.enableSplashSound)
   const [selectionSoundUrl, setSelectionSoundUrl] = useState(config.sounds.selectionSoundUrl)
+  const [dsSmallW, setDsSmallW] = useState(config.displayScale.smallScreenWidthDp)
+  const [dsSmallH, setDsSmallH] = useState(config.displayScale.smallScreenHeightDp)
+  const [dsUltraW, setDsUltraW] = useState(config.displayScale.ultraCompactWidthDp)
+  const [dsUltraH, setDsUltraH] = useState(config.displayScale.ultraCompactHeightDp)
+  const [dsForceMode, setDsForceMode] = useState(config.displayScale.forceDisplayMode)
   const [startScreen, setStartScreen] = useState<StartScreenValue>(config.startScreen)
   const [startScreenContentId, setStartScreenContentId] = useState<number | null>(config.startScreenContentId ?? null)
   const [menuHintText, setMenuHintText] = useState(config.menuHintText ?? '')
@@ -142,6 +147,7 @@ export default function HomeExperienceForm({
     homeMenu: false,
     overlays: false,
     sound: false,
+    displayScale: false,
     livePreview: false,
   })
 
@@ -803,6 +809,89 @@ export default function HomeExperienceForm({
               hint={AUDIO_HINT}
               kind="audio"
             />
+          </div>
+        </CollapsibleSection>
+
+        <CollapsibleSection
+          id="displayScale"
+          title="Display Scale / DPI"
+          description="Atur threshold ukuran layar (dp) untuk mode small screen dan ultra compact. Berguna untuk TV dengan resolusi 1280×720 atau layar kecil lainnya."
+          expanded={topLevelExpanded.displayScale}
+          onToggleExpanded={(expanded) => setTopLevelExpanded(prev => ({ ...prev, displayScale: expanded }))}
+        >
+          <input type="hidden" name="displayScale.smallScreenWidthDp" value={dsSmallW} />
+          <input type="hidden" name="displayScale.smallScreenHeightDp" value={dsSmallH} />
+          <input type="hidden" name="displayScale.ultraCompactWidthDp" value={dsUltraW} />
+          <input type="hidden" name="displayScale.ultraCompactHeightDp" value={dsUltraH} />
+          <input type="hidden" name="displayScale.forceDisplayMode" value={dsForceMode} />
+          <p className="text-[11px] text-muted-foreground mb-4">
+            Layar dengan lebar &lt; <strong>Small Width</strong> atau tinggi &lt; <strong>Small Height</strong> akan masuk mode <em>small screen</em> (font dan card lebih kecil).
+            Layar dengan lebar &lt; <strong>Ultra Width</strong> atau tinggi &lt; <strong>Ultra Height</strong> akan masuk mode <em>ultra compact</em> (paling kecil).
+            Nilai dalam satuan <strong>dp</strong> (density-independent pixels). TV 1280×720 DPI 240 = ~853dp lebar.
+          </p>
+          <div className="form-group mb-5">
+            <label>Force Display Mode</label>
+            <select
+              value={dsForceMode}
+              onChange={(e) => setDsForceMode(e.target.value as 'auto' | 'normal' | 'small' | 'ultra_compact')}
+              className="field-input py-2 w-full"
+            >
+              <option value="auto">Auto — deteksi otomatis berdasarkan ukuran layar</option>
+              <option value="normal">Normal — paksa mode normal (tampilan besar)</option>
+              <option value="small">Small — paksa mode small screen</option>
+              <option value="ultra_compact">Ultra Compact — paksa mode paling kecil</option>
+            </select>
+            <span className="form-hint">Jika dipilih selain Auto, threshold di bawah diabaikan. Gunakan "Normal" untuk memaksa tampilan standar di semua resolusi.</span>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+            <div className="form-group">
+              <label>Small Screen — Lebar Maks (dp)</label>
+              <input
+                type="number"
+                min={400} max={2000}
+                value={dsSmallW}
+                onChange={(e) => setDsSmallW(Number(e.target.value))}
+                className="field-input"
+              />
+              <span className="form-hint">Default: 760. Layar dengan lebar dp di bawah nilai ini masuk mode small.</span>
+            </div>
+            <div className="form-group">
+              <label>Small Screen — Tinggi Maks (dp)</label>
+              <input
+                type="number"
+                min={300} max={2000}
+                value={dsSmallH}
+                onChange={(e) => setDsSmallH(Number(e.target.value))}
+                className="field-input"
+              />
+              <span className="form-hint">Default: 500.</span>
+            </div>
+            <div className="form-group">
+              <label>Ultra Compact — Lebar Maks (dp)</label>
+              <input
+                type="number"
+                min={300} max={2000}
+                value={dsUltraW}
+                onChange={(e) => setDsUltraW(Number(e.target.value))}
+                className="field-input"
+              />
+              <span className="form-hint">Default: 600. Layar dengan lebar dp di bawah nilai ini masuk mode ultra compact.</span>
+            </div>
+            <div className="form-group">
+              <label>Ultra Compact — Tinggi Maks (dp)</label>
+              <input
+                type="number"
+                min={200} max={2000}
+                value={dsUltraH}
+                onChange={(e) => setDsUltraH(Number(e.target.value))}
+                className="field-input"
+              />
+              <span className="form-hint">Default: 400.</span>
+            </div>
+          </div>
+          <div className="mt-4 p-3 rounded-xl bg-primary/5 border border-primary/20 text-[11px] text-muted-foreground space-y-1">
+            <p><strong className="text-foreground">Contoh kasus TV 1280×720 DPI 240:</strong></p>
+            <p>screenWidthDp = 1280 ÷ (240÷160) = <strong>853dp</strong>. Dengan default 760, TV ini masuk mode <em>normal</em> (terlalu besar). Naikkan Small Width ke <strong>960</strong> agar masuk mode small screen.</p>
           </div>
         </CollapsibleSection>
 

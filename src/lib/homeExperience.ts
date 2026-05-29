@@ -121,6 +121,13 @@ export type HomeExperienceResolvedConfig = {
     enableSplashSound: boolean
     selectionSoundUrl: string
   }
+  displayScale: {
+    smallScreenWidthDp: number
+    smallScreenHeightDp: number
+    ultraCompactWidthDp: number
+    ultraCompactHeightDp: number
+    forceDisplayMode: 'auto' | 'normal' | 'small' | 'ultra_compact'
+  }
 }
 
 export type HomeExperienceMenuPatch = {
@@ -158,6 +165,7 @@ export type HomeExperiencePatch = {
   menuHintText?: string
   splash?: Partial<HomeExperienceResolvedConfig['splash']>
   sounds?: Partial<HomeExperienceResolvedConfig['sounds']>
+  displayScale?: Partial<HomeExperienceResolvedConfig['displayScale']>
 }
 
 export type HomeExperienceConfig = HomeExperienceResolvedConfig
@@ -465,6 +473,13 @@ export const FALLBACK_HOME_EXPERIENCE_CONFIG: HomeExperienceResolvedConfig = {
     enableSplashSound: true,
     selectionSoundUrl: '',
   },
+  displayScale: {
+    smallScreenWidthDp: 760,
+    smallScreenHeightDp: 500,
+    ultraCompactWidthDp: 600,
+    ultraCompactHeightDp: 400,
+    forceDisplayMode: 'auto',
+  },
 }
 
 export async function getGlobalHomeExperience(): Promise<HomeExperienceResolvedConfig> {
@@ -606,6 +621,13 @@ export function homeExperienceFromFormData(formData: FormData): HomeExperienceRe
       enableSplashSound: formData.get('enableSplashSound') === 'on',
       selectionSoundUrl: formData.get('selectionSoundUrl'),
     },
+    displayScale: {
+      smallScreenWidthDp: formData.get('displayScale.smallScreenWidthDp'),
+      smallScreenHeightDp: formData.get('displayScale.smallScreenHeightDp'),
+      ultraCompactWidthDp: formData.get('displayScale.ultraCompactWidthDp'),
+      ultraCompactHeightDp: formData.get('displayScale.ultraCompactHeightDp'),
+      forceDisplayMode: formData.get('displayScale.forceDisplayMode'),
+    },
   })
 }
 
@@ -623,6 +645,7 @@ export function normalizeHomeExperienceConfig(value: unknown): HomeExperienceRes
     menuHintText: safeString(source.menuHintText, FALLBACK_HOME_EXPERIENCE_CONFIG.menuHintText),
     splash: normalizeSplash(source.splash),
     sounds: normalizeSounds(source.sounds),
+    displayScale: normalizeDisplayScale(source.displayScale),
   }
 }
 
@@ -640,6 +663,7 @@ export function normalizeHomeExperiencePatch(value: unknown): HomeExperiencePatc
   if (hasOwn(source, 'menuHintText')) patch.menuHintText = safeString(source.menuHintText, FALLBACK_HOME_EXPERIENCE_CONFIG.menuHintText)
   if (hasOwn(source, 'splash')) patch.splash = normalizeSplashPatch(source.splash)
   if (hasOwn(source, 'sounds')) patch.sounds = normalizeSoundsPatch(source.sounds)
+  if (hasOwn(source, 'displayScale')) patch.displayScale = normalizeDisplayScalePatch(source.displayScale)
 
   return patch
 }
@@ -666,6 +690,10 @@ export function applyHomeExperiencePatch(
     sounds: {
       ...base.sounds,
       ...(patch.sounds ?? {}),
+    },
+    displayScale: {
+      ...base.displayScale,
+      ...(patch.displayScale ?? {}),
     },
     menus: mergeMenuPatches(base.menus, patch.menus),
   })
@@ -981,6 +1009,30 @@ function normalizeSoundsPatch(value: unknown): Partial<HomeExperienceResolvedCon
   return patch
 }
 
+function normalizeDisplayScale(value: unknown): HomeExperienceResolvedConfig['displayScale'] {
+  const source = isRecord(value) ? value : {}
+  const d = FALLBACK_HOME_EXPERIENCE_CONFIG.displayScale
+  return {
+    smallScreenWidthDp: clampInt(source.smallScreenWidthDp, 400, 2000, d.smallScreenWidthDp),
+    smallScreenHeightDp: clampInt(source.smallScreenHeightDp, 300, 2000, d.smallScreenHeightDp),
+    ultraCompactWidthDp: clampInt(source.ultraCompactWidthDp, 300, 2000, d.ultraCompactWidthDp),
+    ultraCompactHeightDp: clampInt(source.ultraCompactHeightDp, 200, 2000, d.ultraCompactHeightDp),
+    forceDisplayMode: oneOf(source.forceDisplayMode, ['auto', 'normal', 'small', 'ultra_compact'] as const, d.forceDisplayMode),
+  }
+}
+
+function normalizeDisplayScalePatch(value: unknown): Partial<HomeExperienceResolvedConfig['displayScale']> {
+  const source = isRecord(value) ? value : {}
+  const patch: Partial<HomeExperienceResolvedConfig['displayScale']> = {}
+  const d = FALLBACK_HOME_EXPERIENCE_CONFIG.displayScale
+  if (hasOwn(source, 'smallScreenWidthDp')) patch.smallScreenWidthDp = clampInt(source.smallScreenWidthDp, 400, 2000, d.smallScreenWidthDp)
+  if (hasOwn(source, 'smallScreenHeightDp')) patch.smallScreenHeightDp = clampInt(source.smallScreenHeightDp, 300, 2000, d.smallScreenHeightDp)
+  if (hasOwn(source, 'ultraCompactWidthDp')) patch.ultraCompactWidthDp = clampInt(source.ultraCompactWidthDp, 300, 2000, d.ultraCompactWidthDp)
+  if (hasOwn(source, 'ultraCompactHeightDp')) patch.ultraCompactHeightDp = clampInt(source.ultraCompactHeightDp, 200, 2000, d.ultraCompactHeightDp)
+  if (hasOwn(source, 'forceDisplayMode')) patch.forceDisplayMode = oneOf(source.forceDisplayMode, ['auto', 'normal', 'small', 'ultra_compact'] as const, d.forceDisplayMode)
+  return patch
+}
+
 function normalizeMenuPatches(value: unknown): HomeExperienceMenuPatch[] {
   const source = Array.isArray(value) ? value : []
   return source
@@ -1047,6 +1099,9 @@ function compactHomeExperiencePatch(patch: HomeExperiencePatch): HomeExperienceP
 
   const compactSounds = compactObjectPatch(patch.sounds, FALLBACK_HOME_EXPERIENCE_CONFIG.sounds)
   if (Object.keys(compactSounds).length > 0) compacted.sounds = compactSounds
+
+  const compactDisplayScale = compactObjectPatch(patch.displayScale, FALLBACK_HOME_EXPERIENCE_CONFIG.displayScale)
+  if (Object.keys(compactDisplayScale).length > 0) compacted.displayScale = compactDisplayScale
 
   return compacted
 }

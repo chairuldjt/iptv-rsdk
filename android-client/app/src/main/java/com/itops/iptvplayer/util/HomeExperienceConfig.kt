@@ -4,6 +4,19 @@ import androidx.compose.ui.graphics.Color
 import org.json.JSONArray
 import org.json.JSONObject
 
+data class HomeExperienceDisplayScale(
+    // Threshold lebar layar (dp) untuk masuk mode "small screen"
+    val smallScreenWidthDp: Int = 760,
+    // Threshold tinggi layar (dp) untuk masuk mode "small screen"
+    val smallScreenHeightDp: Int = 500,
+    // Threshold lebar layar (dp) untuk masuk mode "ultra compact"
+    val ultraCompactWidthDp: Int = 600,
+    // Threshold tinggi layar (dp) untuk masuk mode "ultra compact"
+    val ultraCompactHeightDp: Int = 400,
+    // Paksa mode tertentu: "auto" | "normal" | "small" | "ultra_compact"
+    val forceDisplayMode: String = "auto"
+)
+
 data class HomeExperienceProfile(
     val logoUrl: String = "",
     val homeBackgroundUrl: String = "",
@@ -13,7 +26,8 @@ data class HomeExperienceProfile(
     val overlays: List<HomeOverlayItem> = emptyList(),
     val menuHintText: String = "Gunakan kiri/kanan remote untuk memutar menu, OK untuk memilih, tahan OK 3 detik untuk ubah nama STB",
     val splash: HomeExperienceSplash = HomeExperienceSplash(),
-    val sounds: HomeExperienceSounds = HomeExperienceSounds()
+    val sounds: HomeExperienceSounds = HomeExperienceSounds(),
+    val displayScale: HomeExperienceDisplayScale = HomeExperienceDisplayScale()
 )
 
 data class HomeExperienceMenu(
@@ -144,7 +158,8 @@ object HomeExperienceParser {
                 overlays = parseOverlays(root.optJSONArray("overlays")),
                 menuHintText = root.optString("menuHintText", "Gunakan kiri/kanan remote untuk memutar menu, OK untuk memilih, tahan OK 3 detik untuk ubah nama STB"),
                 splash = parseSplash(root.optJSONObject("splash")),
-                sounds = parseSounds(root.optJSONObject("sounds"))
+                sounds = parseSounds(root.optJSONObject("sounds")),
+                displayScale = parseDisplayScale(root.optJSONObject("displayScale"))
             )
             if (profile.menus.isEmpty()) profile.copy(menus = defaultMenus()) else profile
         } catch (_: Exception) {
@@ -340,6 +355,20 @@ object HomeExperienceParser {
             enableSelectionSound = obj.optBoolean("enableSelectionSound", true),
             enableSplashSound = obj.optBoolean("enableSplashSound", true),
             selectionSoundUrl = obj.optString("selectionSoundUrl", "")
+        )
+    }
+
+    private fun parseDisplayScale(obj: JSONObject?): HomeExperienceDisplayScale {
+        if (obj == null) return HomeExperienceDisplayScale()
+        val forceMode = obj.optString("forceDisplayMode", "auto").let {
+            if (it in listOf("auto", "normal", "small", "ultra_compact")) it else "auto"
+        }
+        return HomeExperienceDisplayScale(
+            smallScreenWidthDp = obj.optInt("smallScreenWidthDp", 760).coerceIn(400, 2000),
+            smallScreenHeightDp = obj.optInt("smallScreenHeightDp", 500).coerceIn(300, 2000),
+            ultraCompactWidthDp = obj.optInt("ultraCompactWidthDp", 600).coerceIn(300, 2000),
+            ultraCompactHeightDp = obj.optInt("ultraCompactHeightDp", 400).coerceIn(200, 2000),
+            forceDisplayMode = forceMode
         )
     }
 }
