@@ -482,6 +482,35 @@ class IptvRepository(
         }
     }
 
+    /**
+     * Fetch the preload manifest from the server.
+     * Returns a pair of (imageUrls, soundUrls) to preload before entering home screen.
+     * Falls back to empty lists on any error so the splash never gets stuck.
+     */
+    suspend fun fetchPreloadManifest(): Pair<List<String>, List<String>> {
+        val serverApiEnabled = dataStoreManager.serverApiEnabledFlow.first()
+        if (!serverApiEnabled) return Pair(emptyList(), emptyList())
+
+        val deviceId = dataStoreManager.getDeviceId()
+        val serverUrl = dataStoreManager.getServerUrl()
+
+        return try {
+            val apiService = RetrofitClient.getService(serverUrl)
+            val response = apiService.getPreloadManifest(deviceId)
+            if (response.isSuccessful && response.body()?.status == true) {
+                val data = response.body()!!.data
+                dataStoreManager.addLog("Preload manifest: ${data?.total ?: 0} assets to cache.")
+                Pair(data?.images ?: emptyList(), data?.sounds ?: emptyList())
+            } else {
+                dataStoreManager.addLog("Preload manifest fetch failed: HTTP ${response.code()}")
+                Pair(emptyList(), emptyList())
+            }
+        } catch (e: Exception) {
+            dataStoreManager.addLog("Preload manifest error: ${e.message}")
+            Pair(emptyList(), emptyList())
+        }
+    }
+
     // Direct connection test
     suspend fun testConnection(targetUrl: String): Pair<Boolean, String> {
         return try {

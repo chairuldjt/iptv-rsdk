@@ -203,6 +203,9 @@ interface IptvApiService {
 
     @GET("api/entertainment/items")
     suspend fun getEntertainmentItems(): Response<EntertainmentItemsResponse>
+
+    @GET("api/device/preload/{device_id}")
+    suspend fun getPreloadManifest(@Path("device_id") deviceId: String): Response<PreloadManifestResponse>
 }
 
 data class UpdateCheckResponse(
@@ -230,4 +233,16 @@ data class QueuedCommand(
 data class UploadScreenshotRequest(
     val deviceId: String,
     val image: String
+)
+
+data class PreloadManifestData(
+    val images: List<String>,
+    val sounds: List<String>,
+    val total: Int
+)
+
+data class PreloadManifestResponse(
+    val status: Boolean,
+    val message: String,
+    val data: PreloadManifestData?
 )

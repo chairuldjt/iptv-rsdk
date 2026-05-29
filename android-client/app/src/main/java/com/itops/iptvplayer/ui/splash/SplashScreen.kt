@@ -9,7 +9,8 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -64,6 +65,12 @@ fun SplashScreen(
     var currentVersionCode by remember { mutableIntStateOf(0) }
     var splashSoundId by remember { mutableIntStateOf(0) }
     var loadingStatus by remember { mutableStateOf("") }
+    var loadingProgress by remember { mutableFloatStateOf(0f) }
+    val animatedProgress by animateFloatAsState(
+        targetValue = loadingProgress,
+        animationSpec = tween(durationMillis = 400),
+        label = "splashProgress"
+    )
     // Deferred untuk menunggu chime lokal selesai
     val chimeDeferred = remember { kotlinx.coroutines.CompletableDeferred<Unit>() }
 
@@ -114,16 +121,28 @@ fun SplashScreen(
 
         // Wait for animation and config sync only
         animJob.await()
+        loadingProgress = 0.25f
         syncConfigJob.await()
+        loadingProgress = 0.50f
         // syncChannels continues in background — don't await
 
-        // After sync, homeExperienceJson in DataStore is now fresh.
-        // Re-read it and preload all remote image URLs into Coil cache.
+        // After sync, fetch the server-side preload manifest which includes ALL
+        // asset URLs (images + sounds) resolved for this device — including overlay
+        // images that the local parser would miss. Falls back to local parsing if
+        // the server is unreachable so the splash never gets stuck.
         loadingStatus = "Memuat aset tampilan..."
         val freshJson = app.dataStoreManager.homeExperienceJsonFlow.first()
         val freshExp = HomeExperienceParser.parse(freshJson)
         val imageLoader = coil.Coil.imageLoader(context)
-        val urlsToPreload = buildList {
+
+        // Try server manifest first (covers overlays + sounds the local parser misses)
+        val (serverImages, _) = withTimeoutOrNull(5_000L) {
+            app.repository.fetchPreloadManifest()
+        } ?: Pair(emptyList(), emptyList())
+        loadingProgress = 0.75f
+
+        // Build local fallback list from DataStore in case server manifest is empty
+        val localImages = buildList {
             if (freshExp.splash.backgroundUrl.isNotBlank()) add(freshExp.splash.backgroundUrl)
             if (freshExp.splash.logoUrl.isNotBlank()) add(freshExp.splash.logoUrl)
             if (freshExp.homeBackgroundUrl.isNotBlank()) add(freshExp.homeBackgroundUrl)
@@ -131,7 +150,10 @@ fun SplashScreen(
             freshExp.menus.forEach { menu ->
                 if (menu.backgroundUrl.isNotBlank()) add(menu.backgroundUrl)
             }
-        }.distinct()
+        }
+
+        // Prefer server manifest; fall back to local list if server returned nothing
+        val urlsToPreload = (if (serverImages.isNotEmpty()) serverImages else localImages).distinct()
 
         if (urlsToPreload.isNotEmpty()) {
             withTimeoutOrNull(6_000L) {
@@ -150,6 +172,7 @@ fun SplashScreen(
                 preloadJobs.forEach { it.await() }
             }
         }
+        loadingProgress = 1f
 
         // Putar chime dan tunggu selesai (maks 10 detik)
         loadingStatus = ""
@@ -258,10 +281,13 @@ fun SplashScreen(
 
             Spacer(modifier = Modifier.height(42.dp))
 
-            CircularProgressIndicator(
+            LinearProgressIndicator(
+                progress = { animatedProgress },
+                modifier = Modifier
+                    .fillMaxWidth(0.5f)
+                    .height(3.dp),
                 color = Color(0xFF2EE6C6),
-                strokeWidth = 3.dp,
-                modifier = Modifier.size(38.dp)
+                trackColor = Color.White.copy(alpha = 0.15f),
             )
             Spacer(modifier = Modifier.height(12.dp))
             Text(
