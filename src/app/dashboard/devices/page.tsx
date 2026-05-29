@@ -399,6 +399,25 @@ export default async function DevicesPage({
                         {d.macAddress && (
                           <div className="text-[0.625rem] text-muted-foreground font-mono">MAC: {d.macAddress}</div>
                         )}
+                        {(d.screenWidth && d.screenHeight) ? (
+                          <div className="text-[0.625rem] text-muted-foreground font-mono mt-0.5">
+                            {d.screenWidth}×{d.screenHeight}{d.screenDpi ? ` • ${d.screenDpi} DPI` : ''}
+                            {d.screenDpi ? ` • ${Math.round(d.screenWidth / (d.screenDpi / 160))}dp` : ''}
+                          </div>
+                        ) : null}
+                        {d.lastOnline ? (
+                          <div className="text-[0.625rem] mt-0.5">
+                            <span className={isOnline ? 'text-emerald-400' : 'text-muted-foreground'}>
+                              {isOnline ? 'Online sejak ' : 'Terakhir online '}
+                              {new Date(d.lastOnline).toLocaleString('id-ID', {
+                                day: '2-digit', month: 'short', year: 'numeric',
+                                hour: '2-digit', minute: '2-digit'
+                              })}
+                            </span>
+                          </div>
+                        ) : (
+                          <div className="text-[0.625rem] text-muted-foreground mt-0.5">Belum pernah online</div>
+                        )}
                       </td>
                       <td className="text-right">
                         <div className="flex items-center justify-end gap-1.5">

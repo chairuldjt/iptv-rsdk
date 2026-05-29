@@ -6,7 +6,7 @@ import { createDeviceConfigData, getDefaultDeviceConfig } from '@/lib/defaultDev
 export async function POST(request: Request) {
   try {
     const body = await request.json()
-    const { device_id, device_name, device_name_updated_at, app_version, app_version_code, android_version, mac_address, local_ip, api_base_url_confirmed } = body
+    const { device_id, device_name, device_name_updated_at, app_version, app_version_code, android_version, mac_address, local_ip, api_base_url_confirmed, screen_width, screen_height, screen_dpi } = body
 
     if (!device_id) {
       return NextResponse.json(
@@ -44,6 +44,9 @@ export async function POST(request: Request) {
               androidVersion: android_version || existingDeviceByMac.androidVersion,
               lastIp: local_ip || existingDeviceByMac.lastIp,
               lastOnline: new Date(),
+              ...(screen_width ? { screenWidth: screen_width } : {}),
+              ...(screen_height ? { screenHeight: screen_height } : {}),
+              ...(screen_dpi ? { screenDpi: screen_dpi } : {}),
             },
             include: { config: true },
           })
@@ -66,6 +69,9 @@ export async function POST(request: Request) {
             lastIp: local_ip,
             macAddress: mac_address,
             lastOnline: new Date(),
+            screenWidth: screen_width ?? null,
+            screenHeight: screen_height ?? null,
+            screenDpi: screen_dpi ?? null,
           },
         })
  
@@ -102,6 +108,9 @@ export async function POST(request: Request) {
           lastIp: local_ip || device.lastIp,
           macAddress: mac_address || device.macAddress,
           lastOnline: new Date(),
+          ...(screen_width ? { screenWidth: screen_width } : {}),
+          ...(screen_height ? { screenHeight: screen_height } : {}),
+          ...(screen_dpi ? { screenDpi: screen_dpi } : {}),
           // Jika Android konfirmasi sudah pindah ke URL baru, reset apiBaseUrl di server
           // agar tidak dikirim lagi ke device lain atau saat sync berikutnya
           ...(api_base_url_confirmed === true ? {

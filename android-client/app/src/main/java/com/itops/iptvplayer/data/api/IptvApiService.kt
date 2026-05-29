@@ -18,7 +18,10 @@ data class RegisterRequest(
     val android_version: String,
     val mac_address: String?,
     val local_ip: String?,
-    val api_base_url_confirmed: Boolean = false
+    val api_base_url_confirmed: Boolean = false,
+    val screen_width: Int? = null,
+    val screen_height: Int? = null,
+    val screen_dpi: Int? = null
 )
 
 data class RegisterResponse(

@@ -61,6 +61,11 @@ class IptvRepository(
         val serverUrl = dataStoreManager.getServerUrl()
         val deviceName = getEffectiveDeviceName()
 
+        val displayMetrics = context.resources.displayMetrics
+        val screenWidth = displayMetrics.widthPixels
+        val screenHeight = displayMetrics.heightPixels
+        val screenDpi = displayMetrics.densityDpi
+
         val request = RegisterRequest(
             device_id = deviceId,
             device_name = deviceName,
@@ -69,7 +74,10 @@ class IptvRepository(
             app_version_code = BuildConfig.VERSION_CODE,
             android_version = Build.VERSION.RELEASE,
             mac_address = getMacAddress(),
-            local_ip = getLocalIpAddress()
+            local_ip = getLocalIpAddress(),
+            screen_width = screenWidth,
+            screen_height = screenHeight,
+            screen_dpi = screenDpi
         )
         return try {
             val apiService = RetrofitClient.getService(serverUrl)

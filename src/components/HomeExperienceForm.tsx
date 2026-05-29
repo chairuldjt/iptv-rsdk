@@ -131,6 +131,7 @@ export default function HomeExperienceForm({
   const [dsUltraW, setDsUltraW] = useState(config.displayScale.ultraCompactWidthDp)
   const [dsUltraH, setDsUltraH] = useState(config.displayScale.ultraCompactHeightDp)
   const [dsForceMode, setDsForceMode] = useState(config.displayScale.forceDisplayMode)
+  const [dsMultiplier, setDsMultiplier] = useState(config.displayScale.uiScaleMultiplier)
   const [startScreen, setStartScreen] = useState<StartScreenValue>(config.startScreen)
   const [startScreenContentId, setStartScreenContentId] = useState<number | null>(config.startScreenContentId ?? null)
   const [menuHintText, setMenuHintText] = useState(config.menuHintText ?? '')
@@ -824,6 +825,7 @@ export default function HomeExperienceForm({
           <input type="hidden" name="displayScale.ultraCompactWidthDp" value={dsUltraW} />
           <input type="hidden" name="displayScale.ultraCompactHeightDp" value={dsUltraH} />
           <input type="hidden" name="displayScale.forceDisplayMode" value={dsForceMode} />
+          <input type="hidden" name="displayScale.uiScaleMultiplier" value={dsMultiplier} />
           <p className="text-[11px] text-muted-foreground mb-4">
             Layar dengan lebar &lt; <strong>Small Width</strong> atau tinggi &lt; <strong>Small Height</strong> akan masuk mode <em>small screen</em> (font dan card lebih kecil).
             Layar dengan lebar &lt; <strong>Ultra Width</strong> atau tinggi &lt; <strong>Ultra Height</strong> akan masuk mode <em>ultra compact</em> (paling kecil).
@@ -842,6 +844,33 @@ export default function HomeExperienceForm({
               <option value="ultra_compact">Ultra Compact — paksa mode paling kecil</option>
             </select>
             <span className="form-hint">Jika dipilih selain Auto, threshold di bawah diabaikan. Gunakan "Normal" untuk memaksa tampilan standar di semua resolusi.</span>
+          </div>
+          <div className="form-group mb-5">
+            <label>UI Scale Multiplier</label>
+            <div className="flex items-center gap-3">
+              <input
+                type="range"
+                min={0.5} max={2.0} step={0.05}
+                value={dsMultiplier}
+                onChange={(e) => setDsMultiplier(Number(e.target.value))}
+                className="flex-1 accent-primary"
+              />
+              <span className="text-sm font-bold text-foreground w-12 text-right">{dsMultiplier.toFixed(2)}×</span>
+              <button
+                type="button"
+                onClick={() => setDsMultiplier(1.0)}
+                className="btn btn-xs btn-secondary"
+              >Reset</button>
+            </div>
+            <span className="form-hint">
+              1.0 = normal. 0.8 = 80% (lebih kecil). 1.2 = 120% (lebih besar). Berlaku di atas mode yang dipilih.
+              Preset: <button type="button" className="text-primary underline text-[10px]" onClick={() => setDsMultiplier(0.75)}>0.75×</button>{' '}
+              <button type="button" className="text-primary underline text-[10px]" onClick={() => setDsMultiplier(0.85)}>0.85×</button>{' '}
+              <button type="button" className="text-primary underline text-[10px]" onClick={() => setDsMultiplier(0.9)}>0.90×</button>{' '}
+              <button type="button" className="text-primary underline text-[10px]" onClick={() => setDsMultiplier(1.0)}>1.00×</button>{' '}
+              <button type="button" className="text-primary underline text-[10px]" onClick={() => setDsMultiplier(1.1)}>1.10×</button>{' '}
+              <button type="button" className="text-primary underline text-[10px]" onClick={() => setDsMultiplier(1.25)}>1.25×</button>
+            </span>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
             <div className="form-group">

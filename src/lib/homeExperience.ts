@@ -127,6 +127,7 @@ export type HomeExperienceResolvedConfig = {
     ultraCompactWidthDp: number
     ultraCompactHeightDp: number
     forceDisplayMode: 'auto' | 'normal' | 'small' | 'ultra_compact'
+    uiScaleMultiplier: number
   }
 }
 
@@ -479,6 +480,7 @@ export const FALLBACK_HOME_EXPERIENCE_CONFIG: HomeExperienceResolvedConfig = {
     ultraCompactWidthDp: 600,
     ultraCompactHeightDp: 400,
     forceDisplayMode: 'auto',
+    uiScaleMultiplier: 1.0,
   },
 }
 
@@ -627,6 +629,7 @@ export function homeExperienceFromFormData(formData: FormData): HomeExperienceRe
       ultraCompactWidthDp: formData.get('displayScale.ultraCompactWidthDp'),
       ultraCompactHeightDp: formData.get('displayScale.ultraCompactHeightDp'),
       forceDisplayMode: formData.get('displayScale.forceDisplayMode'),
+      uiScaleMultiplier: formData.get('displayScale.uiScaleMultiplier'),
     },
   })
 }
@@ -1018,6 +1021,7 @@ function normalizeDisplayScale(value: unknown): HomeExperienceResolvedConfig['di
     ultraCompactWidthDp: clampInt(source.ultraCompactWidthDp, 300, 2000, d.ultraCompactWidthDp),
     ultraCompactHeightDp: clampInt(source.ultraCompactHeightDp, 200, 2000, d.ultraCompactHeightDp),
     forceDisplayMode: oneOf(source.forceDisplayMode, ['auto', 'normal', 'small', 'ultra_compact'] as const, d.forceDisplayMode),
+    uiScaleMultiplier: clampFloat(source.uiScaleMultiplier, 0.5, 2.0, d.uiScaleMultiplier),
   }
 }
 
@@ -1030,6 +1034,7 @@ function normalizeDisplayScalePatch(value: unknown): Partial<HomeExperienceResol
   if (hasOwn(source, 'ultraCompactWidthDp')) patch.ultraCompactWidthDp = clampInt(source.ultraCompactWidthDp, 300, 2000, d.ultraCompactWidthDp)
   if (hasOwn(source, 'ultraCompactHeightDp')) patch.ultraCompactHeightDp = clampInt(source.ultraCompactHeightDp, 200, 2000, d.ultraCompactHeightDp)
   if (hasOwn(source, 'forceDisplayMode')) patch.forceDisplayMode = oneOf(source.forceDisplayMode, ['auto', 'normal', 'small', 'ultra_compact'] as const, d.forceDisplayMode)
+  if (hasOwn(source, 'uiScaleMultiplier')) patch.uiScaleMultiplier = clampFloat(source.uiScaleMultiplier, 0.5, 2.0, d.uiScaleMultiplier)
   return patch
 }
 
@@ -1229,6 +1234,12 @@ function clampInt(value: unknown, min: number, max: number, fallback: number): n
   const parsed = typeof value === 'number' ? value : Number.parseInt(String(value ?? ''), 10)
   if (!Number.isFinite(parsed)) return fallback
   return Math.max(min, Math.min(max, Math.floor(parsed)))
+}
+
+function clampFloat(value: unknown, min: number, max: number, fallback: number): number {
+  const parsed = typeof value === 'number' ? value : Number.parseFloat(String(value ?? ''))
+  if (!Number.isFinite(parsed)) return fallback
+  return Math.max(min, Math.min(max, parsed))
 }
 
 function oneOf<T extends string>(value: unknown, allowed: readonly T[], fallback: T): T {

@@ -14,7 +14,9 @@ data class HomeExperienceDisplayScale(
     // Threshold tinggi layar (dp) untuk masuk mode "ultra compact"
     val ultraCompactHeightDp: Int = 400,
     // Paksa mode tertentu: "auto" | "normal" | "small" | "ultra_compact"
-    val forceDisplayMode: String = "auto"
+    val forceDisplayMode: String = "auto",
+    // Multiplier skala UI (0.5 - 2.0). 1.0 = normal, 0.8 = 80%, 1.2 = 120%
+    val uiScaleMultiplier: Float = 1.0f
 )
 
 data class HomeExperienceProfile(
@@ -363,12 +365,14 @@ object HomeExperienceParser {
         val forceMode = obj.optString("forceDisplayMode", "auto").let {
             if (it in listOf("auto", "normal", "small", "ultra_compact")) it else "auto"
         }
+        val multiplier = obj.optDouble("uiScaleMultiplier", 1.0).toFloat().coerceIn(0.5f, 2.0f)
         return HomeExperienceDisplayScale(
             smallScreenWidthDp = obj.optInt("smallScreenWidthDp", 760).coerceIn(400, 2000),
             smallScreenHeightDp = obj.optInt("smallScreenHeightDp", 500).coerceIn(300, 2000),
             ultraCompactWidthDp = obj.optInt("ultraCompactWidthDp", 600).coerceIn(300, 2000),
             ultraCompactHeightDp = obj.optInt("ultraCompactHeightDp", 400).coerceIn(200, 2000),
-            forceDisplayMode = forceMode
+            forceDisplayMode = forceMode,
+            uiScaleMultiplier = multiplier
         )
     }
 }

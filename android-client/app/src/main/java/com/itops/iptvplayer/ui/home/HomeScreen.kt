@@ -145,8 +145,11 @@ import coil.compose.AsyncImage
 import com.itops.iptvplayer.R
 import com.itops.iptvplayer.BuildConfig
 import com.itops.iptvplayer.ui.components.KeyboardLayoutProvider
+import com.itops.iptvplayer.ui.components.LocalUiScale
 import com.itops.iptvplayer.ui.components.RemoteKeyboardDialog
 import com.itops.iptvplayer.ui.components.RemoteKeyboardKeySpec
+import com.itops.iptvplayer.ui.components.scaledDp
+import com.itops.iptvplayer.ui.components.scaledSp
 import com.itops.iptvplayer.ui.player.PlayerViewModel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.Job
@@ -339,6 +342,9 @@ fun HomeScreen(
         }
     }
 
+    androidx.compose.runtime.CompositionLocalProvider(
+        LocalUiScale provides homeExperience.displayScale.uiScaleMultiplier
+    ) {
     Box(modifier = Modifier.fillMaxSize()) {
         if (BuildConfig.HOME_LOW_EFFECT_MODE) {
             if (selectedHomeBackgroundUrl.isNotBlank()) {
@@ -429,8 +435,8 @@ fun HomeScreen(
                 .fillMaxSize()
                 .safeDrawingPadding()
                 .padding(
-                    horizontal = if (isUltraCompact) 12.dp else if (isSmallScreen) 18.dp else 34.dp,
-                    vertical = if (isUltraCompact) 6.dp else if (isSmallScreen) 10.dp else 18.dp
+                    horizontal = if (isUltraCompact) 12.scaledDp() else if (isSmallScreen) 18.scaledDp() else 34.scaledDp(),
+                    vertical = if (isUltraCompact) 6.scaledDp() else if (isSmallScreen) 10.scaledDp() else 18.scaledDp()
                 )
         ) {
             // Jika ada overlay dari server, header hardcode disembunyikan —
@@ -551,6 +557,7 @@ fun HomeScreen(
             )
         }
     }
+    } // end CompositionLocalProvider
 }
 
 @Composable
@@ -581,12 +588,12 @@ private fun HospitalityHeader(
         Column(
             modifier = Modifier.weight(1f),
             horizontalAlignment = Alignment.Start,
-            verticalArrangement = Arrangement.spacedBy(if (isUltraCompact) 1.dp else if (isSmallScreen) 2.dp else 4.dp)
+            verticalArrangement = Arrangement.spacedBy(if (isUltraCompact) 1.scaledDp() else if (isSmallScreen) 2.scaledDp() else 4.scaledDp())
         ) {
             Text(
                 text = "Selamat Datang",
                 color = Color.White,
-                fontSize = if (isUltraCompact) 11.sp else if (isSmallScreen) 13.sp else 17.sp,
+                fontSize = if (isUltraCompact) 11.scaledSp() else if (isSmallScreen) 13.scaledSp() else 17.scaledSp(),
                 fontWeight = FontWeight.Bold,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
@@ -594,7 +601,7 @@ private fun HospitalityHeader(
             Text(
                 text = "Premium IPTV Hospitality",
                 color = Color(0xFFE7D8A0),
-                fontSize = if (isUltraCompact) 8.sp else if (isSmallScreen) 9.sp else 12.sp,
+                fontSize = if (isUltraCompact) 8.scaledSp() else if (isSmallScreen) 9.scaledSp() else 12.scaledSp(),
                 fontWeight = FontWeight.SemiBold,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
@@ -602,7 +609,7 @@ private fun HospitalityHeader(
             Text(
                 text = stbName,
                 color = Color.White.copy(alpha = 0.88f),
-                fontSize = if (isUltraCompact) 7.sp else if (isSmallScreen) 8.sp else 10.sp,
+                fontSize = if (isUltraCompact) 7.scaledSp() else if (isSmallScreen) 8.scaledSp() else 10.scaledSp(),
                 fontWeight = FontWeight.Bold,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
@@ -621,8 +628,8 @@ private fun HospitalityHeader(
                         model = logoUrl,
                         contentDescription = "Hospitality IPTV",
                         modifier = Modifier
-                            .size(if (isMediumHeight) 48.dp else 72.dp)
-                            .clip(RoundedCornerShape(16.dp)),
+                            .size(if (isMediumHeight) 48.scaledDp() else 72.scaledDp())
+                            .clip(RoundedCornerShape(16.scaledDp())),
                         contentScale = ContentScale.Fit
                     )
                 } else {
@@ -630,15 +637,15 @@ private fun HospitalityHeader(
                         painter = painterResource(id = R.drawable.ic_global_iptv),
                         contentDescription = "Hospitality IPTV",
                         modifier = Modifier
-                            .size(if (isMediumHeight) 48.dp else 72.dp)
-                            .clip(RoundedCornerShape(16.dp))
+                            .size(if (isMediumHeight) 48.scaledDp() else 72.scaledDp())
+                            .clip(RoundedCornerShape(16.scaledDp()))
                     )
                 }
-                Spacer(modifier = Modifier.height(if (isMediumHeight) 4.dp else 8.dp))
+                Spacer(modifier = Modifier.height(if (isMediumHeight) 4.scaledDp() else 8.scaledDp()))
                 Text(
                     text = "Hospitality IPTV",
                     color = Color(0xFFFFE9A6),
-                    fontSize = if (isMediumHeight) 16.sp else 22.sp,
+                    fontSize = if (isMediumHeight) 16.scaledSp() else 22.scaledSp(),
                     fontWeight = FontWeight.ExtraBold,
                     letterSpacing = 0.5.sp,
                     maxLines = 1,
@@ -647,7 +654,7 @@ private fun HospitalityHeader(
                 Text(
                     text = "Live TV • Education • Guest Services",
                     color = Color.White.copy(alpha = 0.88f),
-                    fontSize = if (isMediumHeight) 9.sp else 11.sp,
+                    fontSize = if (isMediumHeight) 9.scaledSp() else 11.scaledSp(),
                     fontWeight = FontWeight.SemiBold,
                     letterSpacing = 1.2.sp,
                     maxLines = 1,
@@ -664,7 +671,7 @@ private fun HospitalityHeader(
             Text(
                 text = time,
                 color = Color.White,
-                fontSize = if (isUltraCompact) 18.sp else if (isSmallScreen) 22.sp else 30.sp,
+                fontSize = if (isUltraCompact) 18.scaledSp() else if (isSmallScreen) 22.scaledSp() else 30.scaledSp(),
                 fontWeight = FontWeight.ExtraBold,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
@@ -672,16 +679,16 @@ private fun HospitalityHeader(
             Text(
                 text = date,
                 color = Color.White.copy(alpha = 0.82f),
-                fontSize = if (isUltraCompact) 7.sp else if (isSmallScreen) 8.sp else 11.sp,
+                fontSize = if (isUltraCompact) 7.scaledSp() else if (isSmallScreen) 8.scaledSp() else 11.scaledSp(),
                 fontWeight = FontWeight.SemiBold,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )
-            Spacer(modifier = Modifier.height(if (isUltraCompact) 1.dp else if (isSmallScreen) 2.dp else 4.dp))
+            Spacer(modifier = Modifier.height(if (isUltraCompact) 1.scaledDp() else if (isSmallScreen) 2.scaledDp() else 4.scaledDp()))
             Text(
                 text = weather,
                 color = Color(0xFFFFE9A6),
-                fontSize = if (isUltraCompact) 7.sp else if (isSmallScreen) 8.sp else 10.sp,
+                fontSize = if (isUltraCompact) 7.scaledSp() else if (isSmallScreen) 8.scaledSp() else 10.scaledSp(),
                 fontWeight = FontWeight.Bold,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
@@ -694,18 +701,18 @@ private fun HospitalityHeader(
 private fun InfoChip(text: String, isSmallScreen: Boolean = false) {
     Box(
         modifier = Modifier
-            .clip(RoundedCornerShape(if (isSmallScreen) 12.dp else 18.dp))
+            .clip(RoundedCornerShape(if (isSmallScreen) 12.scaledDp() else 18.scaledDp()))
             .background(Color.Black.copy(alpha = 0.25f))
-            .border(1.dp, Color.White.copy(alpha = 0.13f), RoundedCornerShape(if (isSmallScreen) 12.dp else 18.dp))
+            .border(1.dp, Color.White.copy(alpha = 0.13f), RoundedCornerShape(if (isSmallScreen) 12.scaledDp() else 18.scaledDp()))
             .padding(
-                horizontal = if (isSmallScreen) 7.dp else 11.dp,
-                vertical = if (isSmallScreen) 3.dp else 5.dp
+                horizontal = if (isSmallScreen) 7.scaledDp() else 11.scaledDp(),
+                vertical = if (isSmallScreen) 3.scaledDp() else 5.scaledDp()
             )
     ) {
         Text(
             text = text,
             color = Color.White.copy(alpha = 0.84f),
-            fontSize = if (isSmallScreen) 8.sp else 10.sp,
+            fontSize = if (isSmallScreen) 8.scaledSp() else 10.scaledSp(),
             fontWeight = FontWeight.Medium,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis
@@ -938,7 +945,7 @@ private fun HospitalityMenuBar(
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(if (isUltraCompact) 115.dp else if (isSmallScreen) 140.dp else 190.dp)
+                .height(if (isUltraCompact) 115.scaledDp() else if (isSmallScreen) 140.scaledDp() else 190.scaledDp())
                 .focusRequester(carouselFocusRequester)
                 .focusable()
                 .onPreviewKeyEvent { keyEvent ->
@@ -1015,8 +1022,8 @@ private fun HospitalityMenuBar(
                     }
                 }
                 .padding(
-                    horizontal = if (isUltraCompact) 6.dp else if (isSmallScreen) 12.dp else 24.dp,
-                    vertical = if (isUltraCompact) 1.dp else if (isSmallScreen) 2.dp else 4.dp
+                    horizontal = if (isUltraCompact) 6.scaledDp() else if (isSmallScreen) 12.scaledDp() else 24.scaledDp(),
+                    vertical = if (isUltraCompact) 1.scaledDp() else if (isSmallScreen) 2.scaledDp() else 4.scaledDp()
                 ),
             contentAlignment = Alignment.Center
         ) {
@@ -1042,7 +1049,7 @@ private fun HospitalityMenuBar(
             val offsets = if (showFiveItems) listOf(-2, -1, 0, 1, 2) else listOf(-1, 0, 1)
             Row(
                 horizontalArrangement = Arrangement.spacedBy(
-                    if (isUltraCompact) 6.dp else if (isSmallScreen) 10.dp else 18.dp,
+                    if (isUltraCompact) 6.scaledDp() else if (isSmallScreen) 10.scaledDp() else 18.scaledDp(),
                     Alignment.CenterHorizontally
                 ),
                 verticalAlignment = Alignment.CenterVertically,
@@ -1069,22 +1076,22 @@ private fun HospitalityMenuBar(
             }
         }
 
-        Spacer(modifier = Modifier.height(if (isUltraCompact) 2.dp else if (isSmallScreen) 4.dp else 8.dp))
+        Spacer(modifier = Modifier.height(if (isUltraCompact) 2.scaledDp() else if (isSmallScreen) 4.scaledDp() else 8.scaledDp()))
         SelectedMenuLabel(
             item = menuItems[selectedIndex],
             isSmallScreen = isSmallScreen,
             isUltraCompact = isUltraCompact
         )
-        Spacer(modifier = Modifier.height(if (isUltraCompact) 4.dp else if (isSmallScreen) 8.dp else 12.dp))
+        Spacer(modifier = Modifier.height(if (isUltraCompact) 4.scaledDp() else if (isSmallScreen) 8.scaledDp() else 12.scaledDp()))
         Row(
-            horizontalArrangement = Arrangement.spacedBy(if (isUltraCompact) 4.dp else 7.dp),
+            horizontalArrangement = Arrangement.spacedBy(if (isUltraCompact) 4.scaledDp() else 7.scaledDp()),
             verticalAlignment = Alignment.CenterVertically
         ) {
             menuItems.indices.forEach { index ->
                 Box(
                     modifier = Modifier
-                        .width(if (index == selectedIndex) (if (isUltraCompact) 14.dp else 22.dp) else (if (isUltraCompact) 5.dp else 7.dp))
-                        .height(if (isUltraCompact) 5.dp else 7.dp)
+                        .width(if (index == selectedIndex) (if (isUltraCompact) 14.scaledDp() else 22.scaledDp()) else (if (isUltraCompact) 5.scaledDp() else 7.scaledDp()))
+                        .height(if (isUltraCompact) 5.scaledDp() else 7.scaledDp())
                         .clip(RoundedCornerShape(10.dp))
                         .background(
                             if (index == selectedIndex) menuItems[selectedIndex].accent
@@ -1093,30 +1100,30 @@ private fun HospitalityMenuBar(
                 )
             }
         }
-        Spacer(modifier = Modifier.height(if (isUltraCompact) 4.dp else 8.dp))
+        Spacer(modifier = Modifier.height(if (isUltraCompact) 4.scaledDp() else 8.scaledDp()))
         if (okLongPressTriggered) {
             Box(
                 modifier = Modifier
-                    .clip(RoundedCornerShape(if (isUltraCompact) 8.dp else 12.dp))
+                    .clip(RoundedCornerShape(if (isUltraCompact) 8.scaledDp() else 12.scaledDp()))
                     .background(Color(0xFF2EE6C6).copy(alpha = 0.22f))
                     .border(
                         BorderStroke(1.dp, Color(0xFF2EE6C6).copy(alpha = 0.85f)),
-                        RoundedCornerShape(if (isUltraCompact) 8.dp else 12.dp)
+                        RoundedCornerShape(if (isUltraCompact) 8.scaledDp() else 12.scaledDp())
                     )
                     .padding(
-                        horizontal = if (isUltraCompact) 10.dp else 14.dp,
-                        vertical = if (isUltraCompact) 5.dp else 7.dp
+                        horizontal = if (isUltraCompact) 10.scaledDp() else 14.scaledDp(),
+                        vertical = if (isUltraCompact) 5.scaledDp() else 7.scaledDp()
                     )
             ) {
                 Text(
                     text = if (isUltraCompact) "Lepas OK untuk ubah nama STB" else "Trigger aktif. Lepaskan tombol OK untuk membuka ubah nama STB.",
                     color = Color.White,
-                    fontSize = if (isUltraCompact) 8.sp else if (isSmallScreen) 9.sp else 11.sp,
+                    fontSize = if (isUltraCompact) 8.scaledSp() else if (isSmallScreen) 9.scaledSp() else 11.scaledSp(),
                     fontWeight = FontWeight.Bold,
                     textAlign = TextAlign.Center
                 )
             }
-            Spacer(modifier = Modifier.height(if (isUltraCompact) 4.dp else 8.dp))
+            Spacer(modifier = Modifier.height(if (isUltraCompact) 4.scaledDp() else 8.scaledDp()))
         }
         if (homeExperience.menuHintText.isNotBlank()) {
             Text(
@@ -1128,7 +1135,7 @@ private fun HospitalityMenuBar(
                     homeExperience.menuHintText
                 },
                 color = Color.White.copy(alpha = 0.62f),
-                fontSize = if (isUltraCompact) 7.sp else if (isSmallScreen) 8.sp else 10.sp,
+                fontSize = if (isUltraCompact) 7.scaledSp() else if (isSmallScreen) 8.scaledSp() else 10.scaledSp(),
                 fontWeight = FontWeight.Medium
             )
         }
@@ -1282,21 +1289,21 @@ private fun SelectedMenuLabel(
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
         modifier = Modifier
-            .clip(RoundedCornerShape(if (isUltraCompact) 6.dp else if (isSmallScreen) 10.dp else 14.dp))
+            .clip(RoundedCornerShape(if (isUltraCompact) 6.scaledDp() else if (isSmallScreen) 10.scaledDp() else 14.scaledDp()))
             .background(Color.Black.copy(alpha = 0.42f))
             .border(
                 BorderStroke(1.dp, item.accent.copy(alpha = 0.34f)),
-                RoundedCornerShape(if (isUltraCompact) 6.dp else if (isSmallScreen) 10.dp else 14.dp)
+                RoundedCornerShape(if (isUltraCompact) 6.scaledDp() else if (isSmallScreen) 10.scaledDp() else 14.scaledDp())
             )
             .padding(
-                horizontal = if (isUltraCompact) 10.dp else if (isSmallScreen) 14.dp else 20.dp,
-                vertical = if (isUltraCompact) 2.dp else if (isSmallScreen) 4.dp else 7.dp
+                horizontal = if (isUltraCompact) 10.scaledDp() else if (isSmallScreen) 14.scaledDp() else 20.scaledDp(),
+                vertical = if (isUltraCompact) 2.scaledDp() else if (isSmallScreen) 4.scaledDp() else 7.scaledDp()
             )
     ) {
         Text(
             text = item.title,
             color = item.textColor,
-            fontSize = if (isUltraCompact) 10.sp else if (isSmallScreen) 12.sp else 17.sp,
+            fontSize = if (isUltraCompact) 10.scaledSp() else if (isSmallScreen) 12.scaledSp() else 17.scaledSp(),
             fontWeight = FontWeight.ExtraBold,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
@@ -1311,7 +1318,7 @@ private fun SelectedMenuLabel(
         Text(
             text = item.subtitle,
             color = Color.White.copy(alpha = 0.84f),
-            fontSize = if (isUltraCompact) 7.sp else if (isSmallScreen) 8.sp else 10.sp,
+            fontSize = if (isUltraCompact) 7.scaledSp() else if (isSmallScreen) 8.scaledSp() else 10.scaledSp(),
             fontWeight = FontWeight.SemiBold,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
@@ -1334,7 +1341,7 @@ private fun CarouselTouchButton(
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val size = if (isSmallScreen) 42.dp else 54.dp
+    val size = if (isSmallScreen) 42.scaledDp() else 54.scaledDp()
     Box(
         modifier = modifier
             .size(size)
@@ -1347,9 +1354,9 @@ private fun CarouselTouchButton(
         Text(
             text = if (direction < 0) "‹" else "›",
             color = Color.White,
-            fontSize = if (isSmallScreen) 30.sp else 40.sp,
+            fontSize = if (isSmallScreen) 30.scaledSp() else 40.scaledSp(),
             fontWeight = FontWeight.Light,
-            lineHeight = if (isSmallScreen) 30.sp else 40.sp,
+            lineHeight = if (isSmallScreen) 30.scaledSp() else 40.scaledSp(),
             style = TextStyle(
                 shadow = Shadow(
                     color = accent.copy(alpha = 0.75f),
@@ -1384,44 +1391,44 @@ private fun HospitalityCarouselCard(
         )
         val cardWidth by animateDpAsState(
             targetValue = when (distance) {
-                0 -> if (isUltraCompact) 96.dp else if (isSmallScreen) 126.dp else 164.dp
-                1 -> if (isUltraCompact) 74.dp else if (isSmallScreen) 92.dp else 112.dp
-                else -> if (isUltraCompact) 56.dp else if (isSmallScreen) 68.dp else 82.dp
+                0 -> if (isUltraCompact) 96.scaledDp() else if (isSmallScreen) 126.scaledDp() else 164.scaledDp()
+                1 -> if (isUltraCompact) 74.scaledDp() else if (isSmallScreen) 92.scaledDp() else 112.scaledDp()
+                else -> if (isUltraCompact) 56.scaledDp() else if (isSmallScreen) 68.scaledDp() else 82.scaledDp()
             },
             animationSpec = tween(durationMillis = 160),
             label = "hospitality_carousel_width_debug_step1"
         )
         val iconBoxSize by animateDpAsState(
             targetValue = when (distance) {
-                0 -> if (isUltraCompact) 66.dp else if (isSmallScreen) 88.dp else 116.dp
-                1 -> if (isUltraCompact) 44.dp else if (isSmallScreen) 56.dp else 72.dp
-                else -> if (isUltraCompact) 32.dp else if (isSmallScreen) 40.dp else 50.dp
+                0 -> if (isUltraCompact) 66.scaledDp() else if (isSmallScreen) 88.scaledDp() else 116.scaledDp()
+                1 -> if (isUltraCompact) 44.scaledDp() else if (isSmallScreen) 56.scaledDp() else 72.scaledDp()
+                else -> if (isUltraCompact) 32.scaledDp() else if (isSmallScreen) 40.scaledDp() else 50.scaledDp()
             },
             animationSpec = tween(durationMillis = 160),
             label = "hospitality_carousel_box_size_debug_step1"
         )
         val iconSize = when (distance) {
-            0 -> if (isUltraCompact) 28.dp else if (isSmallScreen) 38.dp else 54.dp
-            1 -> if (isUltraCompact) 20.dp else if (isSmallScreen) 26.dp else 36.dp
-            else -> if (isUltraCompact) 14.dp else if (isSmallScreen) 20.dp else 26.dp
+            0 -> if (isUltraCompact) 28.scaledDp() else if (isSmallScreen) 38.scaledDp() else 54.scaledDp()
+            1 -> if (isUltraCompact) 20.scaledDp() else if (isSmallScreen) 26.scaledDp() else 36.scaledDp()
+            else -> if (isUltraCompact) 14.scaledDp() else if (isSmallScreen) 20.scaledDp() else 26.scaledDp()
         }
         val iconPlateSize = when (distance) {
-            0 -> if (isUltraCompact) 36.dp else if (isSmallScreen) 48.dp else 62.dp
-            1 -> if (isUltraCompact) 24.dp else if (isSmallScreen) 30.dp else 40.dp
-            else -> if (isUltraCompact) 16.dp else if (isSmallScreen) 22.dp else 30.dp
+            0 -> if (isUltraCompact) 36.scaledDp() else if (isSmallScreen) 48.scaledDp() else 62.scaledDp()
+            1 -> if (isUltraCompact) 24.scaledDp() else if (isSmallScreen) 30.scaledDp() else 40.scaledDp()
+            else -> if (isUltraCompact) 16.scaledDp() else if (isSmallScreen) 22.scaledDp() else 30.scaledDp()
         }
         val offsetY by animateDpAsState(
             targetValue = if (isActive) {
-                if (isUltraCompact) (-6).dp else if (isSmallScreen) (-8).dp else (-12).dp
+                if (isUltraCompact) (-6).scaledDp() else if (isSmallScreen) (-8).scaledDp() else (-12).scaledDp()
             } else {
-                if (isUltraCompact) 4.dp else if (isSmallScreen) 6.dp else 10.dp
+                if (isUltraCompact) 4.scaledDp() else if (isSmallScreen) 6.scaledDp() else 10.scaledDp()
             },
             animationSpec = tween(durationMillis = 160),
             label = "hospitality_carousel_offset_y_debug_step2"
         )
         val borderWidth by animateDpAsState(
             targetValue = if (isActive) {
-                if (isUltraCompact) 2.dp else if (isSmallScreen) 3.dp else 4.dp
+                if (isUltraCompact) 2.scaledDp() else if (isSmallScreen) 3.scaledDp() else 4.scaledDp()
             } else {
                 1.dp
             },
@@ -1433,12 +1440,12 @@ private fun HospitalityCarouselCard(
             animationSpec = tween(durationMillis = 160),
             label = "hospitality_carousel_border_color_debug_step1"
         )
-        val cardShape = RoundedCornerShape(if (isActive) (if (isUltraCompact) 10.dp else 16.dp) else (if (isUltraCompact) 8.dp else 12.dp))
+        val cardShape = RoundedCornerShape(if (isActive) (if (isUltraCompact) 10.scaledDp() else 16.scaledDp()) else (if (isUltraCompact) 8.scaledDp() else 12.scaledDp()))
         val shadowElevation by animateDpAsState(
             targetValue = if (isActive) {
-                if (isUltraCompact) 4.dp else if (isSmallScreen) 6.dp else 8.dp
+                if (isUltraCompact) 4.scaledDp() else if (isSmallScreen) 6.scaledDp() else 8.scaledDp()
             } else {
-                if (isUltraCompact) 1.dp else if (isSmallScreen) 2.dp else 3.dp
+                if (isUltraCompact) 1.scaledDp() else if (isSmallScreen) 2.scaledDp() else 3.scaledDp()
             },
             animationSpec = tween(durationMillis = 160),
             label = "hospitality_carousel_shadow_debug_step3"
@@ -1507,9 +1514,9 @@ private fun HospitalityCarouselCard(
                 Box(
                     modifier = Modifier
                         .align(Alignment.TopCenter)
-                        .padding(top = if (isUltraCompact) 3.dp else if (isSmallScreen) 5.dp else 7.dp)
+                        .padding(top = if (isUltraCompact) 3.scaledDp() else if (isSmallScreen) 5.scaledDp() else 7.scaledDp())
                         .width(if (isActive) iconBoxSize * 0.52f else iconBoxSize * 0.40f)
-                        .height(if (isUltraCompact) 2.dp else if (isSmallScreen) 3.dp else 4.dp)
+                        .height(if (isUltraCompact) 2.scaledDp() else if (isSmallScreen) 3.scaledDp() else 4.scaledDp())
                         .clip(RoundedCornerShape(999.dp))
                         .background(item.accent.copy(alpha = if (isActive) 0.78f else 0.36f))
                 )
@@ -1523,7 +1530,7 @@ private fun HospitalityCarouselCard(
                         },
                         modifier = Modifier
                             .size(iconPlateSize)
-                            .offset(y = if (isActive) (-2).dp else 0.dp)
+                            .offset(y = if (isActive) (-2).scaledDp() else 0.dp)
                     )
                 } else {
                     Icon(
@@ -1532,18 +1539,18 @@ private fun HospitalityCarouselCard(
                         tint = Color.White.copy(alpha = if (isActive) 0.98f else 0.78f),
                         modifier = Modifier
                             .size(iconPlateSize)
-                            .offset(y = if (isActive) (-2).dp else 0.dp)
+                            .offset(y = if (isActive) (-2).scaledDp() else 0.dp)
                     )
                 }
             }
 
-            Spacer(modifier = Modifier.height(if (isActive) (if (isUltraCompact) 4.dp else 8.dp) else (if (isUltraCompact) 2.dp else 4.dp)))
+            Spacer(modifier = Modifier.height(if (isActive) (if (isUltraCompact) 4.scaledDp() else 8.scaledDp()) else (if (isUltraCompact) 2.scaledDp() else 4.scaledDp())))
 
             if (!isActive) {
                 Text(
                     text = item.title,
                     color = Color.White.copy(alpha = 0.76f),
-                    fontSize = if (isUltraCompact) 7.sp else if (isSmallScreen) 8.sp else 10.sp,
+                    fontSize = if (isUltraCompact) 7.scaledSp() else if (isSmallScreen) 8.scaledSp() else 10.scaledSp(),
                     fontWeight = FontWeight.Bold,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
@@ -1570,29 +1577,29 @@ private fun HospitalityCarouselCard(
     )
     val cardWidth by animateDpAsState(
         targetValue = when (distance) {
-            0 -> if (isUltraCompact) 96.dp else if (isSmallScreen) 126.dp else 164.dp
-            1 -> if (isUltraCompact) 74.dp else if (isSmallScreen) 92.dp else 112.dp
-            else -> if (isUltraCompact) 56.dp else if (isSmallScreen) 68.dp else 82.dp
+            0 -> if (isUltraCompact) 96.scaledDp() else if (isSmallScreen) 126.scaledDp() else 164.scaledDp()
+            1 -> if (isUltraCompact) 74.scaledDp() else if (isSmallScreen) 92.scaledDp() else 112.scaledDp()
+            else -> if (isUltraCompact) 56.scaledDp() else if (isSmallScreen) 68.scaledDp() else 82.scaledDp()
         },
         animationSpec = if (lowEffectMode) tween(durationMillis = 0) else tween(durationMillis = 220),
         label = "hospitality_carousel_width"
     )
     val iconBoxSize by animateDpAsState(
         targetValue = when (distance) {
-            0 -> if (isUltraCompact) 66.dp else if (isSmallScreen) 88.dp else 116.dp
-            1 -> if (isUltraCompact) 44.dp else if (isSmallScreen) 56.dp else 72.dp
-            else -> if (isUltraCompact) 32.dp else if (isSmallScreen) 40.dp else 50.dp
+            0 -> if (isUltraCompact) 66.scaledDp() else if (isSmallScreen) 88.scaledDp() else 116.scaledDp()
+            1 -> if (isUltraCompact) 44.scaledDp() else if (isSmallScreen) 56.scaledDp() else 72.scaledDp()
+            else -> if (isUltraCompact) 32.scaledDp() else if (isSmallScreen) 40.scaledDp() else 50.scaledDp()
         },
         animationSpec = if (lowEffectMode) tween(durationMillis = 0) else tween(durationMillis = 220),
         label = "hospitality_carousel_box_size"
     )
     val offsetY by animateDpAsState(
-        targetValue = if (isActive) (if (isUltraCompact) (-10).dp else if (isSmallScreen) (-16).dp else (-28).dp) else (if (isUltraCompact) 6.dp else if (isSmallScreen) 10.dp else 16.dp),
+        targetValue = if (isActive) (if (isUltraCompact) (-10).scaledDp() else if (isSmallScreen) (-16).scaledDp() else (-28).scaledDp()) else (if (isUltraCompact) 6.scaledDp() else if (isSmallScreen) 10.scaledDp() else 16.scaledDp()),
         animationSpec = if (lowEffectMode) tween(durationMillis = 0) else tween(durationMillis = 220),
         label = "hospitality_carousel_offset_y"
     )
     val borderWidth by animateDpAsState(
-        targetValue = if (isActive) (if (isUltraCompact) 2.dp else if (isSmallScreen) 3.dp else 4.dp) else (if (isUltraCompact) 1.dp else if (isSmallScreen) 1.8.dp else 2.5.dp),
+        targetValue = if (isActive) (if (isUltraCompact) 2.scaledDp() else if (isSmallScreen) 3.scaledDp() else 4.scaledDp()) else (if (isUltraCompact) 1.scaledDp() else if (isSmallScreen) 1.8f.scaledDp() else 2.5f.scaledDp()),
         animationSpec = if (lowEffectMode) tween(durationMillis = 0) else tween(durationMillis = 220),
         label = "hospitality_carousel_border_width"
     )
@@ -1602,14 +1609,14 @@ private fun HospitalityCarouselCard(
         label = "hospitality_carousel_border_color"
     )
     val cornerRadius by animateDpAsState(
-        targetValue = if (isActive) (if (isUltraCompact) 10.dp else if (isSmallScreen) 16.dp else 24.dp) else (if (isUltraCompact) 8.dp else if (isSmallScreen) 12.dp else 18.dp),
+        targetValue = if (isActive) (if (isUltraCompact) 10.scaledDp() else if (isSmallScreen) 16.scaledDp() else 24.scaledDp()) else (if (isUltraCompact) 8.scaledDp() else if (isSmallScreen) 12.scaledDp() else 18.scaledDp()),
         animationSpec = if (lowEffectMode) tween(durationMillis = 0) else tween(durationMillis = 220),
         label = "hospitality_carousel_corner_radius"
     )
     val cardShape = RoundedCornerShape(cornerRadius)
 
     val shadowElevation by animateDpAsState(
-        targetValue = if (lowEffectMode) 0.dp else if (isActive) (if (isUltraCompact) 10.dp else if (isSmallScreen) 16.dp else 24.dp) else (if (isUltraCompact) 3.dp else if (isSmallScreen) 5.dp else 7.dp),
+        targetValue = if (lowEffectMode) 0.dp else if (isActive) (if (isUltraCompact) 10.scaledDp() else if (isSmallScreen) 16.scaledDp() else 24.scaledDp()) else (if (isUltraCompact) 3.scaledDp() else if (isSmallScreen) 5.scaledDp() else 7.scaledDp()),
         animationSpec = if (lowEffectMode) tween(durationMillis = 0) else tween(durationMillis = 220),
         label = "hospitality_carousel_shadow_elevation"
     )
@@ -1638,7 +1645,7 @@ private fun HospitalityCarouselCard(
             if (isActive) {
                 Box(
                     modifier = Modifier
-                        .size(iconBoxSize + (if (isUltraCompact) 36.dp else if (isSmallScreen) 54.dp else 78.dp))
+                        .size(iconBoxSize + (if (isUltraCompact) 36.scaledDp() else if (isSmallScreen) 54.scaledDp() else 78.scaledDp()))
                         .background(
                             Brush.radialGradient(
                                 colors = listOf(
@@ -1708,9 +1715,9 @@ private fun HospitalityCarouselCard(
                         },
                         modifier = Modifier.size(
                             when (distance) {
-                                0 -> if (isUltraCompact) 26.dp else if (isSmallScreen) 34.dp else 48.dp
-                                1 -> if (isUltraCompact) 18.dp else if (isSmallScreen) 24.dp else 32.dp
-                                else -> if (isUltraCompact) 14.dp else if (isSmallScreen) 18.dp else 24.dp
+                                0 -> if (isUltraCompact) 26.scaledDp() else if (isSmallScreen) 34.scaledDp() else 48.scaledDp()
+                                1 -> if (isUltraCompact) 18.scaledDp() else if (isSmallScreen) 24.scaledDp() else 32.scaledDp()
+                                else -> if (isUltraCompact) 14.scaledDp() else if (isSmallScreen) 18.scaledDp() else 24.scaledDp()
                             }
                         )
                     )
@@ -1721,9 +1728,9 @@ private fun HospitalityCarouselCard(
                         tint = Color.White.copy(alpha = if (isActive) 1f else 0.76f),
                         modifier = Modifier.size(
                             when (distance) {
-                                0 -> if (isUltraCompact) 26.dp else if (isSmallScreen) 34.dp else 48.dp
-                                1 -> if (isUltraCompact) 18.dp else if (isSmallScreen) 24.dp else 32.dp
-                                else -> if (isUltraCompact) 14.dp else if (isSmallScreen) 18.dp else 24.dp
+                                0 -> if (isUltraCompact) 26.scaledDp() else if (isSmallScreen) 34.scaledDp() else 48.scaledDp()
+                                1 -> if (isUltraCompact) 18.scaledDp() else if (isSmallScreen) 24.scaledDp() else 32.scaledDp()
+                                else -> if (isUltraCompact) 14.scaledDp() else if (isSmallScreen) 18.scaledDp() else 24.scaledDp()
                             }
                         )
                     )
@@ -1732,9 +1739,9 @@ private fun HospitalityCarouselCard(
         }
         val textSpacerHeight by animateDpAsState(
             targetValue = if (isActive) {
-                if (isUltraCompact) 4.dp else if (isSmallScreen) 8.dp else 14.dp
+                if (isUltraCompact) 4.scaledDp() else if (isSmallScreen) 8.scaledDp() else 14.scaledDp()
             } else {
-                if (isUltraCompact) 2.dp else if (isSmallScreen) 4.dp else 6.dp
+                if (isUltraCompact) 2.scaledDp() else if (isSmallScreen) 4.scaledDp() else 6.scaledDp()
             },
             label = "hospitality_carousel_text_spacer"
         )
@@ -1751,23 +1758,23 @@ private fun HospitalityCarouselCard(
             )
             val titleHorizontalPadding by animateDpAsState(
                 targetValue = if (isActive) {
-                    if (isUltraCompact) 6.dp else if (isSmallScreen) 8.dp else 12.dp
+                    if (isUltraCompact) 6.scaledDp() else if (isSmallScreen) 8.scaledDp() else 12.scaledDp()
                 } else {
-                    if (isUltraCompact) 4.dp else if (isSmallScreen) 5.dp else 8.dp
+                    if (isUltraCompact) 4.scaledDp() else if (isSmallScreen) 5.scaledDp() else 8.scaledDp()
                 },
                 label = "hospitality_carousel_title_padding_h"
             )
             val titleVerticalPadding by animateDpAsState(
                 targetValue = if (isActive) {
-                    if (isUltraCompact) 1.5.dp else if (isSmallScreen) 2.5.dp else 4.dp
+                    if (isUltraCompact) 1.5f.scaledDp() else if (isSmallScreen) 2.5f.scaledDp() else 4.scaledDp()
                 } else {
-                    if (isUltraCompact) 1.dp else if (isSmallScreen) 1.5.dp else 2.5.dp
+                    if (isUltraCompact) 1.scaledDp() else if (isSmallScreen) 1.5f.scaledDp() else 2.5f.scaledDp()
                 },
                 label = "hospitality_carousel_title_padding_v"
             )
             Box(
                 modifier = Modifier
-                    .clip(RoundedCornerShape(if (isUltraCompact) 5.dp else if (isSmallScreen) 7.dp else 10.dp))
+                    .clip(RoundedCornerShape(if (isUltraCompact) 5.scaledDp() else if (isSmallScreen) 7.scaledDp() else 10.scaledDp()))
                     .background(Color.Black.copy(alpha = titleBgAlpha))
                     .padding(horizontal = titleHorizontalPadding, vertical = titleVerticalPadding)
             ) {
@@ -1775,9 +1782,9 @@ private fun HospitalityCarouselCard(
                     text = item.title,
                     color = if (isActive) item.accent else Color.White.copy(alpha = 0.76f),
                     fontSize = if (isActive) {
-                        if (isUltraCompact) 9.sp else if (isSmallScreen) 12.sp else 16.sp
+                        if (isUltraCompact) 9.scaledSp() else if (isSmallScreen) 12.scaledSp() else 16.scaledSp()
                     } else {
-                        if (isUltraCompact) 7.sp else if (isSmallScreen) 8.sp else 10.sp
+                        if (isUltraCompact) 7.scaledSp() else if (isSmallScreen) 8.scaledSp() else 10.scaledSp()
                     },
                     fontWeight = FontWeight.ExtraBold,
                     maxLines = 1,
@@ -1795,9 +1802,9 @@ private fun HospitalityCarouselCard(
                 text = item.subtitle,
                 color = Color.White.copy(alpha = if (isActive) 0.86f else 0.54f),
                 fontSize = if (isActive) {
-                    if (isUltraCompact) 7.sp else if (isSmallScreen) 8.sp else 10.sp
+                    if (isUltraCompact) 7.scaledSp() else if (isSmallScreen) 8.scaledSp() else 10.scaledSp()
                 } else {
-                    if (isUltraCompact) 5.5.sp else if (isSmallScreen) 6.sp else 7.5.sp
+                    if (isUltraCompact) 5.5f.scaledSp() else if (isSmallScreen) 6.scaledSp() else 7.5f.scaledSp()
                 },
                 fontWeight = if (isActive) FontWeight.SemiBold else FontWeight.Medium,
                 maxLines = 1,

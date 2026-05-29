@@ -71,6 +71,9 @@ model Device {
   androidVersion String?
   lastIp         String?
   macAddress     String?
+  screenWidth    Int?
+  screenHeight   Int?
+  screenDpi      Int?
   lastOnline     DateTime?
   createdAt      DateTime      @default(now())
   updatedAt      DateTime      @updatedAt
