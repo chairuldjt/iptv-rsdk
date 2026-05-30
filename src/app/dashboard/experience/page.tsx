@@ -20,10 +20,19 @@ import {
   homeExperienceFromFormData,
   saveHomeExperienceProfileConfig,
   setGlobalProfileId,
+  cloneHomeExperienceProfile,
+  renameHomeExperienceProfile,
+  exportHomeExperienceProfile,
+  importHomeExperienceProfile,
+  toggleHomeExperienceProfileLock,
+  toggleHomeExperienceProfileEnabled,
+  unsetHomeExperienceGlobalProfile,
   type HomeExperiencePatch,
   type HomeExperienceResolvedConfig,
   type HomeExperienceProfile,
+  type HomeExperienceProfileExport,
 } from '@/lib/homeExperience'
+import ExperienceProfileCard from './_components/ExperienceProfileCard'
 import { saveHomeExperienceAudio, saveHomeExperienceImage } from '@/lib/uploadedAssets'
 import type { ImageAssetKind } from '@/lib/assetValidation'
 import { getDeviceGroupAssignments, getDeviceGroups, type DeviceGroup } from '@/lib/deviceGroups'
@@ -142,6 +151,108 @@ async function assignDeviceAction(formData: FormData) {
   redirect(`/dashboard/experience?assign=${encodeURIComponent(profileId)}&ok=1`)
 }
 
+async function cloneProfileAction(formData: FormData) {
+  'use server'
+  const profileId = (formData.get('profileId') as string) || ''
+  if (!profileId) return
+  await cloneHomeExperienceProfile(profileId)
+  revalidatePath('/dashboard/experience')
+  redirect('/dashboard/experience?cloned=1')
+}
+
+async function renameProfileAction(formData: FormData) {
+  'use server'
+  const profileId = (formData.get('profileId') as string) || ''
+  const newName = (formData.get('profileName') as string) || ''
+  if (profileId && newName) {
+    await renameHomeExperienceProfile(profileId, newName)
+  }
+  revalidatePath('/dashboard/experience')
+  redirect('/dashboard/experience?updated=1')
+}
+
+async function exportProfileAction(formData: FormData) {
+  'use server'
+  const profileId = (formData.get('profileId') as string) || ''
+  if (!profileId) return
+
+  const exportData = await exportHomeExperienceProfile(profileId)
+  if (!exportData) return
+
+  const json = JSON.stringify(exportData, null, 2)
+  const blob = new Blob([json], { type: 'application/json' })
+  const url = URL.createObjectURL(blob)
+
+  redirect(url)
+}
+
+async function importProfileAction(formData: FormData) {
+  'use server'
+  const jsonData = (formData.get('importData') as string) || ''
+  if (!jsonData) {
+    redirect('/dashboard/experience?importError=No+data+provided')
+    return
+  }
+
+  try {
+    const data = JSON.parse(jsonData) as HomeExperienceProfileExport
+    const imported = await importHomeExperienceProfile(data)
+    if (imported) {
+      revalidatePath('/dashboard/experience')
+      redirect('/dashboard/experience?imported=1')
+    } else {
+      redirect('/dashboard/experience?importError=Invalid+profile+data')
+    }
+  } catch {
+    redirect('/dashboard/experience?importError=Invalid+JSON+format')
+  }
+}
+
+async function toggleLockAction(formData: FormData) {
+  'use server'
+  const profileId = (formData.get('profileId') as string) || ''
+  if (profileId) await toggleHomeExperienceProfileLock(profileId)
+  revalidatePath('/dashboard/experience')
+  redirect('/dashboard/experience?locked=1')
+}
+
+async function toggleEnabledAction(formData: FormData) {
+  'use server'
+  const profileId = (formData.get('profileId') as string) || ''
+  if (profileId) await toggleHomeExperienceProfileEnabled(profileId)
+  revalidatePath('/dashboard/experience')
+  redirect('/dashboard/experience?enabledToggled=1')
+}
+
+async function unsetGlobalAction() {
+  'use server'
+  await unsetHomeExperienceGlobalProfile()
+  revalidatePath('/dashboard/experience')
+  redirect('/dashboard/experience?globalUnset=1')
+}
+
+async function assignGroupModalAction(profileId: string, groupId: string, assign: boolean): Promise<{ success: boolean }> {
+  'use server'
+  try {
+    await assignProfileToGroup(groupId, assign ? profileId : null)
+    revalidatePath('/dashboard/experience')
+    return { success: true }
+  } catch {
+    return { success: false }
+  }
+}
+
+async function assignDeviceModalAction(profileId: string, deviceId: string, assign: boolean): Promise<{ success: boolean }> {
+  'use server'
+  try {
+    await assignProfileToDevice(deviceId, assign ? profileId : null)
+    revalidatePath('/dashboard/experience')
+    return { success: true }
+  } catch {
+    return { success: false }
+  }
+}
+
 // ── Page Component ────────────────────────────────────────────────────────────
 
 export default async function ExperiencePage({
@@ -156,8 +267,14 @@ export default async function ExperiencePage({
     updated?: string
     deleted?: string
     globalSet?: string
+    globalUnset?: string
     ok?: string
     uploadError?: string
+    cloned?: string
+    imported?: string
+    importError?: string
+    locked?: string
+    enabledToggled?: string
   }>
 }) {
   const sp = await searchParams
@@ -175,7 +292,7 @@ export default async function ExperiencePage({
     select: { deviceId: true, deviceName: true, isActive: true },
   })
 
-  const hasNotif = sp.created || sp.saved || sp.reset || sp.updated || sp.deleted || sp.globalSet || sp.ok
+  const hasNotif = sp.created || sp.saved || sp.reset || sp.updated || sp.deleted || sp.globalSet || sp.globalUnset || sp.ok || sp.cloned || sp.imported || sp.importError || sp.locked
 
   // ── Mode: Edit profile config ──────────────────────────────────────────────
   if (editProfileId) {
@@ -247,172 +364,6 @@ export default async function ExperiencePage({
     )
   }
 
-  // ── Mode: Manage assignments for a profile ────────────────────────────────
-  if (assignProfileId) {
-    const profile = profiles.find((p) => p.id === assignProfileId)
-    if (!profile) redirect('/dashboard/experience')
-
-    // Find which groups and devices are assigned to this profile
-    const assignedGroupIds = new Set(
-      Object.entries(groupProfileMap)
-        .filter(([, pid]) => pid === assignProfileId)
-        .map(([gid]) => gid)
-    )
-    const assignedDeviceIds = new Set(
-      Object.entries(deviceProfileMap)
-        .filter(([, pid]) => pid === assignProfileId)
-        .map(([did]) => did)
-    )
-
-    return (
-      <div className="space-y-6 animate-fade-in">
-        <div className="flex items-center gap-3">
-          <a
-            href="/dashboard/experience"
-            className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
-          >
-            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M10.5 19.5L3 12m0 0l7.5-7.5M3 12h18" />
-            </svg>
-            Kembali ke Daftar Config
-          </a>
-          <span className="text-border">/</span>
-          <span className="text-xs text-foreground font-medium">Assignment: {profile.name}</span>
-        </div>
-
-        {sp.ok && (
-          <div className="p-3.5 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs font-semibold">
-            Assignment berhasil diperbarui.
-          </div>
-        )}
-
-        <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
-          {/* Group Assignments */}
-          <div className="card rounded-2xl overflow-hidden">
-            <div className="px-5 py-4 border-b border-border">
-              <h3 className="text-sm font-semibold text-foreground">Group Level</h3>
-              <p className="text-[10px] text-muted-foreground mt-0.5">
-                Semua device dalam grup akan menggunakan config ini sebagai group-level policy.
-                Satu grup hanya bisa memiliki satu config aktif.
-              </p>
-            </div>
-            <div className="divide-y divide-border/50">
-              {groups.length === 0 ? (
-                <div className="px-5 py-6 text-center text-[11px] text-muted-foreground">
-                  Belum ada grup. <a href="/dashboard/groups" className="text-primary hover:underline">Buat grup dulu.</a>
-                </div>
-              ) : (
-                groups.map((group) => {
-                  const isAssigned = assignedGroupIds.has(group.id)
-                  const currentProfileId = groupProfileMap[group.id]
-                  const currentProfile = currentProfileId && currentProfileId !== assignProfileId
-                    ? profiles.find((p) => p.id === currentProfileId)
-                    : null
-                  const memberCount = Object.values(groupAssignments).filter((gid) => gid === group.id).length
-
-                  return (
-                    <div key={group.id} className="flex items-center justify-between gap-3 px-5 py-3">
-                      <div className="flex items-center gap-3 min-w-0">
-                        <span className="w-3 h-3 rounded-full shrink-0" style={{ backgroundColor: group.color }} />
-                        <div className="min-w-0">
-                          <div className="text-xs font-semibold text-foreground truncate">{group.name}</div>
-                          <div className="text-[10px] text-muted-foreground">
-                            {memberCount} device
-                            {currentProfile && !isAssigned && (
-                              <span className="ml-1 text-amber-400"> • aktif: {currentProfile.name}</span>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                      <form action={assignGroupAction} className="shrink-0">
-                        <input type="hidden" name="profileId" value={assignProfileId} />
-                        <input type="hidden" name="groupId" value={group.id} />
-                        <input type="hidden" name="action" value={isAssigned ? 'remove' : 'assign'} />
-                        <button
-                          type="submit"
-                          className={`rounded-lg border px-3 py-1.5 text-[10px] font-semibold transition-all ${
-                            isAssigned
-                              ? 'border-rose-500/20 text-rose-400 hover:bg-rose-500/10'
-                              : 'border-primary/20 text-primary hover:bg-primary/10'
-                          }`}
-                        >
-                          {isAssigned ? 'Remove' : 'Assign'}
-                        </button>
-                      </form>
-                    </div>
-                  )
-                })
-              )}
-            </div>
-          </div>
-
-          {/* Device Assignments */}
-          <div className="card rounded-2xl overflow-hidden">
-            <div className="px-5 py-4 border-b border-border">
-              <h3 className="text-sm font-semibold text-foreground">Device Level (Override)</h3>
-              <p className="text-[10px] text-muted-foreground mt-0.5">
-                Device yang di-assign langsung akan menggunakan config ini sebagai device-level override,
-                menggantikan config grup-nya.
-              </p>
-            </div>
-            <div className="divide-y divide-border/50 max-h-[480px] overflow-y-auto">
-              {allDevices.length === 0 ? (
-                <div className="px-5 py-6 text-center text-[11px] text-muted-foreground">Belum ada device terdaftar.</div>
-              ) : (
-                allDevices.map((device) => {
-                  const isAssigned = assignedDeviceIds.has(device.deviceId)
-                  const currentProfileId = deviceProfileMap[device.deviceId]
-                  const currentProfile = currentProfileId && currentProfileId !== assignProfileId
-                    ? profiles.find((p) => p.id === currentProfileId)
-                    : null
-                  const deviceGroupId = groupAssignments[device.deviceId]
-                  const deviceGroup = groups.find((g) => g.id === deviceGroupId)
-
-                  return (
-                    <div key={device.deviceId} className="flex items-center justify-between gap-3 px-5 py-3">
-                      <div className="flex items-center gap-2 min-w-0">
-                        <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${device.isActive ? 'bg-emerald-500' : 'bg-muted'}`} />
-                        <div className="min-w-0">
-                          <div className="text-xs font-semibold text-foreground truncate">{device.deviceName}</div>
-                          <div className="text-[10px] text-muted-foreground">
-                            {deviceGroup ? (
-                              <span className="flex items-center gap-1">
-                                <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: deviceGroup.color }} />
-                                {deviceGroup.name}
-                              </span>
-                            ) : 'Tanpa grup'}
-                            {currentProfile && !isAssigned && (
-                              <span className="ml-1 text-amber-400"> • aktif: {currentProfile.name}</span>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                      <form action={assignDeviceAction} className="shrink-0">
-                        <input type="hidden" name="profileId" value={assignProfileId} />
-                        <input type="hidden" name="deviceId" value={device.deviceId} />
-                        <input type="hidden" name="action" value={isAssigned ? 'remove' : 'assign'} />
-                        <button
-                          type="submit"
-                          className={`rounded-lg border px-3 py-1.5 text-[10px] font-semibold transition-all ${
-                            isAssigned
-                              ? 'border-rose-500/20 text-rose-400 hover:bg-rose-500/10'
-                              : 'border-border text-muted-foreground hover:text-foreground hover:bg-accent/50'
-                          }`}
-                        >
-                          {isAssigned ? 'Remove' : 'Assign'}
-                        </button>
-                      </form>
-                    </div>
-                  )
-                })
-              )}
-            </div>
-          </div>
-        </div>
-      </div>
-    )
-  }
-
   // ── Mode: Profile list (default) ───────────────────────────────────────────
 
   // Build assignment stats per profile
@@ -445,7 +396,17 @@ export default async function ExperiencePage({
           {sp.updated && 'Profile berhasil diperbarui.'}
           {sp.deleted && 'Profile berhasil dihapus.'}
           {sp.globalSet && 'Global profile berhasil diubah.'}
+          {sp.globalUnset && 'Global profile berhasil di-unset.'}
           {sp.ok && 'Assignment berhasil diperbarui.'}
+          {sp.cloned && 'Profile berhasil di-clone.'}
+          {sp.imported && 'Profile berhasil di-import.'}
+          {sp.locked && 'Status lock profile berhasil diubah.'}
+        </div>
+      )}
+
+      {sp.importError && (
+        <div className="p-3.5 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-400 text-xs font-semibold">
+          Import gagal: {sp.importError}
         </div>
       )}
 
@@ -508,7 +469,7 @@ export default async function ExperiencePage({
               const assignedDeviceIds2 = profileDeviceCount.get(profile.id) || []
 
               return (
-                <ProfileCard
+                <ExperienceProfileCard
                   key={profile.id}
                   profile={profile}
                   isGlobal={isGlobal}
@@ -516,6 +477,35 @@ export default async function ExperiencePage({
                   assignedDeviceCount={assignedDeviceIds2.length}
                   deleteProfileAction={deleteProfileAction}
                   setGlobalAction={setGlobalAction}
+                  cloneProfileAction={cloneProfileAction}
+                  renameProfileAction={renameProfileAction}
+                  exportProfileAction={exportProfileAction}
+                  importProfileAction={importProfileAction}
+                  toggleLockAction={toggleLockAction}
+                  toggleEnabledAction={toggleEnabledAction}
+                  unsetGlobalAction={unsetGlobalAction}
+                  groups={groups.map((g) => ({
+                    id: g.id,
+                    name: g.name,
+                    isAssigned: groupProfileMap[g.id] === profile.id,
+                    currentProfileName: (() => {
+                      const curPid = groupProfileMap[g.id]
+                      return curPid && curPid !== profile.id ? profiles.find((p) => p.id === curPid)?.name || null : null
+                    })(),
+                    color: g.color,
+                    memberCount: Object.values(groupAssignments).filter((gid) => gid === g.id).length,
+                  }))}
+                  devices={allDevices.map((d) => ({
+                    id: d.deviceId,
+                    name: d.deviceName,
+                    isAssigned: deviceProfileMap[d.deviceId] === profile.id,
+                    currentProfileName: (() => {
+                      const curPid = deviceProfileMap[d.deviceId]
+                      return curPid && curPid !== profile.id ? profiles.find((p) => p.id === curPid)?.name || null : null
+                    })(),
+                  }))}
+                  onAssignGroup={assignGroupModalAction}
+                  onAssignDevice={assignDeviceModalAction}
                 />
               )
             })
@@ -527,124 +517,6 @@ export default async function ExperiencePage({
 }
 
 // ── Sub-components ────────────────────────────────────────────────────────────
-
-function ProfileCard({
-  profile,
-  isGlobal,
-  assignedGroups,
-  assignedDeviceCount,
-  deleteProfileAction,
-  setGlobalAction,
-}: {
-  profile: HomeExperienceProfile
-  isGlobal: boolean
-  assignedGroups: Array<{ id: string; name: string; color: string }>
-  assignedDeviceCount: number
-  deleteProfileAction: (fd: FormData) => Promise<void>
-  setGlobalAction: (fd: FormData) => Promise<void>
-}) {
-  return (
-    <div className={`card rounded-2xl overflow-hidden ${isGlobal ? 'ring-2 ring-primary/30' : ''}`}>
-      <div className="px-5 py-4 flex items-center justify-between gap-3 border-b border-border">
-        <div className="flex items-center gap-3 min-w-0">
-          <div className={`w-8 h-8 rounded-xl flex items-center justify-center shrink-0 text-sm ${
-            isGlobal ? 'bg-primary/15 border border-primary/20 text-primary' : 'bg-accent/30 border border-border text-muted-foreground'
-          }`}>
-            {isGlobal ? '🌐' : '📋'}
-          </div>
-          <div className="min-w-0">
-            <div className="flex items-center gap-2 flex-wrap">
-              <span className="text-sm font-semibold text-foreground truncate">{profile.name}</span>
-              {isGlobal && <span className="badge badge-primary shrink-0">Global Base</span>}
-            </div>
-            {profile.description && (
-              <p className="text-[10px] text-muted-foreground truncate">{profile.description}</p>
-            )}
-          </div>
-        </div>
-
-        <div className="flex items-center gap-2 shrink-0">
-          <a
-            href={`/dashboard/experience?assign=${encodeURIComponent(profile.id)}`}
-            className="btn btn-xs border border-border text-muted-foreground hover:text-foreground hover:bg-accent/50"
-          >
-            Assign
-          </a>
-          <a
-            href={`/dashboard/experience?edit=${encodeURIComponent(profile.id)}`}
-            className="btn btn-xs border border-primary/20 text-primary hover:bg-primary/10"
-          >
-            Edit Config
-          </a>
-          <ConfirmForm
-            action={deleteProfileAction}
-            message={`Hapus profile "${profile.name}"? Semua assignment grup/device yang menggunakan profile ini akan dihapus.`}
-          >
-            <input type="hidden" name="profileId" value={profile.id} />
-            <button
-              type="submit"
-              className="p-1.5 text-rose-400 hover:text-rose-300 border border-rose-500/10 hover:bg-rose-500/10 rounded-lg transition-all"
-            >
-              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0" />
-              </svg>
-            </button>
-          </ConfirmForm>
-        </div>
-      </div>
-
-      <div className="px-5 py-3 flex flex-wrap items-center gap-4 text-[11px]">
-        {/* Assignment Info */}
-        <div className="flex items-center gap-1.5 text-muted-foreground">
-          <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M18 18.72a9.094 9.094 0 003.741-.479 3 3 0 00-4.682-2.72m.94 3.198l.001.031c0 .225-.012.447-.037.666A11.944 11.944 0 0112 21c-2.17 0-4.207-.576-5.963-1.584A6.062 6.062 0 016 18.719m12 0a5.971 5.971 0 00-.941-3.197m0 0A5.995 5.995 0 0012 12.75a5.995 5.995 0 00-5.058 2.772m0 0a3 3 0 00-4.681 2.72 8.986 8.986 0 003.74.477m.94-3.197a5.971 5.971 0 00-.94 3.197M15 6.75a3 3 0 11-6 0 3 3 0 016 0zm6 3a2.25 2.25 0 11-4.5 0 2.25 2.25 0 014.5 0zm-13.5 0a2.25 2.25 0 11-4.5 0 2.25 2.25 0 014.5 0z" />
-          </svg>
-          {assignedGroups.length > 0 ? (
-            <span className="flex items-center gap-1.5 flex-wrap">
-              Grup:{' '}
-              {assignedGroups.map((g) => (
-                <span key={g.id} className="inline-flex items-center gap-1">
-                  <span className="w-2 h-2 rounded-full" style={{ backgroundColor: g.color }} />
-                  <span className="font-medium text-foreground">{g.name}</span>
-                </span>
-              ))}
-            </span>
-          ) : (
-            <span>Belum di-assign ke grup</span>
-          )}
-        </div>
-
-        <div className="flex items-center gap-1.5 text-muted-foreground">
-          <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M10.5 1.5H8.25A2.25 2.25 0 006 3.75v16.5a2.25 2.25 0 002.25 2.25h7.5A2.25 2.25 0 0018 20.25V3.75a2.25 2.25 0 00-2.25-2.25H13.5m-3 0V3h3V1.5m-3 0h3m-3 18.75h3" />
-          </svg>
-          {assignedDeviceCount > 0
-            ? <span>{assignedDeviceCount} device override langsung</span>
-            : <span>Tidak ada device override langsung</span>
-          }
-        </div>
-
-        {/* Set as Global */}
-        {!isGlobal && (
-          <form action={setGlobalAction} className="ml-auto">
-            <input type="hidden" name="profileId" value={profile.id} />
-            <button
-              type="submit"
-              className="rounded-lg border border-border px-2.5 py-1.5 text-[10px] font-semibold text-muted-foreground hover:text-foreground hover:bg-accent/50 transition-all"
-            >
-              Set as Global
-            </button>
-          </form>
-        )}
-        {isGlobal && (
-          <span className="ml-auto text-[10px] text-primary/70">
-            ✓ Base config untuk semua device
-          </span>
-        )}
-      </div>
-    </div>
-  )
-}
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (

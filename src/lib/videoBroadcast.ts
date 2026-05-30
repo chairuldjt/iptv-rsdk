@@ -6,6 +6,15 @@ export type VideoBroadcastProfile = {
   name: string
   description: string
   createdAt: string
+  locked?: boolean
+  enabled?: boolean
+}
+
+export type VideoBroadcastProfileExport = {
+  version: 1
+  type: 'videoBroadcast'
+  profile: VideoBroadcastProfile
+  config: VideoBroadcastConfig
 }
 
 export type VideoBroadcastScope = 'global' | 'group' | 'device'
@@ -227,6 +236,115 @@ export async function assignVideoBroadcastProfileToDevice(deviceId: string, prof
   await saveProfileMap(VIDEO_DEVICE_PROFILE_MAP_KEY, map)
 }
 
+export async function cloneVideoBroadcastProfile(profileId: string): Promise<VideoBroadcastProfile | null> {
+  const profiles = await getVideoBroadcastProfiles()
+  const source = profiles.find((p) => p.id === profileId)
+  if (!source) return null
+
+  const cloned: VideoBroadcastProfile = {
+    id: `vbp_${Date.now()}`,
+    name: `${source.name} (Copy)`,
+    description: source.description,
+    createdAt: new Date().toISOString(),
+    locked: false,
+  }
+
+  profiles.push(cloned)
+  await saveVideoBroadcastProfiles(profiles)
+
+  const sourceConfig = await getVideoBroadcastProfileConfig(profileId)
+  if (sourceConfig) {
+    await saveVideoBroadcastProfileConfig(cloned.id, sourceConfig)
+  }
+
+  return cloned
+}
+
+export async function renameVideoBroadcastProfile(
+  profileId: string,
+  newName: string
+): Promise<void> {
+  const profiles = await getVideoBroadcastProfiles()
+  await saveVideoBroadcastProfiles(
+    profiles.map((p) =>
+      p.id === profileId ? { ...p, name: newName.trim() || p.name } : p
+    )
+  )
+}
+
+export async function exportVideoBroadcastProfile(
+  profileId: string
+): Promise<VideoBroadcastProfileExport | null> {
+  const profiles = await getVideoBroadcastProfiles()
+  const profile = profiles.find((p) => p.id === profileId)
+  if (!profile) return null
+
+  const config = await getVideoBroadcastProfileConfig(profileId)
+  return {
+    version: 1,
+    type: 'videoBroadcast',
+    profile,
+    config: config ?? FALLBACK_VIDEO_BROADCAST_CONFIG,
+  }
+}
+
+export async function importVideoBroadcastProfile(
+  data: VideoBroadcastProfileExport
+): Promise<VideoBroadcastProfile | null> {
+  if (data.version !== 1 || data.type !== 'videoBroadcast') return null
+
+  const profiles = await getVideoBroadcastProfiles()
+  const newProfile: VideoBroadcastProfile = {
+    id: `vbp_${Date.now()}`,
+    name: data.profile.name || 'Imported Profile',
+    description: data.profile.description || '',
+    createdAt: new Date().toISOString(),
+    locked: false,
+  }
+
+  profiles.push(newProfile)
+  await saveVideoBroadcastProfiles(profiles)
+
+  const safeConfig = normalizeVideoBroadcastConfig(data.config ?? FALLBACK_VIDEO_BROADCAST_CONFIG)
+  await saveVideoBroadcastProfileConfig(newProfile.id, safeConfig)
+
+  return newProfile
+}
+
+export async function toggleVideoBroadcastProfileLock(profileId: string): Promise<boolean> {
+  const profiles = await getVideoBroadcastProfiles()
+  let newLocked = false
+  await saveVideoBroadcastProfiles(
+    profiles.map((p) => {
+      if (p.id === profileId) {
+        newLocked = !p.locked
+        return { ...p, locked: newLocked }
+      }
+      return p
+    })
+  )
+  return newLocked
+}
+
+export async function unsetVideoGlobalProfile(): Promise<void> {
+  await setVideoGlobalProfileId(null)
+}
+
+export async function toggleVideoBroadcastProfileEnabled(profileId: string): Promise<boolean> {
+  const profiles = await getVideoBroadcastProfiles()
+  let newEnabled = false
+  await saveVideoBroadcastProfiles(
+    profiles.map((p) => {
+      if (p.id === profileId) {
+        newEnabled = p.enabled === false ? true : false
+        return { ...p, enabled: newEnabled }
+      }
+      return p
+    })
+  )
+  return newEnabled
+}
+
 export function videoBroadcastFromFormData(formData: FormData): VideoBroadcastConfig {
   return normalizeVideoBroadcastConfig({
     revision: Number.parseInt(String(formData.get('revision') || FALLBACK_VIDEO_BROADCAST_CONFIG.revision), 10),
@@ -290,10 +408,16 @@ export function normalizeVideoBroadcastConfig(value: unknown): VideoBroadcastCon
   }
 }
 
+async function isVideoProfileEnabled(profileId: string): Promise<boolean> {
+  const profiles = await getVideoBroadcastProfiles()
+  const profile = profiles.find((p) => p.id === profileId)
+  return profile?.enabled !== false
+}
+
 export async function resolveEffectiveVideoBroadcast(deviceId: string): Promise<ResolvedVideoBroadcastConfig> {
   // 1. Global Profile
   const globalProfileId = await getVideoGlobalProfileId()
-  const globalConfig = globalProfileId
+  const globalConfig = globalProfileId && await isVideoProfileEnabled(globalProfileId)
     ? (await getVideoBroadcastProfileConfig(globalProfileId))
     : null
 
@@ -303,13 +427,15 @@ export async function resolveEffectiveVideoBroadcast(deviceId: string): Promise<
   if (groupId) {
     const groupProfileMap = await getVideoBroadcastGroupProfileMap()
     const groupProfileId = groupProfileMap[groupId]
-    if (groupProfileId) groupConfig = await getVideoBroadcastProfileConfig(groupProfileId)
+    if (groupProfileId && await isVideoProfileEnabled(groupProfileId)) {
+      groupConfig = await getVideoBroadcastProfileConfig(groupProfileId)
+    }
   }
 
   // 3. Device Profile Override
   const deviceProfileMap = await getVideoBroadcastDeviceProfileMap()
   const deviceProfileId = deviceProfileMap[deviceId]
-  const deviceConfig = deviceProfileId
+  const deviceConfig = deviceProfileId && await isVideoProfileEnabled(deviceProfileId)
     ? await getVideoBroadcastProfileConfig(deviceProfileId)
     : null
 

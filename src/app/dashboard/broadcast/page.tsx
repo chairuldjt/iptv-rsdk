@@ -25,17 +25,21 @@ import TabsNavigation from './_components/TabsNavigation'
 import ProfileCardItem from './_components/ProfileCardItem'
 import NotificationBar from './_components/NotificationBar'
 import BackBreadcrumb from './_components/BackBreadcrumb'
-import AssignPanel from './_components/AssignPanel'
 
 import {
   createVideoProfileAction,
   saveVideoProfileConfigAction,
   deleteVideoProfileAction,
   setVideoGlobalAction,
-  assignVideoGroupAction,
-  assignVideoDeviceAction,
   playVideoBroadcastNowAction,
   stopVideoBroadcastNowAction,
+  cloneVideoProfileAction,
+  exportVideoProfileAction,
+  toggleVideoLockAction,
+  toggleVideoEnabledAction,
+  unsetVideoGlobalAction,
+  assignVideoGroupModalAction,
+  assignVideoDeviceModalAction,
 } from './actions/videoActions'
 
 import {
@@ -43,10 +47,15 @@ import {
   saveRunningProfileConfigAction,
   deleteRunningProfileAction,
   setRunningGlobalAction,
-  assignRunningGroupAction,
-  assignRunningDeviceAction,
   pushRunningTextLiveAction,
   stopRunningTextLiveAction,
+  cloneRunningProfileAction,
+  exportRunningProfileAction,
+  toggleRunningLockAction,
+  toggleRunningEnabledAction,
+  unsetRunningGlobalAction,
+  assignRunningGroupModalAction,
+  assignRunningDeviceModalAction,
 } from './actions/runningTextActions'
 
 export const revalidate = 0
@@ -65,12 +74,18 @@ type BroadcastSearchParams = {
   updated?: string
   deleted?: string
   globalSet?: string
+  globalUnset?: string
   ok?: string
   notice?: string
   pushed?: string
   error?: string
   count?: string
   skipped?: string
+  cloned?: string
+  imported?: string
+  importError?: string
+  locked?: string
+  enabledToggled?: string
 }
 
 function countVideoProfileRecipients(params: {
@@ -170,7 +185,7 @@ export default async function BroadcastPage({
 }) {
   const sp = await searchParams
   const activeTab = sp.tab === 'ticker' ? 'ticker' : 'video'
-  const hasNotif = sp.created || sp.saved || sp.updated || sp.deleted || sp.globalSet || sp.ok || sp.notice || sp.pushed
+  const hasNotif = sp.created || sp.saved || sp.updated || sp.deleted || sp.globalSet || sp.globalUnset || sp.ok || sp.notice || sp.pushed || sp.cloned || sp.imported || sp.importError || sp.locked
 
   // Load common data
   const [groups, groupAssignments, devices, broadcastVideos, folders] = await Promise.all([
@@ -253,65 +268,6 @@ export default async function BroadcastPage({
       )
     }
 
-    // Mode: Assign Profile
-    if (sp.assignVideoProfile) {
-      const profile = videoProfiles.find((p) => p.id === sp.assignVideoProfile)
-      if (!profile) redirect('/dashboard/broadcast?tab=video')
-
-      const groupTargets = groups.map((group) => {
-        const isAssigned = groupVideoProfileMap[group.id] === profile.id
-        const curPid = groupVideoProfileMap[group.id]
-        const curProfile = curPid && curPid !== profile.id ? videoProfiles.find((p) => p.id === curPid) : null
-        return {
-          id: group.id,
-          name: group.name,
-          isAssigned,
-          currentProfileName: curProfile?.name || null,
-        }
-      })
-
-      const deviceTargets = devices.map((device) => {
-        const isAssigned = deviceVideoProfileMap[device.deviceId] === profile.id
-        const curPid = deviceVideoProfileMap[device.deviceId]
-        const curProfile = curPid && curPid !== profile.id ? videoProfiles.find((p) => p.id === curPid) : null
-        return {
-          id: device.deviceId,
-          name: device.deviceName,
-          isAssigned,
-          currentProfileName: curProfile?.name || null,
-        }
-      })
-
-      return (
-        <div className="space-y-6 animate-fade-in">
-          <BackBreadcrumb
-            href="/dashboard/broadcast?tab=video"
-            backLabel="Kembali ke Daftar Profile Video"
-            currentLabel={`Assign Profile Video: ${profile.name}`}
-          />
-          {sp.ok && <NotificationBar message="Assignment berhasil diperbarui." tone="success" />}
-          <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
-            <AssignPanel
-              title="Group Level (Video)"
-              description="Device dalam grup terhubung akan memutar video broadcast ini."
-              targets={groupTargets}
-              profileId={profile.id}
-              assignAction={assignVideoGroupAction}
-              idFieldName="groupId"
-            />
-            <AssignPanel
-              title="Device Level Override (Video)"
-              description="Override khusus per device, melompati aturan grup."
-              targets={deviceTargets}
-              profileId={profile.id}
-              assignAction={assignVideoDeviceAction}
-              idFieldName="deviceId"
-            />
-          </div>
-        </div>
-      )
-    }
-
     // Default: Video Profile List
     return (
       <div className="space-y-6">
@@ -323,10 +279,15 @@ export default async function BroadcastPage({
               sp.created ? 'Video Broadcast Profile baru berhasil dibuat.'
               : sp.deleted ? 'Profile berhasil dihapus.'
               : sp.globalSet ? 'Global Video profile berhasil diperbarui.'
+              : sp.globalUnset ? 'Global Video profile berhasil di-unset.'
+              : sp.cloned ? 'Profile berhasil di-clone.'
+              : sp.imported ? 'Profile berhasil di-import.'
+              : sp.locked ? 'Status lock profile berhasil diubah.'
+              : sp.importError ? `Import gagal: ${decodeURIComponent(sp.importError)}`
               : buildVideoNotice(sp)?.message || ''
             }
             tone={
-              sp.created || sp.deleted || sp.globalSet
+              sp.created || sp.deleted || sp.globalSet || sp.globalUnset || sp.cloned || sp.imported || sp.locked
                 ? 'success'
                 : buildVideoNotice(sp)?.tone || 'success'
             }
@@ -361,17 +322,48 @@ export default async function BroadcastPage({
                 const isGlobal = globalVideoProfileId === p.id
                 const assignedGroupCount = Object.values(groupVideoProfileMap).filter((pid) => pid === p.id).length
                 const assignedDeviceCount = Object.values(deviceVideoProfileMap).filter((pid) => pid === p.id).length
+
+                const profileGroups = groups.map((g) => ({
+                  id: g.id,
+                  name: g.name,
+                  isAssigned: groupVideoProfileMap[g.id] === p.id,
+                  currentProfileName: (() => {
+                    const curPid = groupVideoProfileMap[g.id]
+                    return curPid && curPid !== p.id ? videoProfiles.find((vp) => vp.id === curPid)?.name || null : null
+                  })(),
+                  color: g.color,
+                  memberCount: Object.values(groupAssignments).filter((gid) => gid === g.id).length,
+                }))
+
+                const profileDevices = devices.map((d) => ({
+                  id: d.deviceId,
+                  name: d.deviceName,
+                  isAssigned: deviceVideoProfileMap[d.deviceId] === p.id,
+                  currentProfileName: (() => {
+                    const curPid = deviceVideoProfileMap[d.deviceId]
+                    return curPid && curPid !== p.id ? videoProfiles.find((vp) => vp.id === curPid)?.name || null : null
+                  })(),
+                }))
+
                 return (
                   <ProfileCardItem
                     key={p.id}
                     profile={p}
                     isGlobal={isGlobal}
                     editHref={`/dashboard/broadcast?tab=video&editVideoProfile=${p.id}`}
-                    assignHref={`/dashboard/broadcast?tab=video&assignVideoProfile=${p.id}`}
                     deleteAction={deleteVideoProfileAction}
                     setGlobalAction={setVideoGlobalAction}
+                    cloneAction={cloneVideoProfileAction}
+                    exportAction={exportVideoProfileAction}
+                    toggleLockAction={toggleVideoLockAction}
+                    toggleEnabledAction={toggleVideoEnabledAction}
+                    unsetGlobalAction={unsetVideoGlobalAction}
                     assignedGroupCount={assignedGroupCount}
                     assignedDeviceCount={assignedDeviceCount}
+                    groups={profileGroups}
+                    devices={profileDevices}
+                    onAssignGroup={assignVideoGroupModalAction}
+                    onAssignDevice={assignVideoDeviceModalAction}
                   />
                 )
               })
@@ -422,65 +414,6 @@ export default async function BroadcastPage({
       )
     }
 
-    // Mode: Assign Profile
-    if (sp.assignRunningProfile) {
-      const profile = runningProfiles.find((p) => p.id === sp.assignRunningProfile)
-      if (!profile) redirect('/dashboard/broadcast?tab=ticker')
-
-      const groupTargets = groups.map((group) => {
-        const isAssigned = groupRunningProfileMap[group.id] === profile.id
-        const curPid = groupRunningProfileMap[group.id]
-        const curProfile = curPid && curPid !== profile.id ? runningProfiles.find((p) => p.id === curPid) : null
-        return {
-          id: group.id,
-          name: group.name,
-          isAssigned,
-          currentProfileName: curProfile?.name || null,
-        }
-      })
-
-      const deviceTargets = devices.map((device) => {
-        const isAssigned = deviceRunningProfileMap[device.deviceId] === profile.id
-        const curPid = deviceRunningProfileMap[device.deviceId]
-        const curProfile = curPid && curPid !== profile.id ? runningProfiles.find((p) => p.id === curPid) : null
-        return {
-          id: device.deviceId,
-          name: device.deviceName,
-          isAssigned,
-          currentProfileName: curProfile?.name || null,
-        }
-      })
-
-      return (
-        <div className="space-y-6 animate-fade-in">
-          <BackBreadcrumb
-            href="/dashboard/broadcast?tab=ticker"
-            backLabel="Kembali ke Daftar Profile Running Text"
-            currentLabel={`Assign Profile Running Text: ${profile.name}`}
-          />
-          {sp.ok && <NotificationBar message="Assignment berhasil diperbarui." />}
-          <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
-            <AssignPanel
-              title="Group Level (Ticker)"
-              description="Device dalam grup terhubung akan mendapatkan running text profile ini."
-              targets={groupTargets}
-              profileId={profile.id}
-              assignAction={assignRunningGroupAction}
-              idFieldName="groupId"
-            />
-            <AssignPanel
-              title="Device Level Override (Ticker)"
-              description="Override khusus per device, melompati aturan grup."
-              targets={deviceTargets}
-              profileId={profile.id}
-              assignAction={assignRunningDeviceAction}
-              idFieldName="deviceId"
-            />
-          </div>
-        </div>
-      )
-    }
-
     // Default: Running Profile List
     return (
       <div className="space-y-6">
@@ -492,6 +425,11 @@ export default async function BroadcastPage({
               sp.created ? 'Running Text Profile baru berhasil dibuat.'
               : sp.deleted ? 'Profile berhasil dihapus.'
               : sp.globalSet ? 'Global Running Text profile berhasil diperbarui.'
+              : sp.globalUnset ? 'Global Running Text profile berhasil di-unset.'
+              : sp.cloned ? 'Profile berhasil di-clone.'
+              : sp.imported ? 'Profile berhasil di-import.'
+              : sp.locked ? 'Status lock profile berhasil diubah.'
+              : sp.importError ? `Import gagal: ${decodeURIComponent(sp.importError)}`
               : ''
             }
           />
@@ -525,17 +463,48 @@ export default async function BroadcastPage({
                 const isGlobal = globalRunningProfileId === p.id
                 const assignedGroupCount = Object.values(groupRunningProfileMap).filter((pid) => pid === p.id).length
                 const assignedDeviceCount = Object.values(deviceRunningProfileMap).filter((pid) => pid === p.id).length
+
+                const profileGroups = groups.map((g) => ({
+                  id: g.id,
+                  name: g.name,
+                  isAssigned: groupRunningProfileMap[g.id] === p.id,
+                  currentProfileName: (() => {
+                    const curPid = groupRunningProfileMap[g.id]
+                    return curPid && curPid !== p.id ? runningProfiles.find((rp) => rp.id === curPid)?.name || null : null
+                  })(),
+                  color: g.color,
+                  memberCount: Object.values(groupAssignments).filter((gid) => gid === g.id).length,
+                }))
+
+                const profileDevices = devices.map((d) => ({
+                  id: d.deviceId,
+                  name: d.deviceName,
+                  isAssigned: deviceRunningProfileMap[d.deviceId] === p.id,
+                  currentProfileName: (() => {
+                    const curPid = deviceRunningProfileMap[d.deviceId]
+                    return curPid && curPid !== p.id ? runningProfiles.find((rp) => rp.id === curPid)?.name || null : null
+                  })(),
+                }))
+
                 return (
                   <ProfileCardItem
                     key={p.id}
                     profile={p}
                     isGlobal={isGlobal}
                     editHref={`/dashboard/broadcast?tab=ticker&editRunningProfile=${p.id}`}
-                    assignHref={`/dashboard/broadcast?tab=ticker&assignRunningProfile=${p.id}`}
                     deleteAction={deleteRunningProfileAction}
                     setGlobalAction={setRunningGlobalAction}
+                    cloneAction={cloneRunningProfileAction}
+                    exportAction={exportRunningProfileAction}
+                    toggleLockAction={toggleRunningLockAction}
+                    toggleEnabledAction={toggleRunningEnabledAction}
+                    unsetGlobalAction={unsetRunningGlobalAction}
                     assignedGroupCount={assignedGroupCount}
                     assignedDeviceCount={assignedDeviceCount}
+                    groups={profileGroups}
+                    devices={profileDevices}
+                    onAssignGroup={assignRunningGroupModalAction}
+                    onAssignDevice={assignRunningDeviceModalAction}
                   />
                 )
               })

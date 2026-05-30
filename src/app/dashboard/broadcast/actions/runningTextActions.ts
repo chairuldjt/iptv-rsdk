@@ -10,6 +10,14 @@ import {
   setRunningGlobalProfileId,
   assignRunningTextProfileToGroup,
   assignRunningTextProfileToDevice,
+  cloneRunningTextProfile,
+  exportRunningTextProfile,
+  importRunningTextProfile,
+  toggleRunningTextProfileLock,
+  toggleRunningTextProfileEnabled,
+  renameRunningTextProfile,
+  unsetRunningGlobalProfile,
+  type RunningTextProfileExport,
 } from '@/lib/runningText'
 import type { HomeExperienceRunningTextItem } from '@/lib/homeExperience'
 import { pushCommand } from '@/lib/remoteQueue'
@@ -78,6 +86,88 @@ export async function deleteRunningProfileAction(formData: FormData) {
   redirect('/dashboard/broadcast?tab=ticker&deleted=1')
 }
 
+export async function cloneRunningProfileAction(formData: FormData) {
+  'use server'
+  const profileId = (formData.get('profileId') as string) || ''
+  if (!profileId) return
+  const cloned = await cloneRunningTextProfile(profileId)
+  if (cloned) {
+    revalidatePath('/dashboard/broadcast')
+    redirect(`/dashboard/broadcast?tab=ticker&cloned=1`)
+  }
+}
+
+export async function renameRunningProfileAction(formData: FormData) {
+  'use server'
+  const profileId = (formData.get('profileId') as string) || ''
+  const newName = (formData.get('profileName') as string) || ''
+  if (profileId && newName) {
+    await renameRunningTextProfile(profileId, newName)
+  }
+  revalidatePath('/dashboard/broadcast')
+  redirect(`/dashboard/broadcast?tab=ticker&updated=1`)
+}
+
+export async function exportRunningProfileAction(formData: FormData) {
+  'use server'
+  const profileId = (formData.get('profileId') as string) || ''
+  if (!profileId) return
+
+  const exportData = await exportRunningTextProfile(profileId)
+  if (!exportData) return
+
+  const json = JSON.stringify(exportData, null, 2)
+  const blob = new Blob([json], { type: 'application/json' })
+  const url = URL.createObjectURL(blob)
+
+  redirect(url)
+}
+
+export async function importRunningProfileAction(formData: FormData) {
+  'use server'
+  const jsonData = (formData.get('importData') as string) || ''
+  if (!jsonData) {
+    redirect('/dashboard/broadcast?tab=ticker&importError=No+data+provided')
+    return
+  }
+
+  try {
+    const data = JSON.parse(jsonData) as RunningTextProfileExport
+    const imported = await importRunningTextProfile(data)
+    if (imported) {
+      revalidatePath('/dashboard/broadcast')
+      redirect(`/dashboard/broadcast?tab=ticker&imported=1`)
+    } else {
+      redirect('/dashboard/broadcast?tab=ticker&importError=Invalid+profile+data')
+    }
+  } catch {
+    redirect('/dashboard/broadcast?tab=ticker&importError=Invalid+JSON+format')
+  }
+}
+
+export async function toggleRunningLockAction(formData: FormData) {
+  'use server'
+  const profileId = (formData.get('profileId') as string) || ''
+  if (profileId) await toggleRunningTextProfileLock(profileId)
+  revalidatePath('/dashboard/broadcast')
+  redirect('/dashboard/broadcast?tab=ticker&locked=1')
+}
+
+export async function toggleRunningEnabledAction(formData: FormData) {
+  'use server'
+  const profileId = (formData.get('profileId') as string) || ''
+  if (profileId) await toggleRunningTextProfileEnabled(profileId)
+  revalidatePath('/dashboard/broadcast')
+  redirect('/dashboard/broadcast?tab=ticker&enabledToggled=1')
+}
+
+export async function unsetRunningGlobalAction() {
+  'use server'
+  await unsetRunningGlobalProfile()
+  revalidatePath('/dashboard/broadcast')
+  redirect('/dashboard/broadcast?tab=ticker&globalUnset=1')
+}
+
 // ── Global & Assignment ───────────────────────────────────────────────────────
 
 export async function setRunningGlobalAction(formData: FormData) {
@@ -107,6 +197,30 @@ export async function assignRunningDeviceAction(formData: FormData) {
   }
   revalidatePath('/dashboard/broadcast')
   redirect(`/dashboard/broadcast?tab=ticker&assignRunningProfile=${encodeURIComponent(profileId)}&ok=1`)
+}
+
+// ── Modal-compatible Assignment (no redirect) ────────────────────────────────
+
+export async function assignRunningGroupModalAction(profileId: string, groupId: string, assign: boolean): Promise<{ success: boolean }> {
+  'use server'
+  try {
+    await assignRunningTextProfileToGroup(groupId, assign ? profileId : null)
+    revalidatePath('/dashboard/broadcast')
+    return { success: true }
+  } catch {
+    return { success: false }
+  }
+}
+
+export async function assignRunningDeviceModalAction(profileId: string, deviceId: string, assign: boolean): Promise<{ success: boolean }> {
+  'use server'
+  try {
+    await assignRunningTextProfileToDevice(deviceId, assign ? profileId : null)
+    revalidatePath('/dashboard/broadcast')
+    return { success: true }
+  } catch {
+    return { success: false }
+  }
 }
 
 // ── Live Execution ────────────────────────────────────────────────────────────

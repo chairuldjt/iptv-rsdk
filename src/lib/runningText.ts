@@ -7,6 +7,15 @@ export type RunningTextProfile = {
   name: string
   description: string
   createdAt: string
+  locked?: boolean
+  enabled?: boolean
+}
+
+export type RunningTextProfileExport = {
+  version: 1
+  type: 'runningText'
+  profile: RunningTextProfile
+  config: RunningTextConfig
 }
 
 export type RunningTextConfig = {
@@ -198,10 +207,125 @@ export async function assignRunningTextProfileToDevice(deviceId: string, profile
   await saveProfileMap(RUNNING_DEVICE_PROFILE_MAP_KEY, map)
 }
 
+export async function cloneRunningTextProfile(profileId: string): Promise<RunningTextProfile | null> {
+  const profiles = await getRunningTextProfiles()
+  const source = profiles.find((p) => p.id === profileId)
+  if (!source) return null
+
+  const cloned: RunningTextProfile = {
+    id: `rtp_${Date.now()}`,
+    name: `${source.name} (Copy)`,
+    description: source.description,
+    createdAt: new Date().toISOString(),
+    locked: false,
+  }
+
+  profiles.push(cloned)
+  await saveRunningTextProfiles(profiles)
+
+  const sourceConfig = await getRunningTextProfileConfig(profileId)
+  if (sourceConfig) {
+    await saveRunningTextProfileConfig(cloned.id, sourceConfig)
+  }
+
+  return cloned
+}
+
+export async function renameRunningTextProfile(
+  profileId: string,
+  newName: string
+): Promise<void> {
+  const profiles = await getRunningTextProfiles()
+  await saveRunningTextProfiles(
+    profiles.map((p) =>
+      p.id === profileId ? { ...p, name: newName.trim() || p.name } : p
+    )
+  )
+}
+
+export async function exportRunningTextProfile(
+  profileId: string
+): Promise<RunningTextProfileExport | null> {
+  const profiles = await getRunningTextProfiles()
+  const profile = profiles.find((p) => p.id === profileId)
+  if (!profile) return null
+
+  const config = await getRunningTextProfileConfig(profileId)
+  return {
+    version: 1,
+    type: 'runningText',
+    profile,
+    config: config ?? FALLBACK_RUNNING_TEXT_CONFIG,
+  }
+}
+
+export async function importRunningTextProfile(
+  data: RunningTextProfileExport
+): Promise<RunningTextProfile | null> {
+  if (data.version !== 1 || data.type !== 'runningText') return null
+
+  const profiles = await getRunningTextProfiles()
+  const newProfile: RunningTextProfile = {
+    id: `rtp_${Date.now()}`,
+    name: data.profile.name || 'Imported Profile',
+    description: data.profile.description || '',
+    createdAt: new Date().toISOString(),
+    locked: false,
+  }
+
+  profiles.push(newProfile)
+  await saveRunningTextProfiles(profiles)
+
+  const safeConfig = normalizeRunningTextConfig(data.config ?? FALLBACK_RUNNING_TEXT_CONFIG)
+  await saveRunningTextProfileConfig(newProfile.id, safeConfig)
+
+  return newProfile
+}
+
+export async function toggleRunningTextProfileLock(profileId: string): Promise<boolean> {
+  const profiles = await getRunningTextProfiles()
+  let newLocked = false
+  await saveRunningTextProfiles(
+    profiles.map((p) => {
+      if (p.id === profileId) {
+        newLocked = !p.locked
+        return { ...p, locked: newLocked }
+      }
+      return p
+    })
+  )
+  return newLocked
+}
+
+export async function unsetRunningGlobalProfile(): Promise<void> {
+  await setRunningGlobalProfileId(null)
+}
+
+export async function toggleRunningTextProfileEnabled(profileId: string): Promise<boolean> {
+  const profiles = await getRunningTextProfiles()
+  let newEnabled = false
+  await saveRunningTextProfiles(
+    profiles.map((p) => {
+      if (p.id === profileId) {
+        newEnabled = p.enabled === false ? true : false
+        return { ...p, enabled: newEnabled }
+      }
+      return p
+    })
+  )
+  return newEnabled
+}
+
+async function isRunningProfileEnabled(profileId: string): Promise<boolean> {
+  const profiles = await getRunningTextProfiles()
+  const profile = profiles.find((p) => p.id === profileId)
+  return profile?.enabled !== false
+}
+
 export async function resolveEffectiveRunningText(deviceId: string): Promise<RunningTextConfig> {
   // 1. Global Profile
   const globalProfileId = await getRunningGlobalProfileId()
-  const globalConfig = globalProfileId
+  const globalConfig = globalProfileId && await isRunningProfileEnabled(globalProfileId)
     ? (await getRunningTextProfileConfig(globalProfileId))
     : null
 
@@ -211,13 +335,15 @@ export async function resolveEffectiveRunningText(deviceId: string): Promise<Run
   if (groupId) {
     const groupProfileMap = await getRunningTextGroupProfileMap()
     const groupProfileId = groupProfileMap[groupId]
-    if (groupProfileId) groupConfig = await getRunningTextProfileConfig(groupProfileId)
+    if (groupProfileId && await isRunningProfileEnabled(groupProfileId)) {
+      groupConfig = await getRunningTextProfileConfig(groupProfileId)
+    }
   }
 
   // 3. Device Profile
   const deviceProfileMap = await getRunningTextDeviceProfileMap()
   const deviceProfileId = deviceProfileMap[deviceId]
-  const deviceConfig = deviceProfileId
+  const deviceConfig = deviceProfileId && await isRunningProfileEnabled(deviceProfileId)
     ? await getRunningTextProfileConfig(deviceProfileId)
     : null
 

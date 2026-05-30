@@ -649,7 +649,7 @@ export async function clearScopedHomeExperience(scope: HomeExperienceScope, id?:
 export async function resolveEffectiveHomeExperience(deviceId: string): Promise<HomeExperienceResolvedConfig> {
   const globalProfileId = await getGlobalProfileId()
   let globalPatch: HomeExperiencePatch | null
-  if (globalProfileId) {
+  if (globalProfileId && await isHomeExperienceProfileEnabled(globalProfileId)) {
     // A global profile is explicitly assigned. Use only its patch — if the
     // profile record is missing or empty, fall through to the default build
     // instead of silently picking up the raw `homeExperience.global` patch.
@@ -664,17 +664,22 @@ export async function resolveEffectiveHomeExperience(deviceId: string): Promise<
   if (groupId) {
     const groupProfileMap = await getGroupProfileMap()
     const groupProfileId = groupProfileMap[groupId]
-    groupPatch = groupProfileId
-      ? await getHomeExperienceProfilePatch(groupProfileId)
-      : await getGroupHomeExperiencePatch(groupId)
+    if (groupProfileId && await isHomeExperienceProfileEnabled(groupProfileId)) {
+      groupPatch = await getHomeExperienceProfilePatch(groupProfileId)
+    } else {
+      groupPatch = await getGroupHomeExperiencePatch(groupId)
+    }
     if (isHomeExperiencePatchEmpty(groupPatch)) groupPatch = null
   }
 
   const deviceProfileMap = await getDeviceProfileMap()
   const deviceProfileId = deviceProfileMap[deviceId]
-  let devicePatch: HomeExperiencePatch | null = deviceProfileId
-    ? await getHomeExperienceProfilePatch(deviceProfileId)
-    : await getDeviceHomeExperiencePatch(deviceId)
+  let devicePatch: HomeExperiencePatch | null = null
+  if (deviceProfileId && await isHomeExperienceProfileEnabled(deviceProfileId)) {
+    devicePatch = await getHomeExperienceProfilePatch(deviceProfileId)
+  } else {
+    devicePatch = await getDeviceHomeExperiencePatch(deviceId)
+  }
   if (isHomeExperiencePatchEmpty(devicePatch)) devicePatch = null
 
   const merged = applyHomeExperiencePatch(
@@ -859,6 +864,15 @@ export type HomeExperienceProfile = {
   name: string
   description: string
   createdAt: string
+  locked?: boolean
+  enabled?: boolean
+}
+
+export type HomeExperienceProfileExport = {
+  version: 1
+  type: 'homeExperience'
+  profile: HomeExperienceProfile
+  config: HomeExperiencePatch
 }
 
 const PROFILES_META_KEY = 'homeExperience.profiles'
@@ -1019,6 +1033,125 @@ export async function assignProfileToDevice(deviceId: string, profileId: string 
     map[deviceId] = profileId
   }
   await saveProfileMap(DEVICE_PROFILE_MAP_KEY, map)
+}
+
+export async function cloneHomeExperienceProfile(profileId: string): Promise<HomeExperienceProfile | null> {
+  const profiles = await getHomeExperienceProfiles()
+  const source = profiles.find((p) => p.id === profileId)
+  if (!source) return null
+
+  const cloned: HomeExperienceProfile = {
+    id: `hep_${Date.now()}`,
+    name: `${source.name} (Copy)`,
+    description: source.description,
+    createdAt: new Date().toISOString(),
+    locked: false,
+  }
+
+  profiles.push(cloned)
+  await saveHomeExperienceProfiles(profiles)
+
+  const sourceConfig = await getHomeExperienceProfileConfig(profileId)
+  if (sourceConfig) {
+    await saveStoredHomeExperience(profileDataKey(cloned.id), sourceConfig)
+  }
+
+  return cloned
+}
+
+export async function renameHomeExperienceProfile(
+  profileId: string,
+  newName: string
+): Promise<void> {
+  const profiles = await getHomeExperienceProfiles()
+  await saveHomeExperienceProfiles(
+    profiles.map((p) =>
+      p.id === profileId ? { ...p, name: newName.trim() || p.name } : p
+    )
+  )
+}
+
+export async function exportHomeExperienceProfile(
+  profileId: string
+): Promise<HomeExperienceProfileExport | null> {
+  const profiles = await getHomeExperienceProfiles()
+  const profile = profiles.find((p) => p.id === profileId)
+  if (!profile) return null
+
+  const config = await getHomeExperienceProfilePatch(profileId)
+  return {
+    version: 1,
+    type: 'homeExperience',
+    profile,
+    config: config ?? {},
+  }
+}
+
+export async function importHomeExperienceProfile(
+  data: HomeExperienceProfileExport
+): Promise<HomeExperienceProfile | null> {
+  if (data.version !== 1 || data.type !== 'homeExperience') return null
+
+  const profiles = await getHomeExperienceProfiles()
+  const newProfile: HomeExperienceProfile = {
+    id: `hep_${Date.now()}`,
+    name: data.profile.name || 'Imported Profile',
+    description: data.profile.description || '',
+    createdAt: new Date().toISOString(),
+    locked: false,
+  }
+
+  profiles.push(newProfile)
+  await saveHomeExperienceProfiles(profiles)
+
+  if (data.config && Object.keys(data.config).length > 0) {
+    const resolved = applyHomeExperiencePatch(FALLBACK_HOME_EXPERIENCE_CONFIG, data.config)
+    await saveStoredHomeExperience(profileDataKey(newProfile.id), resolved)
+  } else {
+    await saveStoredHomeExperience(profileDataKey(newProfile.id), FALLBACK_HOME_EXPERIENCE_CONFIG)
+  }
+
+  return newProfile
+}
+
+export async function toggleHomeExperienceProfileLock(profileId: string): Promise<boolean> {
+  const profiles = await getHomeExperienceProfiles()
+  let newLocked = false
+  await saveHomeExperienceProfiles(
+    profiles.map((p) => {
+      if (p.id === profileId) {
+        newLocked = !p.locked
+        return { ...p, locked: newLocked }
+      }
+      return p
+    })
+  )
+  return newLocked
+}
+
+export async function unsetHomeExperienceGlobalProfile(): Promise<void> {
+  await setGlobalProfileId(null)
+}
+
+export async function toggleHomeExperienceProfileEnabled(profileId: string): Promise<boolean> {
+  const profiles = await getHomeExperienceProfiles()
+  let newEnabled = false
+  await saveHomeExperienceProfiles(
+    profiles.map((p) => {
+      if (p.id === profileId) {
+        newEnabled = p.enabled === false ? true : false
+        return { ...p, enabled: newEnabled }
+      }
+      return p
+    })
+  )
+  return newEnabled
+}
+
+async function isHomeExperienceProfileEnabled(profileId: string): Promise<boolean> {
+  const profiles = await getHomeExperienceProfiles()
+  const profile = profiles.find((p) => p.id === profileId)
+  return profile?.enabled !== false
 }
 
 async function getStoredHomeExperience(key: string): Promise<HomeExperienceResolvedConfig> {

@@ -12,6 +12,14 @@ import {
   setVideoGlobalProfileId,
   assignVideoBroadcastProfileToGroup,
   assignVideoBroadcastProfileToDevice,
+  cloneVideoBroadcastProfile,
+  exportVideoBroadcastProfile,
+  importVideoBroadcastProfile,
+  toggleVideoBroadcastProfileLock,
+  toggleVideoBroadcastProfileEnabled,
+  renameVideoBroadcastProfile,
+  unsetVideoGlobalProfile,
+  type VideoBroadcastProfileExport,
 } from '@/lib/videoBroadcast'
 import { pushCommand } from '@/lib/remoteQueue'
 import { resolveProfileRecipientDevices } from '../_lib/resolveRecipients'
@@ -145,6 +153,81 @@ export async function deleteVideoProfileAction(formData: FormData) {
   redirect('/dashboard/broadcast?tab=video&deleted=1')
 }
 
+export async function cloneVideoProfileAction(formData: FormData) {
+  'use server'
+  const profileId = (formData.get('profileId') as string) || ''
+  if (!profileId) return
+  const cloned = await cloneVideoBroadcastProfile(profileId)
+  if (cloned) {
+    revalidatePath('/dashboard/broadcast')
+    redirect(`/dashboard/broadcast?tab=video&cloned=1`)
+  }
+}
+
+export async function renameVideoProfileAction(formData: FormData) {
+  'use server'
+  const profileId = (formData.get('profileId') as string) || ''
+  const newName = (formData.get('profileName') as string) || ''
+  if (profileId && newName) {
+    await renameVideoBroadcastProfile(profileId, newName)
+  }
+  revalidatePath('/dashboard/broadcast')
+  redirect(`/dashboard/broadcast?tab=video&updated=1`)
+}
+
+export async function exportVideoProfileAction(formData: FormData) {
+  'use server'
+  const profileId = (formData.get('profileId') as string) || ''
+  if (!profileId) return
+
+  const exportData = await exportVideoBroadcastProfile(profileId)
+  if (!exportData) return
+
+  const json = JSON.stringify(exportData, null, 2)
+  const blob = new Blob([json], { type: 'application/json' })
+  const url = URL.createObjectURL(blob)
+
+  redirect(url)
+}
+
+export async function importVideoProfileAction(formData: FormData) {
+  'use server'
+  const jsonData = (formData.get('importData') as string) || ''
+  if (!jsonData) {
+    redirect('/dashboard/broadcast?tab=video&importError=No+data+provided')
+    return
+  }
+
+  try {
+    const data = JSON.parse(jsonData) as VideoBroadcastProfileExport
+    const imported = await importVideoBroadcastProfile(data)
+    if (imported) {
+      revalidatePath('/dashboard/broadcast')
+      redirect(`/dashboard/broadcast?tab=video&imported=1`)
+    } else {
+      redirect('/dashboard/broadcast?tab=video&importError=Invalid+profile+data')
+    }
+  } catch {
+    redirect('/dashboard/broadcast?tab=video&importError=Invalid+JSON+format')
+  }
+}
+
+export async function toggleVideoLockAction(formData: FormData) {
+  'use server'
+  const profileId = (formData.get('profileId') as string) || ''
+  if (profileId) await toggleVideoBroadcastProfileLock(profileId)
+  revalidatePath('/dashboard/broadcast')
+  redirect('/dashboard/broadcast?tab=video&locked=1')
+}
+
+export async function toggleVideoEnabledAction(formData: FormData) {
+  'use server'
+  const profileId = (formData.get('profileId') as string) || ''
+  if (profileId) await toggleVideoBroadcastProfileEnabled(profileId)
+  revalidatePath('/dashboard/broadcast')
+  redirect('/dashboard/broadcast?tab=video&enabledToggled=1')
+}
+
 // ── Global & Assignment ───────────────────────────────────────────────────────
 
 export async function setVideoGlobalAction(formData: FormData) {
@@ -152,6 +235,13 @@ export async function setVideoGlobalAction(formData: FormData) {
   if (profileId) await setVideoGlobalProfileId(profileId)
   revalidatePath('/dashboard/broadcast')
   redirect('/dashboard/broadcast?tab=video&globalSet=1')
+}
+
+export async function unsetVideoGlobalAction() {
+  'use server'
+  await unsetVideoGlobalProfile()
+  revalidatePath('/dashboard/broadcast')
+  redirect('/dashboard/broadcast?tab=video&globalUnset=1')
 }
 
 export async function assignVideoGroupAction(formData: FormData) {
@@ -174,6 +264,30 @@ export async function assignVideoDeviceAction(formData: FormData) {
   }
   revalidatePath('/dashboard/broadcast')
   redirect(`/dashboard/broadcast?tab=video&assignVideoProfile=${encodeURIComponent(profileId)}&ok=1`)
+}
+
+// ── Modal-compatible Assignment (no redirect) ────────────────────────────────
+
+export async function assignVideoGroupModalAction(profileId: string, groupId: string, assign: boolean): Promise<{ success: boolean }> {
+  'use server'
+  try {
+    await assignVideoBroadcastProfileToGroup(groupId, assign ? profileId : null)
+    revalidatePath('/dashboard/broadcast')
+    return { success: true }
+  } catch {
+    return { success: false }
+  }
+}
+
+export async function assignVideoDeviceModalAction(profileId: string, deviceId: string, assign: boolean): Promise<{ success: boolean }> {
+  'use server'
+  try {
+    await assignVideoBroadcastProfileToDevice(deviceId, assign ? profileId : null)
+    revalidatePath('/dashboard/broadcast')
+    return { success: true }
+  } catch {
+    return { success: false }
+  }
 }
 
 // ── Live Execution ────────────────────────────────────────────────────────────
