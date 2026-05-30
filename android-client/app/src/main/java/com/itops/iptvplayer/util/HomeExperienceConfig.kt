@@ -42,6 +42,7 @@ data class CarouselConfig(
     val dotActiveColor: String = "#FFFFE9A6",
     val dotInactiveColor: String = "#47FFFFFF",
     val showHintText: Boolean = true,
+    val disableInactiveGradient: Boolean = false,
 )
 
 data class ChannelBrowserConfig(
@@ -490,6 +491,7 @@ object HomeExperienceParser {
             dotActiveColor = obj.optString("dotActiveColor", d.dotActiveColor).ifBlank { d.dotActiveColor },
             dotInactiveColor = obj.optString("dotInactiveColor", d.dotInactiveColor).ifBlank { d.dotInactiveColor },
             showHintText = obj.optBoolean("showHintText", d.showHintText),
+            disableInactiveGradient = obj.optBoolean("disableInactiveGradient", d.disableInactiveGradient),
         )
     }
 }

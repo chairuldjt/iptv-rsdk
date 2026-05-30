@@ -133,6 +133,8 @@ export type CarouselConfig = {
 
   // Hint text
   showHintText: boolean
+  
+  disableInactiveGradient: boolean
 }
 
 export type ChannelBrowserConfig = {
@@ -297,6 +299,7 @@ export const FALLBACK_HOME_EXPERIENCE_CONFIG: HomeExperienceResolvedConfig = {
     dotActiveColor: '#FFFFE9A6',
     dotInactiveColor: '#47FFFFFF',
     showHintText: true,
+    disableInactiveGradient: false,
   },
   overlays: [
     // ── Kiri atas — mirrors HospitalityHeader left column ─────────────────────
@@ -1263,6 +1266,7 @@ function normalizeCarousel(value: unknown): CarouselConfig {
     dotActiveColor: normalizeHexColor(source.dotActiveColor, d.dotActiveColor),
     dotInactiveColor: normalizeHexColor(source.dotInactiveColor, d.dotInactiveColor),
     showHintText: safeBoolean(source.showHintText, d.showHintText),
+    disableInactiveGradient: safeBoolean(source.disableInactiveGradient, d.disableInactiveGradient),
   }
 }
 
@@ -1292,6 +1296,7 @@ function normalizeCarouselPatch(value: unknown): Partial<CarouselConfig> {
   if (hasOwn(source, 'dotActiveColor')) patch.dotActiveColor = normalizeHexColor(source.dotActiveColor, d.dotActiveColor)
   if (hasOwn(source, 'dotInactiveColor')) patch.dotInactiveColor = normalizeHexColor(source.dotInactiveColor, d.dotInactiveColor)
   if (hasOwn(source, 'showHintText')) patch.showHintText = safeBoolean(source.showHintText, d.showHintText)
+  if (hasOwn(source, 'disableInactiveGradient')) patch.disableInactiveGradient = safeBoolean(source.disableInactiveGradient, d.disableInactiveGradient)
   return patch
 }
 

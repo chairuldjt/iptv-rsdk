@@ -1547,14 +1547,14 @@ private fun HospitalityCarouselCard(
                 modifier = Modifier
                     .size(iconBoxSize)
                     .shadow(
-                        elevation = if (item.disableGradient) 0.dp else shadowElevation,
+                        elevation = if (item.disableGradient || (!isActive && carouselConfig.disableInactiveGradient)) 0.dp else shadowElevation,
                         shape = cardShape,
                         ambientColor = if (isActive) item.accent.copy(alpha = 0.18f) else Color.Black.copy(alpha = 0.10f),
                         spotColor = if (isActive) item.accent.copy(alpha = 0.22f) else Color.Black.copy(alpha = 0.12f)
                     )
                     .clip(cardShape)
                     .background(
-                        if (item.disableGradient) Color.Transparent
+                        if (item.disableGradient || (!isActive && carouselConfig.disableInactiveGradient)) Color.Transparent
                         else item.cardBackgroundColor ?: if (isActive) Color(0xFF142331) else Color(0xFF101A24)
                     )
                     .border(
@@ -1566,7 +1566,7 @@ private fun HospitalityCarouselCard(
                     ),
                 contentAlignment = Alignment.Center
             ) {
-                if (!item.disableGradient) {
+                if (!item.disableGradient && !(!isActive && carouselConfig.disableInactiveGradient)) {
                     Box(
                         modifier = Modifier
                             .matchParentSize()
@@ -1756,7 +1756,7 @@ private fun HospitalityCarouselCard(
                     .size(iconBoxSize)
                     .clip(cardShape)
                     .then(
-                        if (!item.disableGradient) Modifier.background(
+                        if (!item.disableGradient && !(!isActive && carouselConfig.disableInactiveGradient)) Modifier.background(
                             Brush.verticalGradient(
                                 listOf(
                                     item.accent.copy(alpha = if (isActive) 0.42f else 0.12f),
@@ -1773,7 +1773,7 @@ private fun HospitalityCarouselCard(
                         cardShape
                     )
                     .shadow(
-                        elevation = if (item.disableGradient) 0.dp else shadowElevation,
+                        elevation = if (item.disableGradient || (!isActive && carouselConfig.disableInactiveGradient)) 0.dp else shadowElevation,
                         shape = cardShape,
                         ambientColor = item.accent.copy(alpha = if (isActive) 0.80f else 0.14f),
                         spotColor = item.accent.copy(alpha = if (isActive) 0.95f else 0.18f)
@@ -1788,7 +1788,7 @@ private fun HospitalityCarouselCard(
                         .alpha(if (lowEffectMode) 0f else if (isActive) 0.42f else 0.18f),
                     contentScale = ContentScale.Crop
                 )
-                if (!item.disableGradient) {
+                if (!item.disableGradient && !(!isActive && carouselConfig.disableInactiveGradient)) {
                     Box(
                         modifier = Modifier
                             .matchParentSize()

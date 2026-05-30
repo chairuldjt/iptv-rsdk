@@ -183,6 +183,7 @@ export default function HomeExperienceForm({
   const [crDotActiveColor, setCrDotActiveColor] = useState(cr.dotActiveColor)
   const [crDotInactiveColor, setCrDotInactiveColor] = useState(cr.dotInactiveColor)
   const [crShowHintText, setCrShowHintText] = useState(cr.showHintText)
+  const [crDisableInactiveGradient, setCrDisableInactiveGradient] = useState(cr.disableInactiveGradient)
 
   const [expandedSections, setExpandedSections] = useState<Record<string, Record<string, boolean>>>({})
   const [enabledSections, setEnabledSections] = useState<Record<string, Record<string, boolean>>>({})
@@ -1067,6 +1068,7 @@ export default function HomeExperienceForm({
             dotActiveColor: crDotActiveColor,
             dotInactiveColor: crDotInactiveColor,
             showHintText: crShowHintText,
+            disableInactiveGradient: crDisableInactiveGradient,
           })} />
 
           <div className="space-y-5">
@@ -1119,6 +1121,7 @@ export default function HomeExperienceForm({
               {([
                 ['Tampilkan Border Non-Selected', crShowInactiveBorder, setCrShowInactiveBorder],
                 ['Tampilkan Glow Non-Selected', crShowInactiveGlow, setCrShowInactiveGlow],
+                ['Nonaktifkan Gradient Non-Selected', crDisableInactiveGradient, setCrDisableInactiveGradient],
                 ['Tampilkan Arrows', crShowArrows, setCrShowArrows],
                 ['Tampilkan Dots', crShowDots, setCrShowDots],
                 ['Tampilkan Hint Text', crShowHintText, setCrShowHintText],
