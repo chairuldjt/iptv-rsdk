@@ -1,7 +1,5 @@
 import prisma from '@/lib/db'
 import { getDeviceGroupForDevice } from '@/lib/deviceGroups'
-import fs from 'fs/promises'
-import path from 'path'
 
 const GLOBAL_HOME_EXPERIENCE_KEY = 'homeExperience.global'
 const HOME_EXPERIENCE_MENU_TYPES = ['tv', 'education', 'entertainment', 'settings', 'info_dialog', 'konten', 'recommendations', 'favorites', 'search', 'app_drawer', 'launch_app'] as const
@@ -1157,7 +1155,7 @@ export async function importHomeExperienceProfile(
 
 export async function importHomeExperienceProfileWithAssets(
   data: HomeExperienceProfileExport,
-  assets: Array<{ relativePath: string; buffer: Buffer }>
+  assetMapping: Array<{ originalUrl: string; newRelativePath: string }>
 ): Promise<HomeExperienceProfile | null> {
   if (data.version !== 1 || data.type !== 'homeExperience') return null
 
@@ -1173,23 +1171,14 @@ export async function importHomeExperienceProfileWithAssets(
   profiles.push(newProfile)
   await saveHomeExperienceProfiles(profiles)
 
-  const publicDir = path.join(process.cwd(), 'public')
-  const uploadedPaths: string[] = []
-
-  for (const asset of assets) {
-    try {
-      const targetPath = path.join(publicDir, asset.relativePath)
-      const targetDir = path.dirname(targetPath)
-      await fs.mkdir(targetDir, { recursive: true })
-      await fs.writeFile(targetPath, asset.buffer)
-      uploadedPaths.push(asset.relativePath)
-    } catch {
-      // Failed to write asset, skip
-    }
+  let configStr = JSON.stringify(data.config ?? {})
+  for (const mapping of assetMapping) {
+    configStr = configStr.split(mapping.originalUrl).join(mapping.newRelativePath)
   }
+  const config = JSON.parse(configStr) as HomeExperiencePatch
 
-  if (data.config && Object.keys(data.config).length > 0) {
-    const resolved = applyHomeExperiencePatch(FALLBACK_HOME_EXPERIENCE_CONFIG, data.config)
+  if (Object.keys(config).length > 0) {
+    const resolved = applyHomeExperiencePatch(FALLBACK_HOME_EXPERIENCE_CONFIG, config)
     await saveStoredHomeExperience(profileDataKey(newProfile.id), resolved)
   } else {
     await saveStoredHomeExperience(profileDataKey(newProfile.id), FALLBACK_HOME_EXPERIENCE_CONFIG)

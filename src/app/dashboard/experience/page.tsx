@@ -1,5 +1,7 @@
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
+import fs from 'fs/promises'
+import path from 'path'
 import JSZip from 'jszip'
 import prisma from '@/lib/db'
 import PageHeader from '@/components/PageHeader'
@@ -200,22 +202,35 @@ async function importProfileAction(formData: FormData) {
     const profileJsonText = await profileJsonFile.async('text')
     const data = JSON.parse(profileJsonText) as HomeExperienceProfileExport
 
-    const assets: Array<{ relativePath: string; buffer: Buffer }> = []
-    zip.forEach((relativePath, zipEntry) => {
-      if (relativePath.startsWith('assets/') && !zipEntry.dir) {
-        assets.push({ relativePath, buffer: Buffer.alloc(0) })
-      }
-    })
+    const publicDir = path.join(process.cwd(), 'public')
+    const assetMapping: Array<{ originalUrl: string; newRelativePath: string }> = []
 
-    for (let i = 0; i < assets.length; i++) {
-      const zipEntry = zip.file(assets[i].relativePath)
-      if (zipEntry) {
+    const assetFiles = zip.folder('uploads')
+    if (assetFiles) {
+      const entries: Array<{ path: string; dir: boolean }> = []
+      assetFiles.forEach((relativePath, entry) => {
+        entries.push({ path: relativePath, dir: entry.dir })
+      })
+
+      for (const entry of entries) {
+        if (entry.dir) continue
+        const zipEntry = assetFiles.file(entry.path)
+        if (!zipEntry) continue
+
         const buffer = Buffer.from(await zipEntry.async('arraybuffer'))
-        assets[i] = { ...assets[i], buffer }
+        const targetRelativePath = `uploads/${entry.path}`
+        const targetFullPath = path.join(publicDir, targetRelativePath)
+
+        const targetDir = path.dirname(targetFullPath)
+        await fs.mkdir(targetDir, { recursive: true })
+        await fs.writeFile(targetFullPath, buffer)
+
+        const originalUrl = `/uploads/${entry.path}`
+        assetMapping.push({ originalUrl, newRelativePath: targetRelativePath })
       }
     }
 
-    const imported = await importHomeExperienceProfileWithAssets(data, assets)
+    const imported = await importHomeExperienceProfileWithAssets(data, assetMapping)
     if (imported) {
       revalidatePath('/dashboard/experience')
       redirect('/dashboard/experience?imported=1')
