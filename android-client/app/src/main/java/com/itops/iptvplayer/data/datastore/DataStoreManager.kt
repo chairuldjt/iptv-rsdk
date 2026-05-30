@@ -46,6 +46,7 @@ class DataStoreManager(private val context: Context) {
         val RUNNING_TEXT_OVERRIDE_JSON = stringPreferencesKey("running_text_override_json")
         val RUNNING_TEXT_OVERRIDE_EXPIRES_AT = longPreferencesKey("running_text_override_expires_at")
         val NEWLY_REGISTERED = booleanPreferencesKey("newly_registered")
+        val CHANNEL_PLAY_COUNTS = stringPreferencesKey("channel_play_counts")
     }
 
     // Generate or get existing Device ID
@@ -592,5 +593,53 @@ class DataStoreManager(private val context: Context) {
             context.dataStore.edit { it.remove(NEWLY_REGISTERED) }
         }
         return isNew
+    }
+
+    // ── Channel Play Tracking ─────────────────────────────────────────────────
+
+    /** Catat channel yang diputar — update last played dan increment play count. */
+    suspend fun recordChannelPlayed(channelId: Int) {
+        context.dataStore.edit { prefs ->
+            // Update last selected channel
+            prefs[LAST_SELECTED_CHANNEL_ID] = channelId
+            // Update play counts (JSON map: "channelId" -> count)
+            val countsJson = prefs[CHANNEL_PLAY_COUNTS] ?: "{}"
+            val counts = try {
+                val obj = org.json.JSONObject(countsJson)
+                val map = mutableMapOf<Int, Int>()
+                obj.keys().forEach { key ->
+                    key.toIntOrNull()?.let { id -> map[id] = obj.optInt(key, 0) }
+                }
+                map
+            } catch (_: Exception) { mutableMapOf() }
+            counts[channelId] = (counts[channelId] ?: 0) + 1
+            val newObj = org.json.JSONObject()
+            counts.forEach { (id, count) -> newObj.put(id.toString(), count) }
+            prefs[CHANNEL_PLAY_COUNTS] = newObj.toString()
+        }
+    }
+
+    /** Ambil ID channel terakhir diputar. */
+    suspend fun getLastPlayedChannelId(): Int? {
+        val prefs = context.dataStore.data.first()
+        val id = prefs[LAST_SELECTED_CHANNEL_ID] ?: -1
+        return if (id > 0) id else null
+    }
+
+    /** Ambil ID channel yang paling sering diputar. */
+    suspend fun getMostPlayedChannelId(): Int? {
+        val prefs = context.dataStore.data.first()
+        val countsJson = prefs[CHANNEL_PLAY_COUNTS] ?: return null
+        return try {
+            val obj = org.json.JSONObject(countsJson)
+            var maxCount = 0
+            var maxId: Int? = null
+            obj.keys().forEach { key ->
+                val count = obj.optInt(key, 0)
+                val id = key.toIntOrNull() ?: return@forEach
+                if (count > maxCount) { maxCount = count; maxId = id }
+            }
+            maxId
+        } catch (_: Exception) { null }
     }
 }

@@ -163,8 +163,9 @@ import com.itops.iptvplayer.util.HomeOverlayItem
 import com.itops.iptvplayer.util.HomeOverlayPosition
 import com.itops.iptvplayer.util.HomeOverlayType
 import com.itops.iptvplayer.util.RemoteAudioPlayer
-import com.itops.iptvplayer.data.api.RetrofitClient
+import com.itops.iptvplayer.util.CarouselConfig
 import com.itops.iptvplayer.util.NtpTimeProvider
+import com.itops.iptvplayer.data.api.RetrofitClient
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -173,9 +174,22 @@ import okhttp3.Request
 import org.json.JSONObject
 import java.net.URI
 
+private fun parseArgbHexColor(hex: String, default: Color): Color {
+    return try {
+        val clean = hex.trimStart('#')
+        when (clean.length) {
+            6 -> Color(android.graphics.Color.parseColor("#FF$clean"))
+            8 -> Color(android.graphics.Color.parseColor("#$clean"))
+            else -> default
+        }
+    } catch (_: Exception) { default }
+}
+
 @Composable
 fun HomeScreen(
+    initialHomeExperienceJson: String = "",
     onNavigateToPlayer: () -> Unit,
+    onNavigateToPlayerWithChannel: (channelId: Int) -> Unit,
     onNavigateToEducation: () -> Unit,
     onNavigateToEntertainment: () -> Unit,
     onNavigateToEntertainmentItem: (Int) -> Unit,
@@ -196,7 +210,7 @@ fun HomeScreen(
     val educationPath by dataStoreManager.educationVideoPathFlow.collectAsState(initial = null)
     val educationSource by dataStoreManager.educationSourceFlow.collectAsState(initial = null)
     val educationPlaybackMode by dataStoreManager.educationPlaybackModeFlow.collectAsState(initial = null)
-    val homeExperienceJson by dataStoreManager.homeExperienceJsonFlow.collectAsState(initial = "")
+    val homeExperienceJson by dataStoreManager.homeExperienceJsonFlow.collectAsState(initial = initialHomeExperienceJson)
     val homeExperience = remember(homeExperienceJson) { HomeExperienceParser.parse(homeExperienceJson) }
 
     var resolvedDeviceId by remember { mutableStateOf("STB-RSDK-DEVICE") }
@@ -416,19 +430,21 @@ fun HomeScreen(
             else -> screenWidth >= (scale.ultraCompactWidthDp - 40) && screenHeight >= (scale.ultraCompactHeightDp - 40)
         }
 
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(
-                    Brush.verticalGradient(
-                        colors = listOf(
-                            Color.Black.copy(alpha = 0.16f),
-                            Color(0xFF06111C).copy(alpha = 0.05f),
-                            Color.Black.copy(alpha = 0.66f)
+        if (!homeExperience.disableMenuBarGradient) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(
+                        Brush.verticalGradient(
+                            colors = listOf(
+                                Color.Black.copy(alpha = 0.16f),
+                                Color(0xFF06111C).copy(alpha = 0.05f),
+                                Color.Black.copy(alpha = 0.66f)
+                            )
                         )
                     )
-                )
-        )
+            )
+        }
 
         Column(
             modifier = Modifier
@@ -482,13 +498,46 @@ fun HomeScreen(
                         onNavigateToEducation()
                     }
                 },
-                onTvClick = {
+                onTvClick = { behavior, channelNumber ->
                     if (channelsLoading) {
                         Toast.makeText(context, "Memuat daftar saluran...", Toast.LENGTH_SHORT).show()
                     } else if (channels.isEmpty()) {
                         Toast.makeText(context, "Saluran TV belum tersedia.", Toast.LENGTH_SHORT).show()
                     } else {
-                        onNavigateToPlayer()
+                        when (behavior) {
+                            "last_played" -> {
+                                coroutineScope.launch {
+                                    val lastId = app.dataStoreManager.getLastPlayedChannelId()
+                                    val target = if (lastId != null) channels.find { it.id == lastId } else null
+                                    if (target != null) {
+                                        onNavigateToPlayerWithChannel(target.id)
+                                    } else {
+                                        onNavigateToPlayer()
+                                    }
+                                }
+                            }
+                            "most_played" -> {
+                                coroutineScope.launch {
+                                    val mostId = app.dataStoreManager.getMostPlayedChannelId()
+                                    val target = if (mostId != null) channels.find { it.id == mostId } else null
+                                    if (target != null) {
+                                        onNavigateToPlayerWithChannel(target.id)
+                                    } else {
+                                        onNavigateToPlayer()
+                                    }
+                                }
+                            }
+                            "by_number" -> {
+                                val idx = (channelNumber - 1).coerceIn(0, channels.lastIndex)
+                                val target = channels.getOrNull(idx)
+                                if (target != null) {
+                                    onNavigateToPlayerWithChannel(target.id)
+                                } else {
+                                    onNavigateToPlayer()
+                                }
+                            }
+                            else -> onNavigateToPlayer() // channel_list (default)
+                        }
                     }
                 },
                 onServiceClick = {
@@ -505,6 +554,7 @@ fun HomeScreen(
                 isSmallScreen = isSmallScreen,
                 isUltraCompact = isUltraCompact,
                 homeExperienceJson = homeExperienceJson,
+                carouselConfig = homeExperience.carousel,
                 onSelectionChanged = { item ->
                     selectedHomeBackground = item.backgroundRes
                     selectedHomeBackgroundUrl = item.backgroundUrl
@@ -729,7 +779,7 @@ private fun HospitalityMenuBar(
     educationSource: String?,
     educationPlaybackMode: String?,
     onEducationClick: () -> Unit,
-    onTvClick: () -> Unit,
+    onTvClick: (behavior: String, channelNumber: Int) -> Unit,
     onServiceClick: () -> Unit,
     onEntertainmentClick: () -> Unit,
     onEntertainmentItemClick: (Int) -> Unit,
@@ -742,6 +792,7 @@ private fun HospitalityMenuBar(
     isSmallScreen: Boolean,
     isUltraCompact: Boolean,
     homeExperienceJson: String,
+    carouselConfig: CarouselConfig = CarouselConfig(),
     onSelectionChanged: (HospitalityCarouselItem) -> Unit
 ) {
     val context = LocalContext.current
@@ -787,8 +838,10 @@ private fun HospitalityMenuBar(
                 else -> menu.subtitle
             }
 
-            val action = when (menu.type) {
-                "tv" -> onTvClick
+            val tvBehavior = menu.tvClickBehavior
+            val tvChannelNumber = menu.tvClickChannelNumber
+            val action: () -> Unit = when (menu.type) {
+                "tv" -> { { onTvClick(tvBehavior, tvChannelNumber) } }
                 "education" -> onEducationClick
                 "entertainment" -> onEntertainmentClick
                 "settings" -> onSettingsClick
@@ -870,6 +923,7 @@ private fun HospitalityMenuBar(
                 cardBackgroundColor = if (menu.cardBackgroundColorHex.isNotBlank()) HomeExperienceParser.colorOrDefault(menu.cardBackgroundColorHex, null) else null,
                 backgroundRes = defaultBackgroundForMenuType(menu.type),
                 backgroundUrl = menu.backgroundUrl,
+                disableGradient = menu.disableGradient,
                 action = action
             )
         }
@@ -885,8 +939,8 @@ private fun HospitalityMenuBar(
                     "tv" -> if (menu.subtitle.isBlank()) "$channelsCount saluran" else menu.subtitle
                     else -> menu.subtitle
                 }
-                val action = when (menu.type) {
-                    "tv" -> onTvClick
+                val action: () -> Unit = when (menu.type) {
+                    "tv" -> { { onTvClick("channel_list", 1) } }
                     "education" -> onEducationClick
                     "entertainment" -> onEntertainmentClick
                     "settings" -> onSettingsClick
@@ -1027,29 +1081,35 @@ private fun HospitalityMenuBar(
                 ),
             contentAlignment = Alignment.Center
         ) {
-            CarouselTouchButton(
-                direction = -1,
-                isSmallScreen = isSmallScreen,
-                accent = menuItems[selectedIndex].accent,
-                onClick = { moveSelection(-1) },
-                modifier = Modifier
-                    .align(Alignment.CenterStart)
-                    .zIndex(4f)
-            )
-            CarouselTouchButton(
-                direction = 1,
-                isSmallScreen = isSmallScreen,
-                accent = menuItems[selectedIndex].accent,
-                onClick = { moveSelection(1) },
-                modifier = Modifier
-                    .align(Alignment.CenterEnd)
-                    .zIndex(4f)
-            )
+            if (carouselConfig.showArrows) {
+                CarouselTouchButton(
+                    direction = -1,
+                    isSmallScreen = isSmallScreen,
+                    accent = menuItems[selectedIndex].accent,
+                    onClick = { moveSelection(-1) },
+                    modifier = Modifier
+                        .align(Alignment.CenterStart)
+                        .zIndex(4f),
+                    arrowColor = parseArgbHexColor(carouselConfig.arrowColor, Color.White),
+                    bgColor = parseArgbHexColor(carouselConfig.arrowBgColor, Color(0x4D334155))
+                )
+                CarouselTouchButton(
+                    direction = 1,
+                    isSmallScreen = isSmallScreen,
+                    accent = menuItems[selectedIndex].accent,
+                    onClick = { moveSelection(1) },
+                    modifier = Modifier
+                        .align(Alignment.CenterEnd)
+                        .zIndex(4f),
+                    arrowColor = parseArgbHexColor(carouselConfig.arrowColor, Color.White),
+                    bgColor = parseArgbHexColor(carouselConfig.arrowBgColor, Color(0x4D334155))
+                )
+            }
 
             val offsets = if (showFiveItems) listOf(-2, -1, 0, 1, 2) else listOf(-1, 0, 1)
             Row(
                 horizontalArrangement = Arrangement.spacedBy(
-                    if (isUltraCompact) 6.scaledDp() else if (isSmallScreen) 10.scaledDp() else 18.scaledDp(),
+                    carouselConfig.cardSpacing.scaledDp(),
                     Alignment.CenterHorizontally
                 ),
                 verticalAlignment = Alignment.CenterVertically,
@@ -1064,6 +1124,7 @@ private fun HospitalityMenuBar(
                         lowEffectMode = lowEffectMode,
                         isSmallScreen = isSmallScreen,
                         isUltraCompact = isUltraCompact,
+                        carouselConfig = carouselConfig,
                         onClick = {
                             if (offset == 0) {
                                 item.action()
@@ -1077,27 +1138,31 @@ private fun HospitalityMenuBar(
         }
 
         Spacer(modifier = Modifier.height(if (isUltraCompact) 2.scaledDp() else if (isSmallScreen) 4.scaledDp() else 8.scaledDp()))
-        SelectedMenuLabel(
-            item = menuItems[selectedIndex],
-            isSmallScreen = isSmallScreen,
-            isUltraCompact = isUltraCompact
-        )
+        if (carouselConfig.showLabelBox) {
+            SelectedMenuLabel(
+                item = menuItems[selectedIndex],
+                isSmallScreen = isSmallScreen,
+                isUltraCompact = isUltraCompact,
+                carouselConfig = carouselConfig
+            )
+        }
         Spacer(modifier = Modifier.height(if (isUltraCompact) 4.scaledDp() else if (isSmallScreen) 8.scaledDp() else 12.scaledDp()))
-        Row(
-            horizontalArrangement = Arrangement.spacedBy(if (isUltraCompact) 4.scaledDp() else 7.scaledDp()),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            menuItems.indices.forEach { index ->
-                Box(
-                    modifier = Modifier
-                        .width(if (index == selectedIndex) (if (isUltraCompact) 14.scaledDp() else 22.scaledDp()) else (if (isUltraCompact) 5.scaledDp() else 7.scaledDp()))
-                        .height(if (isUltraCompact) 5.scaledDp() else 7.scaledDp())
-                        .clip(RoundedCornerShape(10.dp))
-                        .background(
-                            if (index == selectedIndex) menuItems[selectedIndex].accent
-                            else Color.White.copy(alpha = 0.28f)
-                        )
-                )
+        if (carouselConfig.showDots) {
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(if (isUltraCompact) 4.scaledDp() else 7.scaledDp()),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                val dotActive = parseArgbHexColor(carouselConfig.dotActiveColor, Color(0xFFFFE9A6))
+                val dotInactive = parseArgbHexColor(carouselConfig.dotInactiveColor, Color.White.copy(alpha = 0.28f))
+                menuItems.indices.forEach { index ->
+                    Box(
+                        modifier = Modifier
+                            .width(if (index == selectedIndex) (if (isUltraCompact) 14.scaledDp() else 22.scaledDp()) else (if (isUltraCompact) 5.scaledDp() else 7.scaledDp()))
+                            .height(if (isUltraCompact) 5.scaledDp() else 7.scaledDp())
+                            .clip(RoundedCornerShape(10.dp))
+                            .background(if (index == selectedIndex) dotActive else dotInactive)
+                    )
+                }
             }
         }
         Spacer(modifier = Modifier.height(if (isUltraCompact) 4.scaledDp() else 8.scaledDp()))
@@ -1125,7 +1190,7 @@ private fun HospitalityMenuBar(
             }
             Spacer(modifier = Modifier.height(if (isUltraCompact) 4.scaledDp() else 8.scaledDp()))
         }
-        if (homeExperience.menuHintText.isNotBlank()) {
+        if (carouselConfig.showHintText && homeExperience.menuHintText.isNotBlank()) {
             Text(
                 text = if (isUltraCompact) {
                     homeExperience.menuHintText.let {
@@ -1152,6 +1217,7 @@ private data class HospitalityCarouselItem(
     val cardBackgroundColor: Color?,
     val backgroundRes: Int,
     val backgroundUrl: String,
+    val disableGradient: Boolean = false,
     val action: () -> Unit
 )
 
@@ -1284,16 +1350,21 @@ private fun wrapCarouselIndex(index: Int, size: Int): Int {
 private fun SelectedMenuLabel(
     item: HospitalityCarouselItem,
     isSmallScreen: Boolean,
-    isUltraCompact: Boolean
+    isUltraCompact: Boolean,
+    carouselConfig: CarouselConfig = CarouselConfig()
 ) {
+    val bgColor = parseArgbHexColor(carouselConfig.labelBoxBgColor, Color.Black.copy(alpha = 0.42f))
+    val titleColor = parseArgbHexColor(carouselConfig.labelTitleColor, item.textColor)
+    val subtitleColor = parseArgbHexColor(carouselConfig.labelSubtitleColor, Color.White.copy(alpha = 0.84f))
+    val cornerDp = carouselConfig.labelBoxCornerRadius.scaledDp()
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
         modifier = Modifier
-            .clip(RoundedCornerShape(if (isUltraCompact) 6.scaledDp() else if (isSmallScreen) 10.scaledDp() else 14.scaledDp()))
-            .background(Color.Black.copy(alpha = 0.42f))
+            .clip(RoundedCornerShape(cornerDp))
+            .background(bgColor)
             .border(
                 BorderStroke(1.dp, item.accent.copy(alpha = 0.34f)),
-                RoundedCornerShape(if (isUltraCompact) 6.scaledDp() else if (isSmallScreen) 10.scaledDp() else 14.scaledDp())
+                RoundedCornerShape(cornerDp)
             )
             .padding(
                 horizontal = if (isUltraCompact) 10.scaledDp() else if (isSmallScreen) 14.scaledDp() else 20.scaledDp(),
@@ -1302,8 +1373,10 @@ private fun SelectedMenuLabel(
     ) {
         Text(
             text = item.title,
-            color = item.textColor,
-            fontSize = if (isUltraCompact) 10.scaledSp() else if (isSmallScreen) 12.scaledSp() else 17.scaledSp(),
+            color = titleColor,
+            fontSize = if (isUltraCompact) carouselConfig.labelTitleSize.times(0.6f).scaledSp()
+                       else if (isSmallScreen) carouselConfig.labelTitleSize.times(0.75f).scaledSp()
+                       else carouselConfig.labelTitleSize.scaledSp(),
             fontWeight = FontWeight.ExtraBold,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
@@ -1317,8 +1390,10 @@ private fun SelectedMenuLabel(
         )
         Text(
             text = item.subtitle,
-            color = Color.White.copy(alpha = 0.84f),
-            fontSize = if (isUltraCompact) 7.scaledSp() else if (isSmallScreen) 8.scaledSp() else 10.scaledSp(),
+            color = subtitleColor,
+            fontSize = if (isUltraCompact) carouselConfig.labelSubtitleSize.times(0.7f).scaledSp()
+                       else if (isSmallScreen) carouselConfig.labelSubtitleSize.times(0.8f).scaledSp()
+                       else carouselConfig.labelSubtitleSize.scaledSp(),
             fontWeight = FontWeight.SemiBold,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
@@ -1339,21 +1414,23 @@ private fun CarouselTouchButton(
     isSmallScreen: Boolean,
     accent: Color,
     onClick: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    arrowColor: Color = Color.White,
+    bgColor: Color = Color(0x4D334155)
 ) {
     val size = if (isSmallScreen) 42.scaledDp() else 54.scaledDp()
     Box(
         modifier = modifier
             .size(size)
             .clip(CircleShape)
-            .background(Color.Black.copy(alpha = 0.34f))
+            .background(bgColor)
             .border(1.dp, accent.copy(alpha = 0.42f), CircleShape)
             .clickable(onClick = onClick),
         contentAlignment = Alignment.Center
     ) {
         Text(
             text = if (direction < 0) "‹" else "›",
-            color = Color.White,
+            color = arrowColor,
             fontSize = if (isSmallScreen) 30.scaledSp() else 40.scaledSp(),
             fontWeight = FontWeight.Light,
             lineHeight = if (isSmallScreen) 30.scaledSp() else 40.scaledSp(),
@@ -1375,6 +1452,7 @@ private fun HospitalityCarouselCard(
     lowEffectMode: Boolean,
     isSmallScreen: Boolean,
     isUltraCompact: Boolean,
+    carouselConfig: CarouselConfig = CarouselConfig(),
     onClick: () -> Unit
 ) {
     val isActive = offset == 0
@@ -1382,8 +1460,8 @@ private fun HospitalityCarouselCard(
     if (lowEffectMode) {
         val scale by animateFloatAsState(
             targetValue = when (distance) {
-                0 -> 1.10f
-                1 -> 0.92f
+                0 -> carouselConfig.activeCardScale.coerceIn(0.5f, 2.0f) * (1.10f / 1.22f)
+                1 -> carouselConfig.inactiveCardScale.coerceIn(0.3f, 1.5f) * (0.92f / 0.90f)
                 else -> 0.72f
             },
             animationSpec = tween(durationMillis = 160),
@@ -1430,17 +1508,19 @@ private fun HospitalityCarouselCard(
             targetValue = if (isActive) {
                 if (isUltraCompact) 2.scaledDp() else if (isSmallScreen) 3.scaledDp() else 4.scaledDp()
             } else {
-                1.dp
+                if (carouselConfig.showInactiveBorder) carouselConfig.inactiveBorderWidth.dp else 0.dp
             },
             animationSpec = tween(durationMillis = 160),
             label = "hospitality_carousel_border_width_debug_step1"
         )
+        val inactiveBorderColorParsed = parseArgbHexColor(carouselConfig.inactiveBorderColor, Color.White.copy(alpha = 0.30f))
         val borderColor by animateColorAsState(
-            targetValue = if (isActive) item.accent else Color.White.copy(alpha = 0.30f),
+            targetValue = if (isActive) item.accent else inactiveBorderColorParsed,
             animationSpec = tween(durationMillis = 160),
             label = "hospitality_carousel_border_color_debug_step1"
         )
-        val cardShape = RoundedCornerShape(if (isActive) (if (isUltraCompact) 10.scaledDp() else 16.scaledDp()) else (if (isUltraCompact) 8.scaledDp() else 12.scaledDp()))
+        val cardCornerDp = carouselConfig.cardCornerRadius.scaledDp()
+        val cardShape = RoundedCornerShape(if (isActive) cardCornerDp else (cardCornerDp * 0.75f))
         val shadowElevation by animateDpAsState(
             targetValue = if (isActive) {
                 if (isUltraCompact) 4.scaledDp() else if (isSmallScreen) 6.scaledDp() else 8.scaledDp()
@@ -1467,14 +1547,15 @@ private fun HospitalityCarouselCard(
                 modifier = Modifier
                     .size(iconBoxSize)
                     .shadow(
-                        elevation = shadowElevation,
+                        elevation = if (item.disableGradient) 0.dp else shadowElevation,
                         shape = cardShape,
                         ambientColor = if (isActive) item.accent.copy(alpha = 0.18f) else Color.Black.copy(alpha = 0.10f),
                         spotColor = if (isActive) item.accent.copy(alpha = 0.22f) else Color.Black.copy(alpha = 0.12f)
                     )
                     .clip(cardShape)
                     .background(
-                        item.cardBackgroundColor ?: if (isActive) Color(0xFF142331) else Color(0xFF101A24)
+                        if (item.disableGradient) Color.Transparent
+                        else item.cardBackgroundColor ?: if (isActive) Color(0xFF142331) else Color(0xFF101A24)
                     )
                     .border(
                         BorderStroke(
@@ -1485,32 +1566,34 @@ private fun HospitalityCarouselCard(
                     ),
                 contentAlignment = Alignment.Center
             ) {
-                Box(
-                    modifier = Modifier
-                        .matchParentSize()
-                        .background(
-                            Brush.verticalGradient(
-                                colors = listOf(
-                                    item.accent.copy(alpha = if (isActive) 0.16f else 0.08f),
-                                    (item.cardBackgroundColor ?: Color(0xFF142331)).copy(alpha = if (isActive) 0.96f else 0.92f),
-                                    item.cardBackgroundColor ?: Color(0xFF0F1822)
+                if (!item.disableGradient) {
+                    Box(
+                        modifier = Modifier
+                            .matchParentSize()
+                            .background(
+                                Brush.verticalGradient(
+                                    colors = listOf(
+                                        item.accent.copy(alpha = if (isActive) 0.16f else 0.08f),
+                                        (item.cardBackgroundColor ?: Color(0xFF142331)).copy(alpha = if (isActive) 0.96f else 0.92f),
+                                        item.cardBackgroundColor ?: Color(0xFF0F1822)
+                                    )
                                 )
                             )
-                        )
-                )
-                Box(
-                    modifier = Modifier
-                        .matchParentSize()
-                        .background(
-                            Brush.verticalGradient(
-                                colors = listOf(
-                                    Color.White.copy(alpha = if (isActive) 0.07f else 0.03f),
-                                    Color.Transparent,
-                                    Color.Black.copy(alpha = if (isActive) 0.14f else 0.08f)
+                    )
+                    Box(
+                        modifier = Modifier
+                            .matchParentSize()
+                            .background(
+                                Brush.verticalGradient(
+                                    colors = listOf(
+                                        Color.White.copy(alpha = if (isActive) 0.07f else 0.03f),
+                                        Color.Transparent,
+                                        Color.Black.copy(alpha = if (isActive) 0.14f else 0.08f)
+                                    )
                                 )
                             )
-                        )
-                )
+                    )
+                }
                 Box(
                     modifier = Modifier
                         .align(Alignment.TopCenter)
@@ -1561,8 +1644,8 @@ private fun HospitalityCarouselCard(
     }
 
     val targetScale = when (distance) {
-        0 -> if (lowEffectMode) 1.12f else 1.22f
-        1 -> 0.90f
+        0 -> if (lowEffectMode) carouselConfig.activeCardScale * (1.10f / 1.22f) else carouselConfig.activeCardScale
+        1 -> carouselConfig.inactiveCardScale
         else -> 0.66f
     }
     val scale by animateFloatAsState(
@@ -1571,7 +1654,11 @@ private fun HospitalityCarouselCard(
         label = "hospitality_carousel_scale"
     )
     val glowAlpha by animateFloatAsState(
-        targetValue = if (isActive) if (lowEffectMode) 0.24f else 0.84f else if (lowEffectMode) 0f else 0.18f,
+        targetValue = when {
+            isActive -> if (lowEffectMode) 0.24f else 0.84f
+            carouselConfig.showInactiveGlow -> if (lowEffectMode) 0f else 0.18f
+            else -> 0f
+        },
         animationSpec = if (lowEffectMode) tween(durationMillis = 0) else tween(durationMillis = 220),
         label = "hospitality_carousel_glow_alpha"
     )
@@ -1599,17 +1686,23 @@ private fun HospitalityCarouselCard(
         label = "hospitality_carousel_offset_y"
     )
     val borderWidth by animateDpAsState(
-        targetValue = if (isActive) (if (isUltraCompact) 2.scaledDp() else if (isSmallScreen) 3.scaledDp() else 4.scaledDp()) else (if (isUltraCompact) 1.scaledDp() else if (isSmallScreen) 1.8f.scaledDp() else 2.5f.scaledDp()),
+        targetValue = if (isActive) {
+            if (isUltraCompact) 2.scaledDp() else if (isSmallScreen) 3.scaledDp() else 4.scaledDp()
+        } else {
+            if (carouselConfig.showInactiveBorder) carouselConfig.inactiveBorderWidth.dp else 0.dp
+        },
         animationSpec = if (lowEffectMode) tween(durationMillis = 0) else tween(durationMillis = 220),
         label = "hospitality_carousel_border_width"
     )
+    val inactiveBorderColorParsedNormal = parseArgbHexColor(carouselConfig.inactiveBorderColor, Color.White.copy(alpha = 0.45f))
     val borderColor by animateColorAsState(
-        targetValue = if (isActive) item.accent else Color.White.copy(alpha = 0.45f),
+        targetValue = if (isActive) item.accent else inactiveBorderColorParsedNormal,
         animationSpec = if (lowEffectMode) tween(durationMillis = 0) else tween(durationMillis = 220),
         label = "hospitality_carousel_border_color"
     )
+    val cardCornerBaseDp = carouselConfig.cardCornerRadius.scaledDp()
     val cornerRadius by animateDpAsState(
-        targetValue = if (isActive) (if (isUltraCompact) 10.scaledDp() else if (isSmallScreen) 16.scaledDp() else 24.scaledDp()) else (if (isUltraCompact) 8.scaledDp() else if (isSmallScreen) 12.scaledDp() else 18.scaledDp()),
+        targetValue = if (isActive) cardCornerBaseDp else (cardCornerBaseDp * 0.75f),
         animationSpec = if (lowEffectMode) tween(durationMillis = 0) else tween(durationMillis = 220),
         label = "hospitality_carousel_corner_radius"
     )
@@ -1662,13 +1755,15 @@ private fun HospitalityCarouselCard(
                 modifier = Modifier
                     .size(iconBoxSize)
                     .clip(cardShape)
-                    .background(
-                        Brush.verticalGradient(
-                            listOf(
-                                item.accent.copy(alpha = if (isActive) 0.42f else 0.12f),
-                                Color.Black.copy(alpha = if (isActive) 0.64f else 0.34f)
+                    .then(
+                        if (!item.disableGradient) Modifier.background(
+                            Brush.verticalGradient(
+                                listOf(
+                                    item.accent.copy(alpha = if (isActive) 0.42f else 0.12f),
+                                    Color.Black.copy(alpha = if (isActive) 0.64f else 0.34f)
+                                )
                             )
-                        )
+                        ) else Modifier
                     )
                     .border(
                         BorderStroke(
@@ -1678,7 +1773,7 @@ private fun HospitalityCarouselCard(
                         cardShape
                     )
                     .shadow(
-                        elevation = shadowElevation,
+                        elevation = if (item.disableGradient) 0.dp else shadowElevation,
                         shape = cardShape,
                         ambientColor = item.accent.copy(alpha = if (isActive) 0.80f else 0.14f),
                         spotColor = item.accent.copy(alpha = if (isActive) 0.95f else 0.18f)
@@ -1693,18 +1788,20 @@ private fun HospitalityCarouselCard(
                         .alpha(if (lowEffectMode) 0f else if (isActive) 0.42f else 0.18f),
                     contentScale = ContentScale.Crop
                 )
-                Box(
-                    modifier = Modifier
-                        .matchParentSize()
-                        .background(
-                            Brush.verticalGradient(
-                                listOf(
-                                    Color.White.copy(alpha = if (isActive) 0.14f else 0.05f),
-                                    Color.Black.copy(alpha = if (isActive) 0.46f else 0.58f)
+                if (!item.disableGradient) {
+                    Box(
+                        modifier = Modifier
+                            .matchParentSize()
+                            .background(
+                                Brush.verticalGradient(
+                                    listOf(
+                                        Color.White.copy(alpha = if (isActive) 0.14f else 0.05f),
+                                        Color.Black.copy(alpha = if (isActive) 0.46f else 0.58f)
+                                    )
                                 )
                             )
-                        )
-                )
+                    )
+                }
                 if (item.appIconDrawable != null) {
                     AndroidView(
                         factory = { ctx ->

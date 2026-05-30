@@ -135,6 +135,55 @@ export default function HomeExperienceForm({
   const [startScreen, setStartScreen] = useState<StartScreenValue>(config.startScreen)
   const [startScreenContentId, setStartScreenContentId] = useState<number | null>(config.startScreenContentId ?? null)
   const [menuHintText, setMenuHintText] = useState(config.menuHintText ?? '')
+
+  // Channel Browser config state
+  const cb = config.channelBrowser
+  const [cbGridColumns, setCbGridColumns] = useState(cb.gridColumns)
+  const [cbCardAspectRatio, setCbCardAspectRatio] = useState(cb.cardAspectRatio)
+  const [cbCardPadding, setCbCardPadding] = useState(cb.cardPadding)
+  const [cbLogoSize, setCbLogoSize] = useState(cb.logoSize)
+  const [cbLogoCornerRadius, setCbLogoCornerRadius] = useState(cb.logoCornerRadius)
+  const [cbCardBgColor, setCbCardBgColor] = useState(cb.cardBgColor)
+  const [cbCardBgFocusedColor, setCbCardBgFocusedColor] = useState(cb.cardBgFocusedColor)
+  const [cbCardBgCurrentColor, setCbCardBgCurrentColor] = useState(cb.cardBgCurrentColor)
+  const [cbBorderColor, setCbBorderColor] = useState(cb.borderColor)
+  const [cbBorderFocusedColor, setCbBorderFocusedColor] = useState(cb.borderFocusedColor)
+  const [cbChannelNameColor, setCbChannelNameColor] = useState(cb.channelNameColor)
+  const [cbChannelNumberColor, setCbChannelNumberColor] = useState(cb.channelNumberColor)
+  const [cbCategoryBadgeColor, setCbCategoryBadgeColor] = useState(cb.categoryBadgeColor)
+  const [cbCategoryBadgeTextColor, setCbCategoryBadgeTextColor] = useState(cb.categoryBadgeTextColor)
+  const [cbAccentColor, setCbAccentColor] = useState(cb.accentColor)
+  const [cbChannelNameSize, setCbChannelNameSize] = useState(cb.channelNameSize)
+  const [cbCategoryBadgeSize, setCbCategoryBadgeSize] = useState(cb.categoryBadgeSize)
+  const [cbShowCategoryBadge, setCbShowCategoryBadge] = useState(cb.showCategoryBadge)
+  const [cbShowChannelNumber, setCbShowChannelNumber] = useState(cb.showChannelNumber)
+  const [cbShowNowPlayingBadge, setCbShowNowPlayingBadge] = useState(cb.showNowPlayingBadge)
+
+  // Carousel config state
+  const cr = config.carousel
+  const [crCardCornerRadius, setCrCardCornerRadius] = useState(cr.cardCornerRadius)
+  const [crActiveCardScale, setCrActiveCardScale] = useState(cr.activeCardScale)
+  const [crInactiveCardScale, setCrInactiveCardScale] = useState(cr.inactiveCardScale)
+  const [crCardSpacing, setCrCardSpacing] = useState(cr.cardSpacing)
+  const [crShowInactiveBorder, setCrShowInactiveBorder] = useState(cr.showInactiveBorder)
+  const [crInactiveBorderColor, setCrInactiveBorderColor] = useState(cr.inactiveBorderColor)
+  const [crInactiveBorderWidth, setCrInactiveBorderWidth] = useState(cr.inactiveBorderWidth)
+  const [crShowInactiveGlow, setCrShowInactiveGlow] = useState(cr.showInactiveGlow)
+  const [crShowLabelBox, setCrShowLabelBox] = useState(cr.showLabelBox)
+  const [crLabelBoxBgColor, setCrLabelBoxBgColor] = useState(cr.labelBoxBgColor)
+  const [crLabelBoxCornerRadius, setCrLabelBoxCornerRadius] = useState(cr.labelBoxCornerRadius)
+  const [crLabelTitleColor, setCrLabelTitleColor] = useState(cr.labelTitleColor)
+  const [crLabelSubtitleColor, setCrLabelSubtitleColor] = useState(cr.labelSubtitleColor)
+  const [crLabelTitleSize, setCrLabelTitleSize] = useState(cr.labelTitleSize)
+  const [crLabelSubtitleSize, setCrLabelSubtitleSize] = useState(cr.labelSubtitleSize)
+  const [crShowArrows, setCrShowArrows] = useState(cr.showArrows)
+  const [crArrowColor, setCrArrowColor] = useState(cr.arrowColor)
+  const [crArrowBgColor, setCrArrowBgColor] = useState(cr.arrowBgColor)
+  const [crShowDots, setCrShowDots] = useState(cr.showDots)
+  const [crDotActiveColor, setCrDotActiveColor] = useState(cr.dotActiveColor)
+  const [crDotInactiveColor, setCrDotInactiveColor] = useState(cr.dotInactiveColor)
+  const [crShowHintText, setCrShowHintText] = useState(cr.showHintText)
+
   const [expandedSections, setExpandedSections] = useState<Record<string, Record<string, boolean>>>({})
   const [enabledSections, setEnabledSections] = useState<Record<string, Record<string, boolean>>>({})
   const [iconPickerMenuId, setIconPickerMenuId] = useState<string | null>(null)
@@ -149,6 +198,8 @@ export default function HomeExperienceForm({
     overlays: false,
     sound: false,
     displayScale: false,
+    channelBrowser: false,
+    carousel: false,
     livePreview: false,
   })
 
@@ -554,6 +605,21 @@ export default function HomeExperienceForm({
                             hint={BACKGROUND_HINT}
                             kind="image"
                           />
+                          <div className="flex items-center justify-between rounded-xl border border-border bg-muted/30 px-4 py-3">
+                            <div>
+                              <p className="text-xs font-semibold text-foreground">Nonaktifkan Gradient Carousel</p>
+                              <p className="text-[10px] text-muted-foreground mt-0.5">Hapus gradient gelap di belakang card ini agar background terlihat transparan penuh.</p>
+                            </div>
+                            <button
+                              type="button"
+                              role="switch"
+                              aria-checked={menu.disableGradient ?? false}
+                              onClick={() => updateMenu(setMenus, menu.id, { disableGradient: !(menu.disableGradient ?? false) })}
+                              className={`relative ml-4 h-6 w-11 flex-shrink-0 rounded-full border-2 transition-colors duration-200 focus:outline-none ${(menu.disableGradient ?? false) ? 'border-primary bg-primary' : 'border-muted-foreground/30 bg-muted'}`}
+                            >
+                              <span className={`block h-4 w-4 rounded-full bg-white shadow transition-transform duration-200 ${(menu.disableGradient ?? false) ? 'translate-x-5' : 'translate-x-0.5'}`} />
+                            </button>
+                          </div>
                         </div>
                       )}
                     </>
@@ -646,6 +712,40 @@ export default function HomeExperienceForm({
                               </label>
                             </div>
                           )}
+                          {menu.type === 'tv' && (
+                            <div className="md:col-span-2 space-y-3">
+                              <Field label="Behavior Klik TV Channel" wide>
+                                <select
+                                  value={menu.tvClickBehavior ?? 'channel_list'}
+                                  onChange={(e) => updateMenu(setMenus, menu.id, { tvClickBehavior: e.target.value as 'channel_list' | 'last_played' | 'by_number' | 'most_played' })}
+                                  className="field-input py-2 w-full"
+                                >
+                                  <option value="channel_list">Buka Daftar Saluran (default)</option>
+                                  <option value="last_played">Putar Channel Terakhir Ditonton</option>
+                                  <option value="most_played">Putar Channel Terpopuler (paling sering)</option>
+                                  <option value="by_number">Putar Channel by Nomor Urut</option>
+                                </select>
+                                <p className="mt-1 text-[10px] text-muted-foreground">
+                                  Atur apa yang terjadi saat tombol TV Channel ditekan di home screen.
+                                </p>
+                              </Field>
+                              {(menu.tvClickBehavior ?? 'channel_list') === 'by_number' && (
+                                <Field label="Nomor Urut Channel" wide>
+                                  <input
+                                    type="number"
+                                    min={1}
+                                    max={9999}
+                                    value={menu.tvClickChannelNumber ?? 1}
+                                    onChange={(e) => updateMenu(setMenus, menu.id, { tvClickChannelNumber: Math.max(1, Number.parseInt(e.target.value, 10) || 1) })}
+                                    className="field-input"
+                                  />
+                                  <p className="mt-1 text-[10px] text-muted-foreground">
+                                    Nomor urut channel dari playlist (1 = channel pertama). Aman dipakai cross-device karena berdasarkan urutan, bukan ID spesifik.
+                                  </p>
+                                </Field>
+                              )}
+                            </div>
+                          )}
                           <div className="space-y-3">
                             <ToggleInline checked={menu.isPinned || false} onChange={(checked) => updateMenu(setMenus, menu.id, { isPinned: checked })} title="Pinned ⭐" description="Pin menu ke posisi teratas" />
                           </div>
@@ -725,6 +825,19 @@ export default function HomeExperienceForm({
           expanded={topLevelExpanded.overlays}
           onToggleExpanded={(expanded) => setTopLevelExpanded(prev => ({ ...prev, overlays: expanded }))}
         >
+          <div className="mb-5 border-b border-border pb-5">
+            <label className="mb-1.5 block text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Teks Hint Menu</label>
+            <p className="text-[10px] text-muted-foreground mb-2">Teks kecil di bawah carousel menu home screen. Kosongkan untuk menyembunyikan.</p>
+            <input type="hidden" name="menuHintText" value={menuHintText} />
+            <input
+              type="text"
+              value={menuHintText}
+              onChange={(e) => setMenuHintText(e.target.value)}
+              className="field-input w-full"
+              placeholder="Gunakan kiri/kanan remote untuk memutar menu..."
+            />
+          </div>
+
           <div className="flex items-center justify-end gap-4 mb-4">
             <button
               type="button"
@@ -925,6 +1038,284 @@ export default function HomeExperienceForm({
         </CollapsibleSection>
 
         <CollapsibleSection
+          id="carousel"
+          title="Carousel Menu"
+          description="Kustomisasi tampilan carousel menu home screen — ukuran card, label, arrows, dots, dan global non-selected state."
+          expanded={topLevelExpanded.carousel}
+          onToggleExpanded={(expanded) => setTopLevelExpanded(prev => ({ ...prev, carousel: expanded }))}
+        >
+          <input type="hidden" name="carouselJson" value={JSON.stringify({
+            cardCornerRadius: crCardCornerRadius,
+            activeCardScale: crActiveCardScale,
+            inactiveCardScale: crInactiveCardScale,
+            cardSpacing: crCardSpacing,
+            showInactiveBorder: crShowInactiveBorder,
+            inactiveBorderColor: crInactiveBorderColor,
+            inactiveBorderWidth: crInactiveBorderWidth,
+            showInactiveGlow: crShowInactiveGlow,
+            showLabelBox: crShowLabelBox,
+            labelBoxBgColor: crLabelBoxBgColor,
+            labelBoxCornerRadius: crLabelBoxCornerRadius,
+            labelTitleColor: crLabelTitleColor,
+            labelSubtitleColor: crLabelSubtitleColor,
+            labelTitleSize: crLabelTitleSize,
+            labelSubtitleSize: crLabelSubtitleSize,
+            showArrows: crShowArrows,
+            arrowColor: crArrowColor,
+            arrowBgColor: crArrowBgColor,
+            showDots: crShowDots,
+            dotActiveColor: crDotActiveColor,
+            dotInactiveColor: crDotInactiveColor,
+            showHintText: crShowHintText,
+          })} />
+
+          <div className="space-y-5">
+            <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Card Shape &amp; Size</p>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+              <div className="form-group">
+                <label>Corner Radius (dp)</label>
+                <input type="number" min={0} max={64} value={crCardCornerRadius} onChange={(e) => setCrCardCornerRadius(Number(e.target.value))} className="field-input" />
+              </div>
+              <div className="form-group">
+                <label>Scale Card Aktif</label>
+                <div className="flex items-center gap-3">
+                  <input type="range" min={0.5} max={2.0} step={0.01} value={crActiveCardScale} onChange={(e) => setCrActiveCardScale(Number(e.target.value))} className="flex-1 accent-primary" />
+                  <span className="text-sm font-bold w-12 text-right">{crActiveCardScale.toFixed(2)}</span>
+                </div>
+              </div>
+              <div className="form-group">
+                <label>Scale Card Non-Aktif</label>
+                <div className="flex items-center gap-3">
+                  <input type="range" min={0.3} max={1.5} step={0.01} value={crInactiveCardScale} onChange={(e) => setCrInactiveCardScale(Number(e.target.value))} className="flex-1 accent-primary" />
+                  <span className="text-sm font-bold w-12 text-right">{crInactiveCardScale.toFixed(2)}</span>
+                </div>
+              </div>
+              <div className="form-group">
+                <label>Jarak Antar Card (dp)</label>
+                <input type="number" min={0} max={64} value={crCardSpacing} onChange={(e) => setCrCardSpacing(Number(e.target.value))} className="field-input" />
+              </div>
+            </div>
+
+            <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground border-t border-border pt-4">Non-Selected Global</p>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              {([
+                ['Border Non-Selected', crInactiveBorderColor, setCrInactiveBorderColor],
+                ['Arrow Color', crArrowColor, setCrArrowColor],
+                ['Arrow Background', crArrowBgColor, setCrArrowBgColor],
+                ['Dot Aktif', crDotActiveColor, setCrDotActiveColor],
+                ['Dot Non-Aktif', crDotInactiveColor, setCrDotInactiveColor],
+              ] as [string, string, (v: string) => void][]).map(([label, value, setter]) => (
+                <div key={label} className="form-group">
+                  <label className="text-[10px]">{label}</label>
+                  <input type="text" value={value} onChange={(e) => setter(e.target.value.toUpperCase())} className="field-input font-mono text-xs" placeholder="#AARRGGBB" />
+                </div>
+              ))}
+              <div className="form-group">
+                <label className="text-[10px]">Lebar Border Non-Selected (dp)</label>
+                <input type="number" min={0} max={8} value={crInactiveBorderWidth} onChange={(e) => setCrInactiveBorderWidth(Number(e.target.value))} className="field-input" />
+              </div>
+            </div>
+            <div className="space-y-3">
+              {([
+                ['Tampilkan Border Non-Selected', crShowInactiveBorder, setCrShowInactiveBorder],
+                ['Tampilkan Glow Non-Selected', crShowInactiveGlow, setCrShowInactiveGlow],
+                ['Tampilkan Arrows', crShowArrows, setCrShowArrows],
+                ['Tampilkan Dots', crShowDots, setCrShowDots],
+                ['Tampilkan Hint Text', crShowHintText, setCrShowHintText],
+              ] as [string, boolean, (v: boolean) => void][]).map(([label, value, setter]) => (
+                <div key={label} className="flex items-center justify-between rounded-xl border border-border bg-muted/30 px-4 py-3">
+                  <p className="text-xs font-semibold text-foreground">{label}</p>
+                  <button type="button" role="switch" aria-checked={value} onClick={() => setter(!value)}
+                    className={`relative ml-4 h-6 w-11 flex-shrink-0 rounded-full border-2 transition-colors duration-200 focus:outline-none ${value ? 'border-primary bg-primary' : 'border-muted-foreground/30 bg-muted'}`}>
+                    <span className={`block h-4 w-4 rounded-full bg-white shadow transition-transform duration-200 ${value ? 'translate-x-5' : 'translate-x-0.5'}`} />
+                  </button>
+                </div>
+              ))}
+            </div>
+
+            <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground border-t border-border pt-4">Label Box (TV CHANNEL / Live TV)</p>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              <div className="form-group">
+                <label className="text-[10px]">Background Label</label>
+                <input type="text" value={crLabelBoxBgColor} onChange={(e) => setCrLabelBoxBgColor(e.target.value.toUpperCase())} className="field-input font-mono text-xs" placeholder="#AARRGGBB" />
+              </div>
+              <div className="form-group">
+                <label className="text-[10px]">Warna Judul</label>
+                <input type="text" value={crLabelTitleColor} onChange={(e) => setCrLabelTitleColor(e.target.value.toUpperCase())} className="field-input font-mono text-xs" placeholder="#AARRGGBB" />
+              </div>
+              <div className="form-group">
+                <label className="text-[10px]">Warna Subtitle</label>
+                <input type="text" value={crLabelSubtitleColor} onChange={(e) => setCrLabelSubtitleColor(e.target.value.toUpperCase())} className="field-input font-mono text-xs" placeholder="#AARRGGBB" />
+              </div>
+              <div className="form-group">
+                <label className="text-[10px]">Corner Radius Label (dp)</label>
+                <input type="number" min={0} max={64} value={crLabelBoxCornerRadius} onChange={(e) => setCrLabelBoxCornerRadius(Number(e.target.value))} className="field-input" />
+              </div>
+              <div className="form-group">
+                <label className="text-[10px]">Font Size Judul (sp)</label>
+                <div className="flex items-center gap-3">
+                  <input type="range" min={8} max={40} step={1} value={crLabelTitleSize} onChange={(e) => setCrLabelTitleSize(Number(e.target.value))} className="flex-1 accent-primary" />
+                  <span className="text-sm font-bold w-8 text-right">{crLabelTitleSize}</span>
+                </div>
+              </div>
+              <div className="form-group">
+                <label className="text-[10px]">Font Size Subtitle (sp)</label>
+                <div className="flex items-center gap-3">
+                  <input type="range" min={6} max={32} step={1} value={crLabelSubtitleSize} onChange={(e) => setCrLabelSubtitleSize(Number(e.target.value))} className="flex-1 accent-primary" />
+                  <span className="text-sm font-bold w-8 text-right">{crLabelSubtitleSize}</span>
+                </div>
+              </div>
+            </div>
+            <div className="space-y-3">
+              <div className="flex items-center justify-between rounded-xl border border-border bg-muted/30 px-4 py-3">
+                <p className="text-xs font-semibold text-foreground">Tampilkan Label Box</p>
+                <button type="button" role="switch" aria-checked={crShowLabelBox} onClick={() => setCrShowLabelBox(!crShowLabelBox)}
+                  className={`relative ml-4 h-6 w-11 flex-shrink-0 rounded-full border-2 transition-colors duration-200 focus:outline-none ${crShowLabelBox ? 'border-primary bg-primary' : 'border-muted-foreground/30 bg-muted'}`}>
+                  <span className={`block h-4 w-4 rounded-full bg-white shadow transition-transform duration-200 ${crShowLabelBox ? 'translate-x-5' : 'translate-x-0.5'}`} />
+                </button>
+              </div>
+            </div>
+          </div>
+        </CollapsibleSection>
+
+        <CollapsibleSection
+          id="channelBrowser"
+          title="Daftar Saluran"
+          description="Kustomisasi tampilan grid channel browser — warna, ukuran logo, jumlah kolom, dan elemen UI."
+          expanded={topLevelExpanded.channelBrowser}
+          onToggleExpanded={(expanded) => setTopLevelExpanded(prev => ({ ...prev, channelBrowser: expanded }))}
+        >
+          <input type="hidden" name="channelBrowserJson" value={JSON.stringify({
+            gridColumns: cbGridColumns,
+            cardAspectRatio: cbCardAspectRatio,
+            cardPadding: cbCardPadding,
+            logoSize: cbLogoSize,
+            logoCornerRadius: cbLogoCornerRadius,
+            cardBgColor: cbCardBgColor,
+            cardBgFocusedColor: cbCardBgFocusedColor,
+            cardBgCurrentColor: cbCardBgCurrentColor,
+            borderColor: cbBorderColor,
+            borderFocusedColor: cbBorderFocusedColor,
+            channelNameColor: cbChannelNameColor,
+            channelNumberColor: cbChannelNumberColor,
+            categoryBadgeColor: cbCategoryBadgeColor,
+            categoryBadgeTextColor: cbCategoryBadgeTextColor,
+            accentColor: cbAccentColor,
+            channelNameSize: cbChannelNameSize,
+            categoryBadgeSize: cbCategoryBadgeSize,
+            showCategoryBadge: cbShowCategoryBadge,
+            showChannelNumber: cbShowChannelNumber,
+            showNowPlayingBadge: cbShowNowPlayingBadge,
+          })} />
+
+          {/* Grid & Proporsi */}
+          <div className="space-y-5">
+            <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Grid &amp; Proporsi</p>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+              <div className="form-group">
+                <label>Jumlah Kolom</label>
+                <input type="number" min={0} max={10} value={cbGridColumns} onChange={(e) => setCbGridColumns(Number(e.target.value))} className="field-input" />
+                <span className="form-hint">0 = auto (berdasarkan lebar layar). 2–6 untuk override manual.</span>
+              </div>
+              <div className="form-group">
+                <label>Aspect Ratio Card</label>
+                <div className="flex items-center gap-3">
+                  <input type="range" min={0.5} max={2.0} step={0.05} value={cbCardAspectRatio} onChange={(e) => setCbCardAspectRatio(Number(e.target.value))} className="flex-1 accent-primary" />
+                  <span className="text-sm font-bold text-foreground w-12 text-right">{cbCardAspectRatio.toFixed(2)}</span>
+                </div>
+                <span className="form-hint">0.85 = portrait (lebih tinggi). 1.0 = kotak. 1.3 = landscape.</span>
+              </div>
+              <div className="form-group">
+                <label>Padding Card (dp)</label>
+                <input type="number" min={0} max={32} value={cbCardPadding} onChange={(e) => setCbCardPadding(Number(e.target.value))} className="field-input" />
+                <span className="form-hint">Jarak antar card. Default: 6.</span>
+              </div>
+              <div className="form-group">
+                <label>Ukuran Logo (dp)</label>
+                <input type="number" min={32} max={200} value={cbLogoSize} onChange={(e) => setCbLogoSize(Number(e.target.value))} className="field-input" />
+                <span className="form-hint">Default: 88.</span>
+              </div>
+              <div className="form-group">
+                <label>Corner Radius Logo (dp)</label>
+                <input type="number" min={0} max={50} value={cbLogoCornerRadius} onChange={(e) => setCbLogoCornerRadius(Number(e.target.value))} className="field-input" />
+                <span className="form-hint">Default: 14.</span>
+              </div>
+            </div>
+
+            {/* Ukuran Teks */}
+            <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground border-t border-border pt-4">Ukuran Teks</p>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+              <div className="form-group">
+                <label>Nama Channel (sp)</label>
+                <div className="flex items-center gap-3">
+                  <input type="range" min={8} max={32} step={1} value={cbChannelNameSize} onChange={(e) => setCbChannelNameSize(Number(e.target.value))} className="flex-1 accent-primary" />
+                  <span className="text-sm font-bold text-foreground w-8 text-right">{cbChannelNameSize}</span>
+                </div>
+              </div>
+              <div className="form-group">
+                <label>Badge Kategori (sp)</label>
+                <div className="flex items-center gap-3">
+                  <input type="range" min={6} max={20} step={1} value={cbCategoryBadgeSize} onChange={(e) => setCbCategoryBadgeSize(Number(e.target.value))} className="flex-1 accent-primary" />
+                  <span className="text-sm font-bold text-foreground w-8 text-right">{cbCategoryBadgeSize}</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Warna */}
+            <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground border-t border-border pt-4">Warna</p>
+            <p className="text-[10px] text-muted-foreground -mt-3">Format #RRGGBB atau #AARRGGBB (dengan alpha). Contoh: #29FFE9A6 = kuning 16% opacity.</p>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              {([
+                ['Background Card (normal)', cbCardBgColor, setCbCardBgColor],
+                ['Background Card (focused)', cbCardBgFocusedColor, setCbCardBgFocusedColor],
+                ['Background Card (sedang diputar)', cbCardBgCurrentColor, setCbCardBgCurrentColor],
+                ['Border (normal)', cbBorderColor, setCbBorderColor],
+                ['Border (focused)', cbBorderFocusedColor, setCbBorderFocusedColor],
+                ['Nama Channel', cbChannelNameColor, setCbChannelNameColor],
+                ['Nomor Channel', cbChannelNumberColor, setCbChannelNumberColor],
+                ['Background Badge Kategori', cbCategoryBadgeColor, setCbCategoryBadgeColor],
+                ['Teks Badge Kategori', cbCategoryBadgeTextColor, setCbCategoryBadgeTextColor],
+                ['Accent (focused glow)', cbAccentColor, setCbAccentColor],
+              ] as [string, string, (v: string) => void][]).map(([label, value, setter]) => (
+                <div key={label} className="form-group">
+                  <label className="text-[10px]">{label}</label>
+                  <input
+                    type="text"
+                    value={value}
+                    onChange={(e) => setter(e.target.value.toUpperCase())}
+                    className="field-input font-mono text-xs"
+                    placeholder="#AARRGGBB"
+                  />
+                </div>
+              ))}
+            </div>
+
+            {/* Toggle Elemen UI */}
+            <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground border-t border-border pt-4">Elemen UI</p>
+            <div className="space-y-3">
+              {([
+                ['Tampilkan Badge Kategori', cbShowCategoryBadge, setCbShowCategoryBadge],
+                ['Tampilkan Nomor Channel', cbShowChannelNumber, setCbShowChannelNumber],
+                ['Tampilkan Badge Sedang Diputar', cbShowNowPlayingBadge, setCbShowNowPlayingBadge],
+              ] as [string, boolean, (v: boolean) => void][]).map(([label, value, setter]) => (
+                <div key={label} className="flex items-center justify-between rounded-xl border border-border bg-muted/30 px-4 py-3">
+                  <p className="text-xs font-semibold text-foreground">{label}</p>
+                  <button
+                    type="button"
+                    role="switch"
+                    aria-checked={value}
+                    onClick={() => setter(!value)}
+                    className={`relative ml-4 h-6 w-11 flex-shrink-0 rounded-full border-2 transition-colors duration-200 focus:outline-none ${value ? 'border-primary bg-primary' : 'border-muted-foreground/30 bg-muted'}`}
+                  >
+                    <span className={`block h-4 w-4 rounded-full bg-white shadow transition-transform duration-200 ${value ? 'translate-x-5' : 'translate-x-0.5'}`} />
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+        </CollapsibleSection>
+
+        <CollapsibleSection
           id="livePreview"
           title="Live Preview"
           description="Preview cepat untuk splash dan menu berdasarkan state editor saat ini."
@@ -996,21 +1387,6 @@ export default function HomeExperienceForm({
               </select>
             </div>
           )}
-        </div>
-
-        <div className="border-t border-border pt-5 space-y-3">
-          <div>
-            <label className="mb-1.5 block text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Teks Hint Menu</label>
-            <p className="text-[10px] text-muted-foreground mb-2">Teks kecil di bawah carousel menu home screen. Kosongkan untuk menyembunyikan.</p>
-            <input type="hidden" name="menuHintText" value={menuHintText} />
-            <input
-              type="text"
-              value={menuHintText}
-              onChange={(e) => setMenuHintText(e.target.value)}
-              className="field-input w-full"
-              placeholder="Gunakan kiri/kanan remote untuk memutar menu..."
-            />
-          </div>
         </div>
 
         <div className="flex flex-col sm:flex-row gap-3 border-t border-border pt-6">

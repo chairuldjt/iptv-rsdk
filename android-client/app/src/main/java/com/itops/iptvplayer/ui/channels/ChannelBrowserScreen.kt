@@ -28,6 +28,7 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
@@ -49,9 +50,24 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
+import com.itops.iptvplayer.IptvApplication
+import com.itops.iptvplayer.util.HomeExperienceParser
 import com.itops.iptvplayer.R
 import com.itops.iptvplayer.data.cache.ChannelEntity
 import com.itops.iptvplayer.ui.player.PlayerViewModel
+import com.itops.iptvplayer.util.ChannelBrowserConfig
+
+/** Parse #RRGGBB atau #AARRGGBB ke Compose Color. Fallback ke [default] jika gagal. */
+private fun parseArgbHex(hex: String, default: Color): Color {
+    return try {
+        val clean = hex.trimStart('#')
+        when (clean.length) {
+            6 -> Color(android.graphics.Color.parseColor("#FF$clean"))
+            8 -> Color(android.graphics.Color.parseColor("#$clean"))
+            else -> default
+        }
+    } catch (_: Exception) { default }
+}
 
 private fun isFallbackCategoryName(category: String): Boolean {
     val normalized = category.trim().lowercase()
@@ -69,6 +85,11 @@ fun ChannelBrowserScreen(
     onNavigateToSettings: (Int) -> Unit,
     playerViewModel: PlayerViewModel = viewModel()
 ) {
+    val context = LocalContext.current
+    val app = context.applicationContext as IptvApplication
+    val homeExperienceJson by app.dataStoreManager.homeExperienceJsonFlow.collectAsState(initial = "")
+    val homeExperience = remember(homeExperienceJson) { HomeExperienceParser.parse(homeExperienceJson) }
+
     val channels by playerViewModel.channels.collectAsState()
     val categories by playerViewModel.categories.collectAsState()
     val isLoading by playerViewModel.isLoading.collectAsState()
@@ -105,7 +126,8 @@ fun ChannelBrowserScreen(
     // Responsive grid column count based on screen width
     val configuration = LocalConfiguration.current
     val screenWidthDp = configuration.screenWidthDp
-    val gridColumns = when {
+    val cb = homeExperience.channelBrowser
+    val gridColumns = if (cb.gridColumns > 0) cb.gridColumns else when {
         screenWidthDp >= 1200 -> 5
         screenWidthDp >= 900 -> 4
         screenWidthDp >= 600 -> 3
@@ -229,14 +251,25 @@ fun ChannelBrowserScreen(
                 Color(0xFF050B12)
             )
     ) {
-        Image(
-            painter = painterResource(id = R.drawable.home_bg_tv),
-            contentDescription = null,
-            modifier = Modifier
-                .fillMaxSize()
-                .alpha(0.46f),
-            contentScale = ContentScale.Crop
-        )
+        if (homeExperience.homeBackgroundUrl.isNotBlank()) {
+            AsyncImage(
+                model = homeExperience.homeBackgroundUrl,
+                contentDescription = null,
+                modifier = Modifier
+                    .fillMaxSize()
+                    .alpha(0.46f),
+                contentScale = ContentScale.Crop
+            )
+        } else {
+            Image(
+                painter = painterResource(id = R.drawable.home_bg_tv),
+                contentDescription = null,
+                modifier = Modifier
+                    .fillMaxSize()
+                    .alpha(0.46f),
+                contentScale = ContentScale.Crop
+            )
+        }
         Box(
             modifier = Modifier
                 .fillMaxSize()
@@ -472,6 +505,7 @@ fun ChannelBrowserScreen(
                             isCurrent = channel.id == selectedChannel?.id,
                             showCategory = showCategoryFilter,
                             serverUrl = serverUrl,
+                            config = cb,
                             onClick = { onChannelSelected(channel.id) }
                         )
                     }
@@ -543,6 +577,7 @@ fun ChannelGridCard(
     isCurrent: Boolean = false,
     showCategory: Boolean = true,
     serverUrl: String,
+    config: ChannelBrowserConfig = ChannelBrowserConfig(),
     onClick: () -> Unit
 ) {
     var hasRealFocus by remember { mutableStateOf(false) }
@@ -552,68 +587,92 @@ fun ChannelGridCard(
         animationSpec = tween(150),
         label = "card_scale"
     )
-    val borderColor by animateColorAsState(
-        targetValue = if (isFocused) Color.White else Color.White.copy(alpha = 0.16f),
-        animationSpec = tween(200),
-        label = "card_border"
-    )
+
+    val cardBgNormal = remember(config.cardBgColor) { parseArgbHex(config.cardBgColor, Color.Black.copy(alpha = 0.18f)) }
+    val cardBgFocused = remember(config.cardBgFocusedColor) { parseArgbHex(config.cardBgFocusedColor, Color(0xFFFFE9A6).copy(alpha = 0.16f)) }
+    val cardBgCurrent = remember(config.cardBgCurrentColor) { parseArgbHex(config.cardBgCurrentColor, Color(0xFF7DD3FC).copy(alpha = 0.14f)) }
+    val borderNormal = remember(config.borderColor) { parseArgbHex(config.borderColor, Color.White.copy(alpha = 0.16f)) }
+    val borderFocused = remember(config.borderFocusedColor) { parseArgbHex(config.borderFocusedColor, Color.White) }
+    val nameColor = remember(config.channelNameColor) { parseArgbHex(config.channelNameColor, Color.White) }
+    val numberColor = remember(config.channelNumberColor) { parseArgbHex(config.channelNumberColor, Color(0xFFFFE9A6)) }
+    val badgeBgColor = remember(config.categoryBadgeColor) { parseArgbHex(config.categoryBadgeColor, Color(0xFFFFE9A6).copy(alpha = 0.11f)) }
+    val badgeTextColor = remember(config.categoryBadgeTextColor) { parseArgbHex(config.categoryBadgeTextColor, Color(0xFFFFE9A6)) }
+    val accentColor = remember(config.accentColor) { parseArgbHex(config.accentColor, Color(0xFFFFE9A6)) }
+
     val bgColor by animateColorAsState(
         targetValue = when {
-            isFocused -> Color(0xFFFFE9A6).copy(alpha = 0.16f)
-            isCurrent -> Color(0xFF7DD3FC).copy(alpha = 0.14f)
-            else -> Color.Black.copy(alpha = 0.36f)
+            isFocused -> cardBgFocused
+            isCurrent -> cardBgCurrent
+            else -> cardBgNormal
         },
         animationSpec = tween(200),
         label = "card_bg"
     )
+    val borderColor by animateColorAsState(
+        targetValue = when {
+            isFocused -> borderFocused
+            isCurrent && !isFocused -> accentColor.copy(alpha = 0.28f)
+            else -> borderNormal
+        },
+        animationSpec = tween(200),
+        label = "card_border"
+    )
+
+    val logoSize = config.logoSize.dp
+    val logoCorner = config.logoCornerRadius.dp
+    val cardPadding = config.cardPadding.dp
 
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .aspectRatio(1.3f)
-            .padding(4.dp)
-            .scale(scale)
-            .shadow(
-                elevation = if (isFocused) 24.dp else 2.dp,
-                shape = RoundedCornerShape(14.dp),
-                ambientColor = Color.White.copy(alpha = if (isFocused) 0.9f else 0f),
-                spotColor = Color.White.copy(alpha = if (isFocused) 0.9f else 0f)
-            )
+            .aspectRatio(config.cardAspectRatio)
+            .padding(cardPadding)
+            .graphicsLayer {
+                scaleX = scale
+                scaleY = scale
+                clip = false
+            }
             .focusable()
             .onFocusChanged { hasRealFocus = it.isFocused }
             .clickable { onClick() },
         colors = CardDefaults.cardColors(containerColor = bgColor),
         shape = RoundedCornerShape(14.dp),
+        elevation = CardDefaults.cardElevation(
+            defaultElevation = if (isFocused) 24.dp else 2.dp,
+            focusedElevation = 24.dp
+        ),
         border = BorderStroke(
             width = if (isFocused) 3.dp else 1.dp,
-            color = if (isCurrent && !isFocused) Color(0xFFFFE9A6).copy(alpha = 0.28f) else borderColor
+            color = borderColor
         )
     ) {
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(14.dp),
+                .padding(horizontal = 8.dp, vertical = 10.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center
         ) {
-            Box(
-                modifier = Modifier
-                    .align(Alignment.End)
-                    .clip(RoundedCornerShape(999.dp))
-                    .background(Color.Black.copy(alpha = 0.34f))
-                    .border(1.dp, Color.White.copy(alpha = 0.14f), RoundedCornerShape(999.dp))
-                    .padding(horizontal = 8.dp, vertical = 3.dp)
-            ) {
-                Text(
-                    text = channelNumber.toString().padStart(2, '0'),
-                    color = Color(0xFFFFE9A6),
-                    fontSize = 10.sp,
-                    fontWeight = FontWeight.ExtraBold,
-                    maxLines = 1
-                )
+            // Channel Number Badge
+            if (config.showChannelNumber) {
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.End)
+                        .clip(RoundedCornerShape(999.dp))
+                        .background(Color.Black.copy(alpha = 0.34f))
+                        .border(1.dp, Color.White.copy(alpha = 0.14f), RoundedCornerShape(999.dp))
+                        .padding(horizontal = 8.dp, vertical = 3.dp)
+                ) {
+                    Text(
+                        text = channelNumber.toString().padStart(2, '0'),
+                        color = numberColor,
+                        fontSize = 10.sp,
+                        fontWeight = FontWeight.ExtraBold,
+                        maxLines = 1
+                    )
+                }
+                Spacer(modifier = Modifier.height(2.dp))
             }
-
-            Spacer(modifier = Modifier.height(2.dp))
 
             // Channel Logo
             val resolvedLogo = com.itops.iptvplayer.util.LogoResolver.getEffectiveLogoUrl(
@@ -623,8 +682,8 @@ fun ChannelGridCard(
             )
             if (!resolvedLogo.isNullOrEmpty()) {
                 Card(
-                    modifier = Modifier.size(56.dp),
-                    shape = RoundedCornerShape(10.dp),
+                    modifier = Modifier.size(logoSize),
+                    shape = RoundedCornerShape(logoCorner),
                     colors = CardDefaults.cardColors(containerColor = Color.White)
                 ) {
                     AsyncImage(
@@ -632,31 +691,31 @@ fun ChannelGridCard(
                         contentDescription = channel.name,
                         modifier = Modifier
                             .fillMaxSize()
-                            .padding(6.dp),
+                            .padding(8.dp),
                         contentScale = ContentScale.Fit
                     )
                 }
             } else {
                 Box(
                     modifier = Modifier
-                        .size(56.dp)
-                        .clip(RoundedCornerShape(10.dp))
+                        .size(logoSize)
+                        .clip(RoundedCornerShape(logoCorner))
                         .background(
                             Brush.linearGradient(
                                 colors = listOf(
-                                    Color(0xFFFFE9A6).copy(alpha = 0.24f),
+                                    accentColor.copy(alpha = 0.24f),
                                     Color(0xFF7DD3FC).copy(alpha = 0.18f)
                                 )
                             )
                         )
-                        .border(1.dp, Color.White.copy(alpha = 0.22f), RoundedCornerShape(10.dp)),
+                        .border(1.dp, Color.White.copy(alpha = 0.22f), RoundedCornerShape(logoCorner)),
                     contentAlignment = Alignment.Center
                 ) {
                     Text(
                         text = channel.name.take(2).uppercase(),
                         color = Color.White,
                         fontWeight = FontWeight.ExtraBold,
-                        fontSize = 16.sp
+                        fontSize = 20.sp
                     )
                 }
             }
@@ -666,29 +725,28 @@ fun ChannelGridCard(
             // Channel Name
             Text(
                 text = channel.name,
-                color = Color.White,
+                color = nameColor,
                 fontWeight = FontWeight.Bold,
-                fontSize = 13.sp,
+                fontSize = config.channelNameSize.sp,
                 maxLines = 2,
                 overflow = TextOverflow.Ellipsis,
                 textAlign = TextAlign.Center,
-                lineHeight = 16.sp
+                lineHeight = (config.channelNameSize + 3).sp
             )
 
-            if (showCategory) {
+            // Category Badge
+            if (showCategory && config.showCategoryBadge) {
                 Spacer(modifier = Modifier.height(4.dp))
-
-                // Category Badge
                 Box(
                     modifier = Modifier
                         .clip(RoundedCornerShape(6.dp))
-                        .background(Color(0xFFFFE9A6).copy(alpha = 0.11f))
+                        .background(badgeBgColor)
                         .padding(horizontal = 8.dp, vertical = 3.dp)
                 ) {
                     Text(
                         text = channel.groupName,
-                        color = Color(0xFFFFE9A6),
-                        fontSize = 9.sp,
+                        color = badgeTextColor,
+                        fontSize = config.categoryBadgeSize.sp,
                         fontWeight = FontWeight.SemiBold,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
@@ -696,17 +754,18 @@ fun ChannelGridCard(
                 }
             }
 
-            if (isCurrent) {
+            // Now Playing Badge
+            if (isCurrent && config.showNowPlayingBadge) {
                 Spacer(modifier = Modifier.height(5.dp))
                 Box(
                     modifier = Modifier
                         .clip(RoundedCornerShape(999.dp))
-                        .background(Color(0xFFFFE9A6).copy(alpha = 0.14f))
+                        .background(accentColor.copy(alpha = 0.14f))
                         .padding(horizontal = 8.dp, vertical = 3.dp)
                 ) {
                     Text(
                         text = "SEDANG DIPUTAR",
-                        color = Color(0xFFFFE9A6),
+                        color = accentColor,
                         fontSize = 8.sp,
                         fontWeight = FontWeight.ExtraBold,
                         maxLines = 1

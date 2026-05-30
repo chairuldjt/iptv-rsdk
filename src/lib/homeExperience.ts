@@ -36,6 +36,9 @@ export type HomeExperienceMenuItem = {
   useAppIcon?: boolean
   sortOrder: number
   isPinned?: boolean
+  disableGradient?: boolean
+  tvClickBehavior?: 'channel_list' | 'last_played' | 'by_number' | 'most_played'
+  tvClickChannelNumber?: number
   badge?: {
     text: string
     color: string
@@ -96,6 +99,70 @@ export const HOME_OVERLAY_POSITIONS: readonly HomeOverlayPosition[] = [
   'bottom-left', 'bottom-center', 'bottom-right',
 ]
 
+export type CarouselConfig = {
+  // Card shape & size
+  cardCornerRadius: number       // dp
+  activeCardScale: number        // e.g. 1.22
+  inactiveCardScale: number      // e.g. 0.90
+  cardSpacing: number            // dp between cards
+
+  // Non-selected global overrides
+  showInactiveBorder: boolean
+  inactiveBorderColor: string    // #AARRGGBB
+  inactiveBorderWidth: number    // dp
+  showInactiveGlow: boolean
+
+  // Label box (TV CHANNEL / Live TV)
+  showLabelBox: boolean
+  labelBoxBgColor: string        // #AARRGGBB
+  labelBoxCornerRadius: number   // dp
+  labelTitleColor: string        // #AARRGGBB
+  labelSubtitleColor: string     // #AARRGGBB
+  labelTitleSize: number         // sp
+  labelSubtitleSize: number      // sp
+
+  // Navigation arrows
+  showArrows: boolean
+  arrowColor: string             // #AARRGGBB
+  arrowBgColor: string           // #AARRGGBB
+
+  // Dot indicator
+  showDots: boolean
+  dotActiveColor: string         // #AARRGGBB
+  dotInactiveColor: string       // #AARRGGBB
+
+  // Hint text
+  showHintText: boolean
+}
+
+export type ChannelBrowserConfig = {
+  // Grid
+  gridColumns: number // 0 = auto
+  cardAspectRatio: number // e.g. 0.85
+  cardPadding: number // dp
+  // Logo
+  logoSize: number // dp
+  logoCornerRadius: number // dp
+  // Colors — hex string e.g. "#RRGGBB" or "#AARRGGBB"
+  cardBgColor: string
+  cardBgFocusedColor: string
+  cardBgCurrentColor: string
+  borderColor: string
+  borderFocusedColor: string
+  channelNameColor: string
+  channelNumberColor: string
+  categoryBadgeColor: string
+  categoryBadgeTextColor: string
+  accentColor: string
+  // Sizes
+  channelNameSize: number // sp
+  categoryBadgeSize: number // sp
+  // Toggles
+  showCategoryBadge: boolean
+  showChannelNumber: boolean
+  showNowPlayingBadge: boolean
+}
+
 export type HomeExperienceResolvedConfig = {
   revision: number
   logoUrl: string
@@ -105,6 +172,8 @@ export type HomeExperienceResolvedConfig = {
   menus: HomeExperienceMenuItem[]
   overlays: HomeOverlayItem[]
   menuHintText: string
+  channelBrowser: ChannelBrowserConfig
+  carousel: CarouselConfig
   splash: {
     enabled: boolean
     backgroundUrl: string
@@ -148,6 +217,9 @@ export type HomeExperienceMenuPatch = {
   useAppIcon?: boolean
   sortOrder?: number
   isPinned?: boolean
+  disableGradient?: boolean
+  tvClickBehavior?: 'channel_list' | 'last_played' | 'by_number' | 'most_played'
+  tvClickChannelNumber?: number
   badge?: {
     text: string
     color: string
@@ -164,6 +236,8 @@ export type HomeExperiencePatch = {
   menus?: HomeExperienceMenuPatch[]
   overlays?: HomeOverlayItem[]
   menuHintText?: string
+  channelBrowser?: Partial<ChannelBrowserConfig>
+  carousel?: Partial<CarouselConfig>
   splash?: Partial<HomeExperienceResolvedConfig['splash']>
   sounds?: Partial<HomeExperienceResolvedConfig['sounds']>
   displayScale?: Partial<HomeExperienceResolvedConfig['displayScale']>
@@ -178,6 +252,52 @@ export const FALLBACK_HOME_EXPERIENCE_CONFIG: HomeExperienceResolvedConfig = {
   startScreen: 'home_screen',
   startScreenContentId: null,
   menuHintText: 'Gunakan kiri/kanan remote untuk memutar menu, OK untuk memilih, tahan OK 3 detik untuk ubah nama STB',
+  channelBrowser: {
+    gridColumns: 0,
+    cardAspectRatio: 0.85,
+    cardPadding: 6,
+    logoSize: 88,
+    logoCornerRadius: 14,
+    cardBgColor: '#2E18000000',
+    cardBgFocusedColor: '#29FFE9A6',
+    cardBgCurrentColor: '#247DD3FC',
+    borderColor: '#29FFFFFF',
+    borderFocusedColor: '#FFFFFFFF',
+    channelNameColor: '#FFFFFFFF',
+    channelNumberColor: '#FFFFE9A6',
+    categoryBadgeColor: '#1CFFE9A6',
+    categoryBadgeTextColor: '#FFFFE9A6',
+    accentColor: '#FFFFE9A6',
+    channelNameSize: 15,
+    categoryBadgeSize: 9,
+    showCategoryBadge: true,
+    showChannelNumber: true,
+    showNowPlayingBadge: true,
+  },
+  carousel: {
+    cardCornerRadius: 24,
+    activeCardScale: 1.22,
+    inactiveCardScale: 0.90,
+    cardSpacing: 18,
+    showInactiveBorder: true,
+    inactiveBorderColor: '#73FFFFFF',
+    inactiveBorderWidth: 2,
+    showInactiveGlow: true,
+    showLabelBox: true,
+    labelBoxBgColor: '#6B000000',
+    labelBoxCornerRadius: 14,
+    labelTitleColor: '#FFFFFFFF',
+    labelSubtitleColor: '#D6FFFFFF',
+    labelTitleSize: 17,
+    labelSubtitleSize: 10,
+    showArrows: true,
+    arrowColor: '#FFFFFFFF',
+    arrowBgColor: '#57000000',
+    showDots: true,
+    dotActiveColor: '#FFFFE9A6',
+    dotInactiveColor: '#47FFFFFF',
+    showHintText: true,
+  },
   overlays: [
     // ── Kiri atas — mirrors HospitalityHeader left column ─────────────────────
     // verticalArrangement = spacedBy(4.dp), fontSize normal=17/12/10sp
@@ -607,6 +727,16 @@ export function homeExperienceFromFormData(formData: FormData): HomeExperienceRe
     menus: parseJsonArray(formData.get('menusJson'), FALLBACK_HOME_EXPERIENCE_CONFIG.menus),
     overlays: parseJsonArray(formData.get('overlaysJson'), FALLBACK_HOME_EXPERIENCE_CONFIG.overlays),
     menuHintText: formData.get('menuHintText'),
+    channelBrowser: (() => {
+      const v = formData.get('channelBrowserJson')
+      if (!v) return FALLBACK_HOME_EXPERIENCE_CONFIG.channelBrowser
+      try { return JSON.parse(String(v)) } catch { return FALLBACK_HOME_EXPERIENCE_CONFIG.channelBrowser }
+    })(),
+    carousel: (() => {
+      const v = formData.get('carouselJson')
+      if (!v) return FALLBACK_HOME_EXPERIENCE_CONFIG.carousel
+      try { return JSON.parse(String(v)) } catch { return FALLBACK_HOME_EXPERIENCE_CONFIG.carousel }
+    })(),
     splash: {
       enabled: formData.get('splashEnabled') === 'on',
       backgroundUrl: formData.get('splashBackgroundUrl'),
@@ -646,6 +776,8 @@ export function normalizeHomeExperienceConfig(value: unknown): HomeExperienceRes
     menus: normalizeMenus(source.menus),
     overlays: normalizeOverlays(source.overlays),
     menuHintText: safeString(source.menuHintText, FALLBACK_HOME_EXPERIENCE_CONFIG.menuHintText),
+    channelBrowser: normalizeChannelBrowser(source.channelBrowser),
+    carousel: normalizeCarousel(source.carousel),
     splash: normalizeSplash(source.splash),
     sounds: normalizeSounds(source.sounds),
     displayScale: normalizeDisplayScale(source.displayScale),
@@ -667,6 +799,8 @@ export function normalizeHomeExperiencePatch(value: unknown): HomeExperiencePatc
   if (hasOwn(source, 'splash')) patch.splash = normalizeSplashPatch(source.splash)
   if (hasOwn(source, 'sounds')) patch.sounds = normalizeSoundsPatch(source.sounds)
   if (hasOwn(source, 'displayScale')) patch.displayScale = normalizeDisplayScalePatch(source.displayScale)
+  if (hasOwn(source, 'channelBrowser')) patch.channelBrowser = normalizeChannelBrowserPatch(source.channelBrowser)
+  if (hasOwn(source, 'carousel')) patch.carousel = normalizeCarouselPatch(source.carousel)
 
   return patch
 }
@@ -697,6 +831,14 @@ export function applyHomeExperiencePatch(
     displayScale: {
       ...base.displayScale,
       ...(patch.displayScale ?? {}),
+    },
+    channelBrowser: {
+      ...base.channelBrowser,
+      ...(patch.channelBrowser ?? {}),
+    },
+    carousel: {
+      ...base.carousel,
+      ...(patch.carousel ?? {}),
     },
     menus: mergeMenuPatches(base.menus, patch.menus),
   })
@@ -959,6 +1101,9 @@ function normalizeMenus(value: unknown): HomeExperienceMenuItem[] {
       entertainmentItemId: clampInt(entry.entertainmentItemId, 0, 1_000_000, 0),
       targetPackage: safeString(entry.targetPackage, ''),
       useAppIcon: safeBoolean(entry.useAppIcon, false),
+      disableGradient: safeBoolean(entry.disableGradient, false),
+      tvClickBehavior: oneOf(entry.tvClickBehavior, ['channel_list', 'last_played', 'by_number', 'most_played'] as const, 'channel_list'),
+      tvClickChannelNumber: clampInt(entry.tvClickChannelNumber, 1, 9999, 1),
       sortOrder: clampInt(entry.sortOrder, 0, 9999, index * 10),
     }))
     .sort((a, b) => a.sortOrder - b.sortOrder)
@@ -1038,6 +1183,118 @@ function normalizeDisplayScalePatch(value: unknown): Partial<HomeExperienceResol
   return patch
 }
 
+function normalizeChannelBrowser(value: unknown): ChannelBrowserConfig {
+  const source = isRecord(value) ? value : {}
+  const d = FALLBACK_HOME_EXPERIENCE_CONFIG.channelBrowser
+  return {
+    gridColumns: clampInt(source.gridColumns, 0, 10, d.gridColumns),
+    cardAspectRatio: clampFloat(source.cardAspectRatio, 0.5, 2.0, d.cardAspectRatio),
+    cardPadding: clampInt(source.cardPadding, 0, 32, d.cardPadding),
+    logoSize: clampInt(source.logoSize, 32, 200, d.logoSize),
+    logoCornerRadius: clampInt(source.logoCornerRadius, 0, 50, d.logoCornerRadius),
+    cardBgColor: normalizeHexColor(source.cardBgColor, d.cardBgColor),
+    cardBgFocusedColor: normalizeHexColor(source.cardBgFocusedColor, d.cardBgFocusedColor),
+    cardBgCurrentColor: normalizeHexColor(source.cardBgCurrentColor, d.cardBgCurrentColor),
+    borderColor: normalizeHexColor(source.borderColor, d.borderColor),
+    borderFocusedColor: normalizeHexColor(source.borderFocusedColor, d.borderFocusedColor),
+    channelNameColor: normalizeHexColor(source.channelNameColor, d.channelNameColor),
+    channelNumberColor: normalizeHexColor(source.channelNumberColor, d.channelNumberColor),
+    categoryBadgeColor: normalizeHexColor(source.categoryBadgeColor, d.categoryBadgeColor),
+    categoryBadgeTextColor: normalizeHexColor(source.categoryBadgeTextColor, d.categoryBadgeTextColor),
+    accentColor: normalizeHexColor(source.accentColor, d.accentColor),
+    channelNameSize: clampInt(source.channelNameSize, 8, 32, d.channelNameSize),
+    categoryBadgeSize: clampInt(source.categoryBadgeSize, 6, 20, d.categoryBadgeSize),
+    showCategoryBadge: safeBoolean(source.showCategoryBadge, d.showCategoryBadge),
+    showChannelNumber: safeBoolean(source.showChannelNumber, d.showChannelNumber),
+    showNowPlayingBadge: safeBoolean(source.showNowPlayingBadge, d.showNowPlayingBadge),
+  }
+}
+
+function normalizeChannelBrowserPatch(value: unknown): Partial<ChannelBrowserConfig> {
+  const source = isRecord(value) ? value : {}
+  const patch: Partial<ChannelBrowserConfig> = {}
+  const d = FALLBACK_HOME_EXPERIENCE_CONFIG.channelBrowser
+  if (hasOwn(source, 'gridColumns')) patch.gridColumns = clampInt(source.gridColumns, 0, 10, d.gridColumns)
+  if (hasOwn(source, 'cardAspectRatio')) patch.cardAspectRatio = clampFloat(source.cardAspectRatio, 0.5, 2.0, d.cardAspectRatio)
+  if (hasOwn(source, 'cardPadding')) patch.cardPadding = clampInt(source.cardPadding, 0, 32, d.cardPadding)
+  if (hasOwn(source, 'logoSize')) patch.logoSize = clampInt(source.logoSize, 32, 200, d.logoSize)
+  if (hasOwn(source, 'logoCornerRadius')) patch.logoCornerRadius = clampInt(source.logoCornerRadius, 0, 50, d.logoCornerRadius)
+  if (hasOwn(source, 'cardBgColor')) patch.cardBgColor = normalizeHexColor(source.cardBgColor, d.cardBgColor)
+  if (hasOwn(source, 'cardBgFocusedColor')) patch.cardBgFocusedColor = normalizeHexColor(source.cardBgFocusedColor, d.cardBgFocusedColor)
+  if (hasOwn(source, 'cardBgCurrentColor')) patch.cardBgCurrentColor = normalizeHexColor(source.cardBgCurrentColor, d.cardBgCurrentColor)
+  if (hasOwn(source, 'borderColor')) patch.borderColor = normalizeHexColor(source.borderColor, d.borderColor)
+  if (hasOwn(source, 'borderFocusedColor')) patch.borderFocusedColor = normalizeHexColor(source.borderFocusedColor, d.borderFocusedColor)
+  if (hasOwn(source, 'channelNameColor')) patch.channelNameColor = normalizeHexColor(source.channelNameColor, d.channelNameColor)
+  if (hasOwn(source, 'channelNumberColor')) patch.channelNumberColor = normalizeHexColor(source.channelNumberColor, d.channelNumberColor)
+  if (hasOwn(source, 'categoryBadgeColor')) patch.categoryBadgeColor = normalizeHexColor(source.categoryBadgeColor, d.categoryBadgeColor)
+  if (hasOwn(source, 'categoryBadgeTextColor')) patch.categoryBadgeTextColor = normalizeHexColor(source.categoryBadgeTextColor, d.categoryBadgeTextColor)
+  if (hasOwn(source, 'accentColor')) patch.accentColor = normalizeHexColor(source.accentColor, d.accentColor)
+  if (hasOwn(source, 'channelNameSize')) patch.channelNameSize = clampInt(source.channelNameSize, 8, 32, d.channelNameSize)
+  if (hasOwn(source, 'categoryBadgeSize')) patch.categoryBadgeSize = clampInt(source.categoryBadgeSize, 6, 20, d.categoryBadgeSize)
+  if (hasOwn(source, 'showCategoryBadge')) patch.showCategoryBadge = safeBoolean(source.showCategoryBadge, d.showCategoryBadge)
+  if (hasOwn(source, 'showChannelNumber')) patch.showChannelNumber = safeBoolean(source.showChannelNumber, d.showChannelNumber)
+  if (hasOwn(source, 'showNowPlayingBadge')) patch.showNowPlayingBadge = safeBoolean(source.showNowPlayingBadge, d.showNowPlayingBadge)
+  return patch
+}
+
+function normalizeCarousel(value: unknown): CarouselConfig {
+  const source = isRecord(value) ? value : {}
+  const d = FALLBACK_HOME_EXPERIENCE_CONFIG.carousel
+  return {
+    cardCornerRadius: clampInt(source.cardCornerRadius, 0, 64, d.cardCornerRadius),
+    activeCardScale: clampFloat(source.activeCardScale, 0.5, 2.0, d.activeCardScale),
+    inactiveCardScale: clampFloat(source.inactiveCardScale, 0.3, 1.5, d.inactiveCardScale),
+    cardSpacing: clampInt(source.cardSpacing, 0, 64, d.cardSpacing),
+    showInactiveBorder: safeBoolean(source.showInactiveBorder, d.showInactiveBorder),
+    inactiveBorderColor: normalizeHexColor(source.inactiveBorderColor, d.inactiveBorderColor),
+    inactiveBorderWidth: clampInt(source.inactiveBorderWidth, 0, 8, d.inactiveBorderWidth),
+    showInactiveGlow: safeBoolean(source.showInactiveGlow, d.showInactiveGlow),
+    showLabelBox: safeBoolean(source.showLabelBox, d.showLabelBox),
+    labelBoxBgColor: normalizeHexColor(source.labelBoxBgColor, d.labelBoxBgColor),
+    labelBoxCornerRadius: clampInt(source.labelBoxCornerRadius, 0, 64, d.labelBoxCornerRadius),
+    labelTitleColor: normalizeHexColor(source.labelTitleColor, d.labelTitleColor),
+    labelSubtitleColor: normalizeHexColor(source.labelSubtitleColor, d.labelSubtitleColor),
+    labelTitleSize: clampInt(source.labelTitleSize, 8, 40, d.labelTitleSize),
+    labelSubtitleSize: clampInt(source.labelSubtitleSize, 6, 32, d.labelSubtitleSize),
+    showArrows: safeBoolean(source.showArrows, d.showArrows),
+    arrowColor: normalizeHexColor(source.arrowColor, d.arrowColor),
+    arrowBgColor: normalizeHexColor(source.arrowBgColor, d.arrowBgColor),
+    showDots: safeBoolean(source.showDots, d.showDots),
+    dotActiveColor: normalizeHexColor(source.dotActiveColor, d.dotActiveColor),
+    dotInactiveColor: normalizeHexColor(source.dotInactiveColor, d.dotInactiveColor),
+    showHintText: safeBoolean(source.showHintText, d.showHintText),
+  }
+}
+
+function normalizeCarouselPatch(value: unknown): Partial<CarouselConfig> {
+  const source = isRecord(value) ? value : {}
+  const patch: Partial<CarouselConfig> = {}
+  const d = FALLBACK_HOME_EXPERIENCE_CONFIG.carousel
+  if (hasOwn(source, 'cardCornerRadius')) patch.cardCornerRadius = clampInt(source.cardCornerRadius, 0, 64, d.cardCornerRadius)
+  if (hasOwn(source, 'activeCardScale')) patch.activeCardScale = clampFloat(source.activeCardScale, 0.5, 2.0, d.activeCardScale)
+  if (hasOwn(source, 'inactiveCardScale')) patch.inactiveCardScale = clampFloat(source.inactiveCardScale, 0.3, 1.5, d.inactiveCardScale)
+  if (hasOwn(source, 'cardSpacing')) patch.cardSpacing = clampInt(source.cardSpacing, 0, 64, d.cardSpacing)
+  if (hasOwn(source, 'showInactiveBorder')) patch.showInactiveBorder = safeBoolean(source.showInactiveBorder, d.showInactiveBorder)
+  if (hasOwn(source, 'inactiveBorderColor')) patch.inactiveBorderColor = normalizeHexColor(source.inactiveBorderColor, d.inactiveBorderColor)
+  if (hasOwn(source, 'inactiveBorderWidth')) patch.inactiveBorderWidth = clampInt(source.inactiveBorderWidth, 0, 8, d.inactiveBorderWidth)
+  if (hasOwn(source, 'showInactiveGlow')) patch.showInactiveGlow = safeBoolean(source.showInactiveGlow, d.showInactiveGlow)
+  if (hasOwn(source, 'showLabelBox')) patch.showLabelBox = safeBoolean(source.showLabelBox, d.showLabelBox)
+  if (hasOwn(source, 'labelBoxBgColor')) patch.labelBoxBgColor = normalizeHexColor(source.labelBoxBgColor, d.labelBoxBgColor)
+  if (hasOwn(source, 'labelBoxCornerRadius')) patch.labelBoxCornerRadius = clampInt(source.labelBoxCornerRadius, 0, 64, d.labelBoxCornerRadius)
+  if (hasOwn(source, 'labelTitleColor')) patch.labelTitleColor = normalizeHexColor(source.labelTitleColor, d.labelTitleColor)
+  if (hasOwn(source, 'labelSubtitleColor')) patch.labelSubtitleColor = normalizeHexColor(source.labelSubtitleColor, d.labelSubtitleColor)
+  if (hasOwn(source, 'labelTitleSize')) patch.labelTitleSize = clampInt(source.labelTitleSize, 8, 40, d.labelTitleSize)
+  if (hasOwn(source, 'labelSubtitleSize')) patch.labelSubtitleSize = clampInt(source.labelSubtitleSize, 6, 32, d.labelSubtitleSize)
+  if (hasOwn(source, 'showArrows')) patch.showArrows = safeBoolean(source.showArrows, d.showArrows)
+  if (hasOwn(source, 'arrowColor')) patch.arrowColor = normalizeHexColor(source.arrowColor, d.arrowColor)
+  if (hasOwn(source, 'arrowBgColor')) patch.arrowBgColor = normalizeHexColor(source.arrowBgColor, d.arrowBgColor)
+  if (hasOwn(source, 'showDots')) patch.showDots = safeBoolean(source.showDots, d.showDots)
+  if (hasOwn(source, 'dotActiveColor')) patch.dotActiveColor = normalizeHexColor(source.dotActiveColor, d.dotActiveColor)
+  if (hasOwn(source, 'dotInactiveColor')) patch.dotInactiveColor = normalizeHexColor(source.dotInactiveColor, d.dotInactiveColor)
+  if (hasOwn(source, 'showHintText')) patch.showHintText = safeBoolean(source.showHintText, d.showHintText)
+  return patch
+}
+
 function normalizeMenuPatches(value: unknown): HomeExperienceMenuPatch[] {
   const source = Array.isArray(value) ? value : []
   return source
@@ -1059,6 +1316,9 @@ function normalizeMenuPatches(value: unknown): HomeExperienceMenuPatch[] {
       if (hasOwn(entry, 'entertainmentItemId')) patch.entertainmentItemId = clampInt(entry.entertainmentItemId, 0, 1_000_000, 0)
       if (hasOwn(entry, 'targetPackage')) patch.targetPackage = safeString(entry.targetPackage, '')
       if (hasOwn(entry, 'useAppIcon')) patch.useAppIcon = safeBoolean(entry.useAppIcon, false)
+      if (hasOwn(entry, 'disableGradient')) patch.disableGradient = safeBoolean(entry.disableGradient, false)
+      if (hasOwn(entry, 'tvClickBehavior')) patch.tvClickBehavior = oneOf(entry.tvClickBehavior, ['channel_list', 'last_played', 'by_number', 'most_played'] as const, 'channel_list')
+      if (hasOwn(entry, 'tvClickChannelNumber')) patch.tvClickChannelNumber = clampInt(entry.tvClickChannelNumber, 1, 9999, 1)
       if (hasOwn(entry, 'sortOrder')) patch.sortOrder = clampInt(entry.sortOrder, 0, 9999, index * 10)
       return patch
     })
@@ -1108,6 +1368,12 @@ function compactHomeExperiencePatch(patch: HomeExperiencePatch): HomeExperienceP
   const compactDisplayScale = compactObjectPatch(patch.displayScale, FALLBACK_HOME_EXPERIENCE_CONFIG.displayScale)
   if (Object.keys(compactDisplayScale).length > 0) compacted.displayScale = compactDisplayScale
 
+  const compactChannelBrowser = compactObjectPatch(patch.channelBrowser, FALLBACK_HOME_EXPERIENCE_CONFIG.channelBrowser)
+  if (Object.keys(compactChannelBrowser).length > 0) compacted.channelBrowser = compactChannelBrowser
+
+  const compactCarousel = compactObjectPatch(patch.carousel, FALLBACK_HOME_EXPERIENCE_CONFIG.carousel)
+  if (Object.keys(compactCarousel).length > 0) compacted.carousel = compactCarousel
+
   return compacted
 }
 
@@ -1131,6 +1397,9 @@ function compactMenuPatches(patches?: HomeExperienceMenuPatch[]): HomeExperience
       if (patch.entertainmentItemId !== undefined && patch.entertainmentItemId !== fallback.entertainmentItemId) compact.entertainmentItemId = patch.entertainmentItemId
       if (patch.targetPackage !== undefined && patch.targetPackage !== (fallback.targetPackage ?? '')) compact.targetPackage = patch.targetPackage
       if (patch.useAppIcon !== undefined && patch.useAppIcon !== (fallback.useAppIcon ?? false)) compact.useAppIcon = patch.useAppIcon
+      if (patch.disableGradient !== undefined && patch.disableGradient !== (fallback.disableGradient ?? false)) compact.disableGradient = patch.disableGradient
+      if (patch.tvClickBehavior !== undefined && patch.tvClickBehavior !== 'channel_list') compact.tvClickBehavior = patch.tvClickBehavior
+      if (patch.tvClickChannelNumber !== undefined && patch.tvClickChannelNumber !== 1) compact.tvClickChannelNumber = patch.tvClickChannelNumber
       if (patch.sortOrder !== undefined && patch.sortOrder !== fallback.sortOrder) compact.sortOrder = patch.sortOrder
       return compact
     })

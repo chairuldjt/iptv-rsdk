@@ -41,7 +41,7 @@ import kotlinx.coroutines.withTimeoutOrNull
 
 @Composable
 fun SplashScreen(
-    onSplashComplete: (startScreen: String, startScreenContentId: Int?) -> Unit
+    onSplashComplete: (startScreen: String, startScreenContentId: Int?, homeExperienceJson: String) -> Unit
 ) {
     val context = LocalContext.current
     val app = context.applicationContext as IptvApplication
@@ -206,7 +206,7 @@ fun SplashScreen(
         }
 
         delay(300)
-        onSplashComplete(freshExp.startScreen, freshExp.startScreenContentId)
+        onSplashComplete(freshExp.startScreen, freshExp.startScreenContentId, freshJson)
     }
 
     Box(modifier = Modifier.fillMaxSize()) {

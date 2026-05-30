@@ -81,6 +81,7 @@ class MainActivity : ComponentActivity() {
                     color = MaterialTheme.colorScheme.background
                 ) {
                     var currentScreen by remember { mutableStateOf("splash") }
+                    var splashHomeExperienceJson by remember { mutableStateOf("") }
                     var activeSettingsTab by remember { mutableStateOf(0) }
                     var selectedChannelId by remember { mutableIntStateOf(-1) }
                     var selectedEntertainmentItemId by remember { mutableIntStateOf(0) }
@@ -89,8 +90,9 @@ class MainActivity : ComponentActivity() {
                     var activeVideoBroadcast by remember { mutableStateOf(VideoBroadcastProfile()) }
                     var videoBroadcastSessionKey by remember { mutableIntStateOf(0) }
                     val confirmNoFocusRequester = remember { FocusRequester() }
+                    val coroutineScope = rememberCoroutineScope()
                     val serverUrl by dataStoreManager.serverUrlFlow.collectAsState(initial = "")
-                    val homeExperienceJson by dataStoreManager.homeExperienceJsonFlow.collectAsState(initial = "")
+                    val homeExperienceJson by dataStoreManager.homeExperienceJsonFlow.collectAsState(initial = splashHomeExperienceJson)
                     val runningTextJson by dataStoreManager.runningTextJsonFlow.collectAsState(initial = "")
                     val runningTextOverrideJson by dataStoreManager.runningTextOverrideJsonFlow.collectAsState(initial = "")
                     val runningTextOverrideExpiresAt by dataStoreManager.runningTextOverrideExpiresAtFlow.collectAsState(initial = 0L)
@@ -187,7 +189,8 @@ class MainActivity : ComponentActivity() {
                         when (currentScreen) {
                             "splash" -> {
                                 SplashScreen(
-                                    onSplashComplete = { startScreen, contentId ->
+                                    onSplashComplete = { startScreen, contentId, freshJson ->
+                                        splashHomeExperienceJson = freshJson
                                         when (startScreen) {
                                             "entertainment" -> {
                                                 selectedEntertainmentItemId = contentId ?: 0
@@ -206,8 +209,16 @@ class MainActivity : ComponentActivity() {
                                     showExitConfirmDialog = true
                                 }
                                 HomeScreen(
+                                    initialHomeExperienceJson = splashHomeExperienceJson,
                                     onNavigateToPlayer = {
                                         selectedChannelId = -1
+                                        currentScreen = "channels"
+                                    },
+                                    onNavigateToPlayerWithChannel = { channelId ->
+                                        coroutineScope.launch {
+                                            app.dataStoreManager.recordChannelPlayed(channelId)
+                                        }
+                                        selectedChannelId = channelId
                                         currentScreen = "player"
                                     },
                                     onNavigateToEducation = { currentScreen = "education" },
@@ -240,6 +251,9 @@ class MainActivity : ComponentActivity() {
                                 }
                                 ChannelBrowserScreen(
                                     onChannelSelected = { channelId ->
+                                        coroutineScope.launch {
+                                            app.dataStoreManager.recordChannelPlayed(channelId)
+                                        }
                                         selectedChannelId = channelId
                                         currentScreen = "player"
                                     },

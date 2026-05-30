@@ -19,6 +19,54 @@ data class HomeExperienceDisplayScale(
     val uiScaleMultiplier: Float = 1.0f
 )
 
+data class CarouselConfig(
+    val cardCornerRadius: Int = 24,
+    val activeCardScale: Float = 1.22f,
+    val inactiveCardScale: Float = 0.90f,
+    val cardSpacing: Int = 18,
+    val showInactiveBorder: Boolean = true,
+    val inactiveBorderColor: String = "#73FFFFFF",
+    val inactiveBorderWidth: Int = 2,
+    val showInactiveGlow: Boolean = true,
+    val showLabelBox: Boolean = true,
+    val labelBoxBgColor: String = "#6B000000",
+    val labelBoxCornerRadius: Int = 14,
+    val labelTitleColor: String = "#FFFFFFFF",
+    val labelSubtitleColor: String = "#D6FFFFFF",
+    val labelTitleSize: Int = 17,
+    val labelSubtitleSize: Int = 10,
+    val showArrows: Boolean = true,
+    val arrowColor: String = "#FFFFFFFF",
+    val arrowBgColor: String = "#57000000",
+    val showDots: Boolean = true,
+    val dotActiveColor: String = "#FFFFE9A6",
+    val dotInactiveColor: String = "#47FFFFFF",
+    val showHintText: Boolean = true,
+)
+
+data class ChannelBrowserConfig(
+    val gridColumns: Int = 0,
+    val cardAspectRatio: Float = 0.85f,
+    val cardPadding: Int = 6,
+    val logoSize: Int = 88,
+    val logoCornerRadius: Int = 14,
+    val cardBgColor: String = "#2E18000000",
+    val cardBgFocusedColor: String = "#29FFE9A6",
+    val cardBgCurrentColor: String = "#247DD3FC",
+    val borderColor: String = "#29FFFFFF",
+    val borderFocusedColor: String = "#FFFFFFFF",
+    val channelNameColor: String = "#FFFFFFFF",
+    val channelNumberColor: String = "#FFFFE9A6",
+    val categoryBadgeColor: String = "#1CFFE9A6",
+    val categoryBadgeTextColor: String = "#FFFFE9A6",
+    val accentColor: String = "#FFFFE9A6",
+    val channelNameSize: Int = 15,
+    val categoryBadgeSize: Int = 9,
+    val showCategoryBadge: Boolean = true,
+    val showChannelNumber: Boolean = true,
+    val showNowPlayingBadge: Boolean = true,
+)
+
 data class HomeExperienceProfile(
     val logoUrl: String = "",
     val homeBackgroundUrl: String = "",
@@ -27,6 +75,9 @@ data class HomeExperienceProfile(
     val menus: List<HomeExperienceMenu> = emptyList(),
     val overlays: List<HomeOverlayItem> = emptyList(),
     val menuHintText: String = "Gunakan kiri/kanan remote untuk memutar menu, OK untuk memilih, tahan OK 3 detik untuk ubah nama STB",
+    val disableMenuBarGradient: Boolean = false,
+    val channelBrowser: ChannelBrowserConfig = ChannelBrowserConfig(),
+    val carousel: CarouselConfig = CarouselConfig(),
     val splash: HomeExperienceSplash = HomeExperienceSplash(),
     val sounds: HomeExperienceSounds = HomeExperienceSounds(),
     val displayScale: HomeExperienceDisplayScale = HomeExperienceDisplayScale()
@@ -47,6 +98,9 @@ data class HomeExperienceMenu(
     val entertainmentItemId: Int,
     val targetPackage: String,
     val useAppIcon: Boolean,
+    val disableGradient: Boolean = false,
+    val tvClickBehavior: String = "channel_list", // channel_list | last_played | by_number | most_played
+    val tvClickChannelNumber: Int = 1,
     val sortOrder: Int
 )
 
@@ -159,6 +213,9 @@ object HomeExperienceParser {
                 menus = parseMenus(root.optJSONArray("menus")),
                 overlays = parseOverlays(root.optJSONArray("overlays")),
                 menuHintText = root.optString("menuHintText", "Gunakan kiri/kanan remote untuk memutar menu, OK untuk memilih, tahan OK 3 detik untuk ubah nama STB"),
+                disableMenuBarGradient = root.optBoolean("disableMenuBarGradient", false),
+                channelBrowser = parseChannelBrowser(root.optJSONObject("channelBrowser")),
+                carousel = parseCarousel(root.optJSONObject("carousel")),
                 splash = parseSplash(root.optJSONObject("splash")),
                 sounds = parseSounds(root.optJSONObject("sounds")),
                 displayScale = parseDisplayScale(root.optJSONObject("displayScale"))
@@ -298,6 +355,11 @@ object HomeExperienceParser {
                         entertainmentItemId = item.optInt("entertainmentItemId", 0),
                         targetPackage = item.optString("targetPackage", ""),
                         useAppIcon = item.optBoolean("useAppIcon", false),
+                        disableGradient = item.optBoolean("disableGradient", false),
+                        tvClickBehavior = item.optString("tvClickBehavior", "channel_list").let {
+                            if (it in listOf("channel_list", "last_played", "by_number", "most_played")) it else "channel_list"
+                        },
+                        tvClickChannelNumber = item.optInt("tvClickChannelNumber", 1).coerceAtLeast(1),
                         sortOrder = item.optInt("sortOrder", index * 10)
                     )
                 )
@@ -373,6 +435,61 @@ object HomeExperienceParser {
             ultraCompactHeightDp = obj.optInt("ultraCompactHeightDp", 400).coerceIn(200, 2000),
             forceDisplayMode = forceMode,
             uiScaleMultiplier = multiplier
+        )
+    }
+
+    private fun parseChannelBrowser(obj: JSONObject?): ChannelBrowserConfig {        if (obj == null) return ChannelBrowserConfig()
+        val d = ChannelBrowserConfig()
+        return ChannelBrowserConfig(
+            gridColumns = obj.optInt("gridColumns", d.gridColumns).coerceIn(0, 10),
+            cardAspectRatio = obj.optDouble("cardAspectRatio", d.cardAspectRatio.toDouble()).toFloat().coerceIn(0.5f, 2.0f),
+            cardPadding = obj.optInt("cardPadding", d.cardPadding).coerceIn(0, 32),
+            logoSize = obj.optInt("logoSize", d.logoSize).coerceIn(32, 200),
+            logoCornerRadius = obj.optInt("logoCornerRadius", d.logoCornerRadius).coerceIn(0, 50),
+            cardBgColor = obj.optString("cardBgColor", d.cardBgColor).ifBlank { d.cardBgColor },
+            cardBgFocusedColor = obj.optString("cardBgFocusedColor", d.cardBgFocusedColor).ifBlank { d.cardBgFocusedColor },
+            cardBgCurrentColor = obj.optString("cardBgCurrentColor", d.cardBgCurrentColor).ifBlank { d.cardBgCurrentColor },
+            borderColor = obj.optString("borderColor", d.borderColor).ifBlank { d.borderColor },
+            borderFocusedColor = obj.optString("borderFocusedColor", d.borderFocusedColor).ifBlank { d.borderFocusedColor },
+            channelNameColor = obj.optString("channelNameColor", d.channelNameColor).ifBlank { d.channelNameColor },
+            channelNumberColor = obj.optString("channelNumberColor", d.channelNumberColor).ifBlank { d.channelNumberColor },
+            categoryBadgeColor = obj.optString("categoryBadgeColor", d.categoryBadgeColor).ifBlank { d.categoryBadgeColor },
+            categoryBadgeTextColor = obj.optString("categoryBadgeTextColor", d.categoryBadgeTextColor).ifBlank { d.categoryBadgeTextColor },
+            accentColor = obj.optString("accentColor", d.accentColor).ifBlank { d.accentColor },
+            channelNameSize = obj.optInt("channelNameSize", d.channelNameSize).coerceIn(8, 32),
+            categoryBadgeSize = obj.optInt("categoryBadgeSize", d.categoryBadgeSize).coerceIn(6, 20),
+            showCategoryBadge = obj.optBoolean("showCategoryBadge", d.showCategoryBadge),
+            showChannelNumber = obj.optBoolean("showChannelNumber", d.showChannelNumber),
+            showNowPlayingBadge = obj.optBoolean("showNowPlayingBadge", d.showNowPlayingBadge),
+        )
+    }
+
+    private fun parseCarousel(obj: JSONObject?): CarouselConfig {
+        if (obj == null) return CarouselConfig()
+        val d = CarouselConfig()
+        return CarouselConfig(
+            cardCornerRadius = obj.optInt("cardCornerRadius", d.cardCornerRadius).coerceIn(0, 64),
+            activeCardScale = obj.optDouble("activeCardScale", d.activeCardScale.toDouble()).toFloat().coerceIn(0.5f, 2.0f),
+            inactiveCardScale = obj.optDouble("inactiveCardScale", d.inactiveCardScale.toDouble()).toFloat().coerceIn(0.3f, 1.5f),
+            cardSpacing = obj.optInt("cardSpacing", d.cardSpacing).coerceIn(0, 64),
+            showInactiveBorder = obj.optBoolean("showInactiveBorder", d.showInactiveBorder),
+            inactiveBorderColor = obj.optString("inactiveBorderColor", d.inactiveBorderColor).ifBlank { d.inactiveBorderColor },
+            inactiveBorderWidth = obj.optInt("inactiveBorderWidth", d.inactiveBorderWidth).coerceIn(0, 8),
+            showInactiveGlow = obj.optBoolean("showInactiveGlow", d.showInactiveGlow),
+            showLabelBox = obj.optBoolean("showLabelBox", d.showLabelBox),
+            labelBoxBgColor = obj.optString("labelBoxBgColor", d.labelBoxBgColor).ifBlank { d.labelBoxBgColor },
+            labelBoxCornerRadius = obj.optInt("labelBoxCornerRadius", d.labelBoxCornerRadius).coerceIn(0, 64),
+            labelTitleColor = obj.optString("labelTitleColor", d.labelTitleColor).ifBlank { d.labelTitleColor },
+            labelSubtitleColor = obj.optString("labelSubtitleColor", d.labelSubtitleColor).ifBlank { d.labelSubtitleColor },
+            labelTitleSize = obj.optInt("labelTitleSize", d.labelTitleSize).coerceIn(8, 40),
+            labelSubtitleSize = obj.optInt("labelSubtitleSize", d.labelSubtitleSize).coerceIn(6, 32),
+            showArrows = obj.optBoolean("showArrows", d.showArrows),
+            arrowColor = obj.optString("arrowColor", d.arrowColor).ifBlank { d.arrowColor },
+            arrowBgColor = obj.optString("arrowBgColor", d.arrowBgColor).ifBlank { d.arrowBgColor },
+            showDots = obj.optBoolean("showDots", d.showDots),
+            dotActiveColor = obj.optString("dotActiveColor", d.dotActiveColor).ifBlank { d.dotActiveColor },
+            dotInactiveColor = obj.optString("dotInactiveColor", d.dotInactiveColor).ifBlank { d.dotInactiveColor },
+            showHintText = obj.optBoolean("showHintText", d.showHintText),
         )
     }
 }
