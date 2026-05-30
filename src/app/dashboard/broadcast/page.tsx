@@ -34,6 +34,7 @@ import {
   playVideoBroadcastNowAction,
   stopVideoBroadcastNowAction,
   cloneVideoProfileAction,
+  renameVideoProfileAction,
   toggleVideoLockAction,
   toggleVideoEnabledAction,
   unsetVideoGlobalAction,
@@ -49,6 +50,7 @@ import {
   pushRunningTextLiveAction,
   stopRunningTextLiveAction,
   cloneRunningProfileAction,
+  renameRunningProfileAction,
   toggleRunningLockAction,
   toggleRunningEnabledAction,
   unsetRunningGlobalAction,
@@ -275,6 +277,7 @@ export default async function BroadcastPage({
           <NotificationBar
             message={
               sp.created ? 'Video Broadcast Profile baru berhasil dibuat.'
+              : sp.updated ? 'Profile berhasil diperbarui.'
               : sp.deleted ? 'Profile berhasil dihapus.'
               : sp.globalSet ? 'Global Video profile berhasil diperbarui.'
               : sp.globalUnset ? 'Global Video profile berhasil di-unset.'
@@ -285,7 +288,7 @@ export default async function BroadcastPage({
               : buildVideoNotice(sp)?.message || ''
             }
             tone={
-              sp.created || sp.deleted || sp.globalSet || sp.globalUnset || sp.cloned || sp.imported || sp.locked
+              sp.created || sp.updated || sp.deleted || sp.globalSet || sp.globalUnset || sp.cloned || sp.imported || sp.locked
                 ? 'success'
                 : buildVideoNotice(sp)?.tone || 'success'
             }
@@ -352,6 +355,7 @@ export default async function BroadcastPage({
                     deleteAction={deleteVideoProfileAction}
                     setGlobalAction={setVideoGlobalAction}
                     cloneAction={cloneVideoProfileAction}
+                    renameAction={renameVideoProfileAction}
                     toggleLockAction={toggleVideoLockAction}
                     toggleEnabledAction={toggleVideoEnabledAction}
                     unsetGlobalAction={unsetVideoGlobalAction}
@@ -420,6 +424,7 @@ export default async function BroadcastPage({
           <NotificationBar
             message={
               sp.created ? 'Running Text Profile baru berhasil dibuat.'
+              : sp.updated ? 'Profile berhasil diperbarui.'
               : sp.deleted ? 'Profile berhasil dihapus.'
               : sp.globalSet ? 'Global Running Text profile berhasil diperbarui.'
               : sp.globalUnset ? 'Global Running Text profile berhasil di-unset.'
@@ -492,6 +497,7 @@ export default async function BroadcastPage({
                     deleteAction={deleteRunningProfileAction}
                     setGlobalAction={setRunningGlobalAction}
                     cloneAction={cloneRunningProfileAction}
+                    renameAction={renameRunningProfileAction}
                     toggleLockAction={toggleRunningLockAction}
                     toggleEnabledAction={toggleRunningEnabledAction}
                     unsetGlobalAction={unsetRunningGlobalAction}

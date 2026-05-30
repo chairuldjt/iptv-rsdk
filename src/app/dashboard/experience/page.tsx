@@ -189,57 +189,58 @@ async function importProfileAction(formData: FormData) {
     return
   }
 
+  let data: HomeExperienceProfileExport
+  const assetMapping: Array<{ originalUrl: string; newRelativePath: string }> = []
+
   try {
     const arrayBuffer = await file.arrayBuffer()
     const zip = await JSZip.loadAsync(arrayBuffer)
 
     const profileJsonFile = zip.file('profile.json')
-    if (!profileJsonFile) {
-      redirect('/dashboard/experience?importError=Invalid+ZIP+format:+missing+profile.json')
-      return
-    }
+    if (!profileJsonFile) throw new Error('Missing profile.json')
 
     const profileJsonText = await profileJsonFile.async('text')
-    const data = JSON.parse(profileJsonText) as HomeExperienceProfileExport
+    data = JSON.parse(profileJsonText) as HomeExperienceProfileExport
+
+    const importName = (formData.get('importName') as string)?.trim()
+    if (importName) data.profile.name = importName
 
     const publicDir = path.join(process.cwd(), 'public')
-    const assetMapping: Array<{ originalUrl: string; newRelativePath: string }> = []
 
-    const assetFiles = zip.folder('uploads')
-    if (assetFiles) {
-      const entries: Array<{ path: string; dir: boolean }> = []
-      assetFiles.forEach((relativePath, entry) => {
-        entries.push({ path: relativePath, dir: entry.dir })
-      })
-
-      for (const entry of entries) {
-        if (entry.dir) continue
-        const zipEntry = assetFiles.file(entry.path)
-        if (!zipEntry) continue
-
-        const buffer = Buffer.from(await zipEntry.async('arraybuffer'))
-        const targetRelativePath = `uploads/${entry.path}`
-        const targetFullPath = path.join(publicDir, targetRelativePath)
-
-        const targetDir = path.dirname(targetFullPath)
-        await fs.mkdir(targetDir, { recursive: true })
-        await fs.writeFile(targetFullPath, buffer)
-
-        const originalUrl = `/uploads/${entry.path}`
-        assetMapping.push({ originalUrl, newRelativePath: targetRelativePath })
+    const assetEntries: string[] = []
+    zip.forEach((relativePath, entry) => {
+      if (!entry.dir && relativePath.startsWith('uploads/')) {
+        assetEntries.push(relativePath)
       }
-    }
+    })
 
-    const imported = await importHomeExperienceProfileWithAssets(data, assetMapping)
-    if (imported) {
-      revalidatePath('/dashboard/experience')
-      redirect('/dashboard/experience?imported=1')
-    } else {
-      redirect('/dashboard/experience?importError=Invalid+profile+data')
+    for (const relativePath of assetEntries) {
+      const zipEntry = zip.file(relativePath)
+      if (!zipEntry) continue
+
+      const buffer = Buffer.from(await zipEntry.async('arraybuffer'))
+      const targetFullPath = path.join(publicDir, relativePath)
+
+      const targetDir = path.dirname(targetFullPath)
+      await fs.mkdir(targetDir, { recursive: true })
+      await fs.writeFile(targetFullPath, buffer)
+
+      const originalUrl = `/${relativePath}`
+      assetMapping.push({ originalUrl, newRelativePath: originalUrl })
     }
   } catch {
     redirect('/dashboard/experience?importError=Invalid+file+format')
+    return
   }
+
+  const imported = await importHomeExperienceProfileWithAssets(data, assetMapping)
+  if (!imported) {
+    redirect('/dashboard/experience?importError=Invalid+profile+data')
+    return
+  }
+
+  revalidatePath('/dashboard/experience')
+  redirect('/dashboard/experience?imported=1')
 }
 
 async function toggleLockAction(formData: FormData) {
@@ -483,6 +484,12 @@ export default async function ExperiencePage({
               Import profile dari file ZIP yang sebelumnya di-export.
             </p>
             <form action={importProfileAction} className="space-y-3">
+              <input
+                type="text"
+                name="importName"
+                placeholder="Nama profil (biarkan kosong untuk pakai nama asli)"
+                className="field-input text-xs"
+              />
               <input
                 type="file"
                 name="importFile"
