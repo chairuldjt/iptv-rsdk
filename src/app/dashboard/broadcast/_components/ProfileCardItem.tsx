@@ -104,6 +104,7 @@ export default function ProfileCardItem({
             title="Export Profile"
             message={`Export config dari "${profile.name}" ke file JSON?`}
             confirmLabel="Export"
+            variant="info"
           >
             <input type="hidden" name="profileId" value={profile.id} />
             <button type="submit" className="p-1.5 text-emerald-400 hover:text-emerald-300 border border-emerald-500/10 hover:bg-emerald-500/10 rounded-lg transition-all" title="Export">

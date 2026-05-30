@@ -11,8 +11,28 @@ interface ConfirmFormProps extends React.FormHTMLAttributes<HTMLFormElement> {
   description?: string
   confirmLabel?: string
   cancelLabel?: string
+  loadingLabel?: string
+  variant?: 'danger' | 'info' | 'success'
   successToast?: string
   children: React.ReactNode
+}
+
+const variantStyles = {
+  danger: {
+    icon: 'border-rose-500/20 bg-rose-500/10 text-rose-300',
+    iconPath: 'M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z',
+    button: 'btn btn-destructive',
+  },
+  info: {
+    icon: 'border-primary/20 bg-primary/10 text-primary',
+    iconPath: 'M11.25 11.25l.041-.02a.75.75 0 011.063.852l-.708 2.836a.75.75 0 001.063.853l.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-3.75h.008v.008H12V8.25z',
+    button: 'btn btn-primary',
+  },
+  success: {
+    icon: 'border-emerald-500/20 bg-emerald-500/10 text-emerald-300',
+    iconPath: 'M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z',
+    button: 'btn btn-primary',
+  },
 }
 
 export default function ConfirmForm({
@@ -22,6 +42,8 @@ export default function ConfirmForm({
   description,
   confirmLabel = 'Hapus',
   cancelLabel = 'Batal',
+  loadingLabel,
+  variant = 'danger',
   successToast,
   children,
   ...props
@@ -70,9 +92,9 @@ export default function ConfirmForm({
       {showModal && createPortal(
         <div className="fixed inset-0 z-[200] flex items-center justify-center bg-slate-950/78 p-4 backdrop-blur-md animate-fade-in">
           <div className="w-full max-w-md rounded-[28px] border border-white/10 bg-[linear-gradient(180deg,rgba(25,28,45,0.98),rgba(11,15,27,0.98))] p-6 shadow-[0_30px_90px_rgba(0,0,0,0.55)] animate-slide-up">
-            <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl border border-rose-500/20 bg-rose-500/10 text-rose-300">
+            <div className={`mx-auto flex h-12 w-12 items-center justify-center rounded-2xl border ${variantStyles[variant].icon}`}>
               <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z" />
+                <path strokeLinecap="round" strokeLinejoin="round" d={variantStyles[variant].iconPath} />
               </svg>
             </div>
 
@@ -108,7 +130,7 @@ export default function ConfirmForm({
                 type="button"
                 disabled={isPending}
                 onClick={handleConfirm}
-                className="btn btn-destructive flex-1 py-2.5"
+                className={`${variantStyles[variant].button} flex-1 py-2.5`}
               >
                 {isPending ? (
                   <>
@@ -116,7 +138,7 @@ export default function ConfirmForm({
                       <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
                       <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
                     </svg>
-                    Menghapus...
+                    {loadingLabel || `${confirmLabel}...`}
                   </>
                 ) : (
                   confirmLabel

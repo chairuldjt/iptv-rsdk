@@ -113,6 +113,7 @@ export default function ExperienceProfileCard({
               title="Export Profile"
               message={`Export config dari "${profile.name}" ke file JSON?`}
               confirmLabel="Export"
+              variant="info"
             >
               <input type="hidden" name="profileId" value={profile.id} />
               <button
