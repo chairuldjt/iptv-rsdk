@@ -1,5 +1,6 @@
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
+import JSZip from 'jszip'
 import prisma from '@/lib/db'
 import PageHeader from '@/components/PageHeader'
 import HomeExperienceForm, { HomeExperiencePreview } from '@/components/HomeExperienceForm'
@@ -22,8 +23,7 @@ import {
   setGlobalProfileId,
   cloneHomeExperienceProfile,
   renameHomeExperienceProfile,
-  exportHomeExperienceProfile,
-  importHomeExperienceProfile,
+  importHomeExperienceProfileWithAssets,
   toggleHomeExperienceProfileLock,
   toggleHomeExperienceProfileEnabled,
   unsetHomeExperienceGlobalProfile,
@@ -176,27 +176,46 @@ async function exportProfileAction(formData: FormData) {
   const profileId = (formData.get('profileId') as string) || ''
   if (!profileId) return
 
-  const exportData = await exportHomeExperienceProfile(profileId)
-  if (!exportData) return
-
-  const json = JSON.stringify(exportData, null, 2)
-  const blob = new Blob([json], { type: 'application/json' })
-  const url = URL.createObjectURL(blob)
-
-  redirect(url)
+  redirect(`/api/profile/export?profileId=${encodeURIComponent(profileId)}`)
 }
 
 async function importProfileAction(formData: FormData) {
   'use server'
-  const jsonData = (formData.get('importData') as string) || ''
-  if (!jsonData) {
-    redirect('/dashboard/experience?importError=No+data+provided')
+  const file = formData.get('importFile') as File | null
+  if (!file || file.size === 0) {
+    redirect('/dashboard/experience?importError=No+file+provided')
     return
   }
 
   try {
-    const data = JSON.parse(jsonData) as HomeExperienceProfileExport
-    const imported = await importHomeExperienceProfile(data)
+    const arrayBuffer = await file.arrayBuffer()
+    const zip = await JSZip.loadAsync(arrayBuffer)
+
+    const profileJsonFile = zip.file('profile.json')
+    if (!profileJsonFile) {
+      redirect('/dashboard/experience?importError=Invalid+ZIP+format:+missing+profile.json')
+      return
+    }
+
+    const profileJsonText = await profileJsonFile.async('text')
+    const data = JSON.parse(profileJsonText) as HomeExperienceProfileExport
+
+    const assets: Array<{ relativePath: string; buffer: Buffer }> = []
+    zip.forEach((relativePath, zipEntry) => {
+      if (relativePath.startsWith('assets/') && !zipEntry.dir) {
+        assets.push({ relativePath, buffer: Buffer.alloc(0) })
+      }
+    })
+
+    for (let i = 0; i < assets.length; i++) {
+      const zipEntry = zip.file(assets[i].relativePath)
+      if (zipEntry) {
+        const buffer = Buffer.from(await zipEntry.async('arraybuffer'))
+        assets[i] = { ...assets[i], buffer }
+      }
+    }
+
+    const imported = await importHomeExperienceProfileWithAssets(data, assets)
     if (imported) {
       revalidatePath('/dashboard/experience')
       redirect('/dashboard/experience?imported=1')
@@ -204,7 +223,7 @@ async function importProfileAction(formData: FormData) {
       redirect('/dashboard/experience?importError=Invalid+profile+data')
     }
   } catch {
-    redirect('/dashboard/experience?importError=Invalid+JSON+format')
+    redirect('/dashboard/experience?importError=Invalid+file+format')
   }
 }
 
@@ -442,6 +461,25 @@ export default async function ExperiencePage({
               + Buat Profile
             </button>
           </form>
+
+          <div className="border-t border-border pt-4">
+            <h3 className="text-sm font-semibold text-foreground mb-1">Import Profile</h3>
+            <p className="text-[10px] text-muted-foreground mb-3">
+              Import profile dari file ZIP yang sebelumnya di-export.
+            </p>
+            <form action={importProfileAction} className="space-y-3">
+              <input
+                type="file"
+                name="importFile"
+                accept=".zip"
+                required
+                className="field-input text-xs file:mr-2 file:py-1 file:px-2 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-primary/10 file:text-primary hover:file:bg-primary/20"
+              />
+              <button type="submit" className="w-full btn btn-secondary py-2.5">
+                Import ZIP
+              </button>
+            </form>
+          </div>
         </div>
 
         {/* Right: Profile List */}
@@ -480,7 +518,6 @@ export default async function ExperiencePage({
                   cloneProfileAction={cloneProfileAction}
                   renameProfileAction={renameProfileAction}
                   exportProfileAction={exportProfileAction}
-                  importProfileAction={importProfileAction}
                   toggleLockAction={toggleLockAction}
                   toggleEnabledAction={toggleEnabledAction}
                   unsetGlobalAction={unsetGlobalAction}

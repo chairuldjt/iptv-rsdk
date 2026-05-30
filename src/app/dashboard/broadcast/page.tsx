@@ -34,7 +34,6 @@ import {
   playVideoBroadcastNowAction,
   stopVideoBroadcastNowAction,
   cloneVideoProfileAction,
-  exportVideoProfileAction,
   toggleVideoLockAction,
   toggleVideoEnabledAction,
   unsetVideoGlobalAction,
@@ -50,7 +49,6 @@ import {
   pushRunningTextLiveAction,
   stopRunningTextLiveAction,
   cloneRunningProfileAction,
-  exportRunningProfileAction,
   toggleRunningLockAction,
   toggleRunningEnabledAction,
   unsetRunningGlobalAction,
@@ -354,7 +352,6 @@ export default async function BroadcastPage({
                     deleteAction={deleteVideoProfileAction}
                     setGlobalAction={setVideoGlobalAction}
                     cloneAction={cloneVideoProfileAction}
-                    exportAction={exportVideoProfileAction}
                     toggleLockAction={toggleVideoLockAction}
                     toggleEnabledAction={toggleVideoEnabledAction}
                     unsetGlobalAction={unsetVideoGlobalAction}
@@ -495,7 +492,6 @@ export default async function BroadcastPage({
                     deleteAction={deleteRunningProfileAction}
                     setGlobalAction={setRunningGlobalAction}
                     cloneAction={cloneRunningProfileAction}
-                    exportAction={exportRunningProfileAction}
                     toggleLockAction={toggleRunningLockAction}
                     toggleEnabledAction={toggleRunningEnabledAction}
                     unsetGlobalAction={unsetRunningGlobalAction}

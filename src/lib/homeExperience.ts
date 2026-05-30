@@ -1,5 +1,7 @@
 import prisma from '@/lib/db'
 import { getDeviceGroupForDevice } from '@/lib/deviceGroups'
+import fs from 'fs/promises'
+import path from 'path'
 
 const GLOBAL_HOME_EXPERIENCE_KEY = 'homeExperience.global'
 const HOME_EXPERIENCE_MENU_TYPES = ['tv', 'education', 'entertainment', 'settings', 'info_dialog', 'konten', 'recommendations', 'favorites', 'search', 'app_drawer', 'launch_app'] as const
@@ -1087,6 +1089,45 @@ export async function exportHomeExperienceProfile(
   }
 }
 
+export function collectHomeExperienceAssetUrls(
+  config: HomeExperiencePatch | HomeExperienceResolvedConfig
+): string[] {
+  const urls: string[] = []
+  const seen = new Set<string>()
+
+  const addUrl = (url: string) => {
+    if (url && url.startsWith('/') && !seen.has(url)) {
+      seen.add(url)
+      urls.push(url)
+    }
+  }
+
+  if ('logoUrl' in config) addUrl(config.logoUrl ?? '')
+  if ('homeBackgroundUrl' in config) addUrl(config.homeBackgroundUrl ?? '')
+  if ('menus' in config && Array.isArray(config.menus)) {
+    for (const menu of config.menus) {
+      if ('backgroundUrl' in menu) addUrl((menu as { backgroundUrl?: string }).backgroundUrl ?? '')
+    }
+  }
+  if ('overlays' in config && Array.isArray(config.overlays)) {
+    for (const overlay of config.overlays) {
+      if ('imageUrl' in overlay) addUrl((overlay as { imageUrl?: string }).imageUrl ?? '')
+    }
+  }
+  if ('splash' in config && config.splash) {
+    const s = config.splash as Record<string, unknown>
+    if (typeof s.backgroundUrl === 'string') addUrl(s.backgroundUrl)
+    if (typeof s.logoUrl === 'string') addUrl(s.logoUrl)
+    if (typeof s.soundUrl === 'string') addUrl(s.soundUrl)
+  }
+  if ('sounds' in config && config.sounds) {
+    const snd = config.sounds as Record<string, unknown>
+    if (typeof snd.selectionSoundUrl === 'string') addUrl(snd.selectionSoundUrl)
+  }
+
+  return urls
+}
+
 export async function importHomeExperienceProfile(
   data: HomeExperienceProfileExport
 ): Promise<HomeExperienceProfile | null> {
@@ -1103,6 +1144,49 @@ export async function importHomeExperienceProfile(
 
   profiles.push(newProfile)
   await saveHomeExperienceProfiles(profiles)
+
+  if (data.config && Object.keys(data.config).length > 0) {
+    const resolved = applyHomeExperiencePatch(FALLBACK_HOME_EXPERIENCE_CONFIG, data.config)
+    await saveStoredHomeExperience(profileDataKey(newProfile.id), resolved)
+  } else {
+    await saveStoredHomeExperience(profileDataKey(newProfile.id), FALLBACK_HOME_EXPERIENCE_CONFIG)
+  }
+
+  return newProfile
+}
+
+export async function importHomeExperienceProfileWithAssets(
+  data: HomeExperienceProfileExport,
+  assets: Array<{ relativePath: string; buffer: Buffer }>
+): Promise<HomeExperienceProfile | null> {
+  if (data.version !== 1 || data.type !== 'homeExperience') return null
+
+  const profiles = await getHomeExperienceProfiles()
+  const newProfile: HomeExperienceProfile = {
+    id: `hep_${Date.now()}`,
+    name: data.profile.name || 'Imported Profile',
+    description: data.profile.description || '',
+    createdAt: new Date().toISOString(),
+    locked: false,
+  }
+
+  profiles.push(newProfile)
+  await saveHomeExperienceProfiles(profiles)
+
+  const publicDir = path.join(process.cwd(), 'public')
+  const uploadedPaths: string[] = []
+
+  for (const asset of assets) {
+    try {
+      const targetPath = path.join(publicDir, asset.relativePath)
+      const targetDir = path.dirname(targetPath)
+      await fs.mkdir(targetDir, { recursive: true })
+      await fs.writeFile(targetPath, asset.buffer)
+      uploadedPaths.push(asset.relativePath)
+    } catch {
+      // Failed to write asset, skip
+    }
+  }
 
   if (data.config && Object.keys(data.config).length > 0) {
     const resolved = applyHomeExperiencePatch(FALLBACK_HOME_EXPERIENCE_CONFIG, data.config)

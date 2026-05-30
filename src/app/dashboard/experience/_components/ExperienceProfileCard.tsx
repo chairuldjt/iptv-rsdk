@@ -16,7 +16,6 @@ export default function ExperienceProfileCard({
   cloneProfileAction,
   renameProfileAction,
   exportProfileAction,
-  importProfileAction,
   toggleLockAction,
   toggleEnabledAction,
   unsetGlobalAction,
@@ -34,7 +33,6 @@ export default function ExperienceProfileCard({
   cloneProfileAction: (fd: FormData) => Promise<void>
   renameProfileAction: (fd: FormData) => Promise<void>
   exportProfileAction: (fd: FormData) => Promise<void>
-  importProfileAction: (fd: FormData) => Promise<void>
   toggleLockAction: (fd: FormData) => Promise<void>
   toggleEnabledAction: (fd: FormData) => Promise<void>
   unsetGlobalAction: (fd: FormData) => Promise<void>
