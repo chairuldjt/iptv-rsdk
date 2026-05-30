@@ -3,6 +3,31 @@
 import { useState, useRef, useTransition } from 'react'
 import { createPortal } from 'react-dom'
 import type { HomeExperienceRunningTextItem } from '@/lib/homeExperience'
+import type { RunningTextStyle } from '@/lib/runningText'
+import { FALLBACK_RUNNING_TEXT_STYLE } from '@/lib/runningText'
+
+// ── Font options ─────────────────────────────────────────────────────────────
+
+const FONT_FAMILIES = [
+  { label: 'Sans Serif (Default)', value: 'sans-serif' },
+  { label: 'Serif', value: 'serif' },
+  { label: 'Monospace', value: 'monospace' },
+  { label: 'Arial', value: 'Arial, sans-serif' },
+  { label: 'Helvetica', value: 'Helvetica, Arial, sans-serif' },
+  { label: 'Roboto', value: 'Roboto, sans-serif' },
+  { label: 'Open Sans', value: '"Open Sans", sans-serif' },
+  { label: 'Poppins', value: 'Poppins, sans-serif' },
+  { label: 'Inter', value: 'Inter, sans-serif' },
+  { label: 'Lato', value: 'Lato, sans-serif' },
+  { label: 'Montserrat', value: 'Montserrat, sans-serif' },
+  { label: 'Noto Sans', value: '"Noto Sans", sans-serif' },
+  { label: 'Georgia', value: 'Georgia, serif' },
+  { label: 'Times New Roman', value: '"Times New Roman", serif' },
+  { label: 'Courier New', value: '"Courier New", monospace' },
+  { label: 'Cursive', value: 'cursive' },
+]
+
+// ── Types ────────────────────────────────────────────────────────────────────
 
 type RunningTextPanelClientProps = {
   profileId: string
@@ -13,6 +38,7 @@ type RunningTextPanelClientProps = {
     rotationSeconds: number
     displaySeconds: number
     items: HomeExperienceRunningTextItem[]
+    style?: RunningTextStyle
   }
   isGlobal: boolean
   assignedGroupCount: number
@@ -21,6 +47,17 @@ type RunningTextPanelClientProps = {
   pushLiveAction: (fd: FormData) => Promise<void>
   stopLiveAction: (fd: FormData) => Promise<void>
 }
+
+// ── Helper: hex to rgba ──────────────────────────────────────────────────────
+
+function hexToRgba(hex: string, opacity: number): string {
+  const r = parseInt(hex.slice(1, 3), 16)
+  const g = parseInt(hex.slice(3, 5), 16)
+  const b = parseInt(hex.slice(5, 7), 16)
+  return `rgba(${r},${g},${b},${opacity / 100})`
+}
+
+// ── Component ────────────────────────────────────────────────────────────────
 
 export default function RunningTextPanelClient({
   profileId,
@@ -38,6 +75,10 @@ export default function RunningTextPanelClient({
   const [rotationSeconds, setRotationSeconds] = useState<number>(runningText.rotationSeconds)
   const [displaySeconds, setDisplaySeconds] = useState<number>(runningText.displaySeconds)
 
+  // Style state
+  const [style, setStyle] = useState<RunningTextStyle>(runningText.style ?? FALLBACK_RUNNING_TEXT_STYLE)
+  const [showStyleEditor, setShowStyleEditor] = useState(false)
+
   // Confirmation state
   const [showPushConfirm, setShowPushConfirm] = useState(false)
   const [showStopConfirm, setShowStopConfirm] = useState(false)
@@ -47,6 +88,10 @@ export default function RunningTextPanelClient({
   const [isStopPending, startStopTransition] = useTransition()
   const [pushError, setPushError] = useState<string | null>(null)
   const [stopError, setStopError] = useState<string | null>(null)
+
+  const updateStyle = (patch: Partial<RunningTextStyle>) => {
+    setStyle((prev) => ({ ...prev, ...patch }))
+  }
 
   const handlePushConfirm = () => {
     setPushError(null)
@@ -126,7 +171,25 @@ export default function RunningTextPanelClient({
     setItems((current) => current.filter((item) => item.id !== id))
   }
 
+  // Compute preview text
+  const previewText = activeItems.length > 0
+    ? activeItems.map((i) => i.text).join(style.separator)
+    : 'Contoh preview running text akan tampil di sini...'
 
+  // Compute preview inline styles
+  const previewBgStyle = hexToRgba(style.bgColor, style.bgOpacity)
+  const previewTextStyle: React.CSSProperties = {
+    fontFamily: style.fontFamily,
+    fontSize: `${Math.min(style.fontSize, 28)}px`, // cap preview size
+    fontWeight: style.fontWeight,
+    fontStyle: style.fontStyle,
+    color: style.textColor,
+    textShadow: style.textShadow ? '1px 1px 3px rgba(0,0,0,0.7)' : 'none',
+    textTransform: style.textTransform as React.CSSProperties['textTransform'],
+    whiteSpace: 'nowrap',
+  }
+
+  const styleJsonValue = JSON.stringify(style)
 
   return (
     <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_380px] gap-6 items-start animate-fade-in">
@@ -181,8 +244,243 @@ export default function RunningTextPanelClient({
             </label>
           </div>
 
-          {/* Hidden text items payload */}
+          {/* Hidden payloads */}
           <input type="hidden" name="rtItemsJson" value={JSON.stringify(items)} />
+          <input type="hidden" name="rtStyleJson" value={styleJsonValue} />
+
+          {/* ── Style Editor Toggle ─────────────────────────────────────── */}
+          <div className="border border-border rounded-xl overflow-hidden">
+            <button
+              type="button"
+              onClick={() => setShowStyleEditor(!showStyleEditor)}
+              className="w-full flex items-center justify-between px-4 py-3 bg-accent/10 hover:bg-accent/20 transition-colors cursor-pointer select-none"
+            >
+              <div className="flex items-center gap-2">
+                <svg className="w-4 h-4 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M9.53 16.122a3 3 0 00-5.78 1.128 2.25 2.25 0 01-2.4 2.245 4.5 4.5 0 008.4-2.245c0-.399-.078-.78-.22-1.128zm0 0a15.998 15.998 0 003.388-1.62m-5.043-.025a15.994 15.994 0 011.622-3.395m3.42 3.42a15.995 15.995 0 004.764-4.648l3.876-5.814a1.151 1.151 0 00-1.597-1.597L14.146 6.32a15.996 15.996 0 00-4.649 4.763m3.42 3.42a6.776 6.776 0 00-3.42-3.42" />
+                </svg>
+                <span className="text-xs font-semibold text-foreground">Desain & Layout Running Text</span>
+              </div>
+              <svg className={`w-4 h-4 text-muted-foreground transition-transform ${showStyleEditor ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+              </svg>
+            </button>
+
+            {showStyleEditor && (
+              <div className="p-4 space-y-4 border-t border-border bg-accent/5">
+                {/* Row 1: Font Family + Font Size */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <label>
+                    <span className="block text-[9px] font-bold uppercase tracking-wider text-muted-foreground mb-1.5">Jenis Font</span>
+                    <select
+                      value={style.fontFamily}
+                      onChange={(e) => updateStyle({ fontFamily: e.target.value })}
+                      className="field-input py-1.5 text-xs w-full"
+                    >
+                      {FONT_FAMILIES.map((f) => (
+                        <option key={f.value} value={f.value}>{f.label}</option>
+                      ))}
+                    </select>
+                  </label>
+                  <label>
+                    <span className="block text-[9px] font-bold uppercase tracking-wider text-muted-foreground mb-1.5">Ukuran Font (px)</span>
+                    <input
+                      type="number"
+                      value={style.fontSize}
+                      onChange={(e) => updateStyle({ fontSize: Math.max(10, Math.min(120, parseInt(e.target.value) || 24)) })}
+                      min={10}
+                      max={120}
+                      className="field-input py-1.5 text-xs w-full"
+                    />
+                  </label>
+                </div>
+
+                {/* Row 2: Font Weight + Font Style */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <label>
+                    <span className="block text-[9px] font-bold uppercase tracking-wider text-muted-foreground mb-1.5">Ketebalan Font</span>
+                    <select
+                      value={style.fontWeight}
+                      onChange={(e) => updateStyle({ fontWeight: e.target.value as RunningTextStyle['fontWeight'] })}
+                      className="field-input py-1.5 text-xs w-full"
+                    >
+                      <option value="lighter">Lighter (Tipis)</option>
+                      <option value="normal">Normal</option>
+                      <option value="bold">Bold (Tebal)</option>
+                      <option value="bolder">Bolder (Lebih Tebal)</option>
+                    </select>
+                  </label>
+                  <label>
+                    <span className="block text-[9px] font-bold uppercase tracking-wider text-muted-foreground mb-1.5">Gaya Font</span>
+                    <select
+                      value={style.fontStyle}
+                      onChange={(e) => updateStyle({ fontStyle: e.target.value as RunningTextStyle['fontStyle'] })}
+                      className="field-input py-1.5 text-xs w-full"
+                    >
+                      <option value="normal">Normal</option>
+                      <option value="italic">Italic (Miring)</option>
+                    </select>
+                  </label>
+                </div>
+
+                {/* Row 3: Text Color + BG Color */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <label>
+                    <span className="block text-[9px] font-bold uppercase tracking-wider text-muted-foreground mb-1.5">Warna Teks</span>
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="color"
+                        value={style.textColor}
+                        onChange={(e) => updateStyle({ textColor: e.target.value })}
+                        className="w-9 h-9 rounded-lg border border-border cursor-pointer bg-transparent p-0.5"
+                      />
+                      <input
+                        type="text"
+                        value={style.textColor}
+                        onChange={(e) => {
+                          const v = e.target.value
+                          if (/^#[0-9a-fA-F]{6}$/.test(v)) updateStyle({ textColor: v })
+                        }}
+                        className="field-input py-1.5 text-xs flex-1 font-mono"
+                        placeholder="#FFFFFF"
+                        maxLength={7}
+                      />
+                    </div>
+                  </label>
+                  <label>
+                    <span className="block text-[9px] font-bold uppercase tracking-wider text-muted-foreground mb-1.5">Warna Background</span>
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="color"
+                        value={style.bgColor}
+                        onChange={(e) => updateStyle({ bgColor: e.target.value })}
+                        className="w-9 h-9 rounded-lg border border-border cursor-pointer bg-transparent p-0.5"
+                      />
+                      <input
+                        type="text"
+                        value={style.bgColor}
+                        onChange={(e) => {
+                          const v = e.target.value
+                          if (/^#[0-9a-fA-F]{6}$/.test(v)) updateStyle({ bgColor: v })
+                        }}
+                        className="field-input py-1.5 text-xs flex-1 font-mono"
+                        placeholder="#000000"
+                        maxLength={7}
+                      />
+                    </div>
+                  </label>
+                </div>
+
+                {/* Row 4: BG Opacity + Padding Y */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <label>
+                    <span className="block text-[9px] font-bold uppercase tracking-wider text-muted-foreground mb-1.5">Opacity Background ({style.bgOpacity}%)</span>
+                    <input
+                      type="range"
+                      value={style.bgOpacity}
+                      onChange={(e) => updateStyle({ bgOpacity: parseInt(e.target.value) })}
+                      min={0}
+                      max={100}
+                      step={5}
+                      className="w-full accent-primary h-2 rounded-lg cursor-pointer"
+                    />
+                    <div className="flex justify-between text-[9px] text-muted-foreground mt-1">
+                      <span>Transparan</span>
+                      <span>Solid</span>
+                    </div>
+                  </label>
+                  <label>
+                    <span className="block text-[9px] font-bold uppercase tracking-wider text-muted-foreground mb-1.5">Padding Vertikal (px)</span>
+                    <input
+                      type="number"
+                      value={style.paddingY}
+                      onChange={(e) => updateStyle({ paddingY: Math.max(0, Math.min(60, parseInt(e.target.value) || 0)) })}
+                      min={0}
+                      max={60}
+                      className="field-input py-1.5 text-xs w-full"
+                    />
+                  </label>
+                </div>
+
+                {/* Row 5: Position + Direction */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <label>
+                    <span className="block text-[9px] font-bold uppercase tracking-wider text-muted-foreground mb-1.5">Posisi di Layar</span>
+                    <select
+                      value={style.position}
+                      onChange={(e) => updateStyle({ position: e.target.value as RunningTextStyle['position'] })}
+                      className="field-input py-1.5 text-xs w-full"
+                    >
+                      <option value="bottom">Bawah Layar</option>
+                      <option value="top">Atas Layar</option>
+                    </select>
+                  </label>
+                  <label>
+                    <span className="block text-[9px] font-bold uppercase tracking-wider text-muted-foreground mb-1.5">Arah Gerak</span>
+                    <select
+                      value={style.direction}
+                      onChange={(e) => updateStyle({ direction: e.target.value as RunningTextStyle['direction'] })}
+                      className="field-input py-1.5 text-xs w-full"
+                    >
+                      <option value="left">Kiri (Default)</option>
+                      <option value="right">Kanan</option>
+                    </select>
+                  </label>
+                </div>
+
+                {/* Row 6: Text Transform + Separator */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <label>
+                    <span className="block text-[9px] font-bold uppercase tracking-wider text-muted-foreground mb-1.5">Transformasi Teks</span>
+                    <select
+                      value={style.textTransform}
+                      onChange={(e) => updateStyle({ textTransform: e.target.value as RunningTextStyle['textTransform'] })}
+                      className="field-input py-1.5 text-xs w-full"
+                    >
+                      <option value="none">Tidak Ada</option>
+                      <option value="uppercase">HURUF BESAR SEMUA</option>
+                      <option value="lowercase">huruf kecil semua</option>
+                      <option value="capitalize">Huruf Besar Tiap Kata</option>
+                    </select>
+                  </label>
+                  <label>
+                    <span className="block text-[9px] font-bold uppercase tracking-wider text-muted-foreground mb-1.5">Pemisah Antar Pesan</span>
+                    <input
+                      type="text"
+                      value={style.separator}
+                      onChange={(e) => updateStyle({ separator: e.target.value })}
+                      className="field-input py-1.5 text-xs w-full font-mono"
+                      placeholder="   |   "
+                    />
+                  </label>
+                </div>
+
+                {/* Row 7: Toggles */}
+                <div className="flex flex-wrap gap-4">
+                  <label className="flex items-center gap-2 cursor-pointer select-none">
+                    <input
+                      type="checkbox"
+                      checked={style.textShadow}
+                      onChange={(e) => updateStyle({ textShadow: e.target.checked })}
+                      className="w-4 h-4 rounded border-border accent-primary cursor-pointer"
+                    />
+                    <span className="text-xs text-foreground">Bayangan Teks (Text Shadow)</span>
+                  </label>
+                </div>
+
+                {/* Reset to default */}
+                <div className="pt-2 border-t border-border/50">
+                  <button
+                    type="button"
+                    onClick={() => setStyle(FALLBACK_RUNNING_TEXT_STYLE)}
+                    className="text-[10px] font-semibold text-muted-foreground hover:text-foreground transition-colors cursor-pointer select-none"
+                  >
+                    Reset ke Default
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
 
           {/* Messages list */}
           <div className="space-y-3 max-h-[500px] overflow-y-auto pr-1">
@@ -250,8 +548,80 @@ export default function RunningTextPanelClient({
         </form>
       </div>
 
-      {/* Right: Live Push + Status */}
+      {/* Right: Live Push + Status + Preview */}
       <div className="space-y-4">
+        {/* Live Preview Card */}
+        <div className="card rounded-2xl p-5 border border-border bg-card text-card-foreground shadow-sm space-y-4">
+          <h3 className="text-sm font-semibold text-foreground">Preview Running Text</h3>
+          <p className="text-[10px] text-muted-foreground leading-normal">
+            Preview tampilan running text sesuai konfigurasi desain. Tampilan di device mungkin sedikit berbeda tergantung resolusi layar.
+          </p>
+
+          {/* Simulated TV screen */}
+          <div className="relative rounded-xl border border-white/10 bg-gradient-to-b from-slate-800 to-slate-900 overflow-hidden" style={{ aspectRatio: '16/9' }}>
+            {/* Fake TV content */}
+            <div className="absolute inset-0 flex items-center justify-center">
+              <div className="text-center space-y-1">
+                <svg className="w-8 h-8 text-white/15 mx-auto" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M6 20.25h12m-7.5-3v3m3-3v3m-10.125-3h17.25c.621 0 1.125-.504 1.125-1.125V4.875c0-.621-.504-1.125-1.125-1.125H3.375c-.621 0-1.125.504-1.125 1.125v11.25c0 .621.504 1.125 1.125 1.125z" />
+                </svg>
+                <div className="text-[9px] text-white/20 font-medium">Layar Device</div>
+              </div>
+            </div>
+
+            {/* Running text bar */}
+            <div
+              className={`absolute left-0 right-0 ${style.position === 'top' ? 'top-0' : 'bottom-0'}`}
+              style={{
+                backgroundColor: previewBgStyle,
+                paddingTop: `${Math.min(style.paddingY, 16)}px`,
+                paddingBottom: `${Math.min(style.paddingY, 16)}px`,
+              }}
+            >
+              <div className="overflow-hidden px-2">
+                <div
+                  className="inline-block animate-marquee-preview"
+                  style={previewTextStyle}
+                >
+                  {previewText}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Style summary */}
+          <div className="space-y-1.5 text-[10px]">
+            <div className="flex items-center justify-between">
+              <span className="text-muted-foreground">Font</span>
+              <span className="font-semibold text-foreground truncate max-w-[180px]" style={{ fontFamily: style.fontFamily }}>
+                {FONT_FAMILIES.find(f => f.value === style.fontFamily)?.label || style.fontFamily}
+              </span>
+            </div>
+            <div className="flex items-center justify-between">
+              <span className="text-muted-foreground">Ukuran</span>
+              <span className="font-semibold text-foreground">{style.fontSize}px / {style.fontWeight}</span>
+            </div>
+            <div className="flex items-center justify-between">
+              <span className="text-muted-foreground">Warna</span>
+              <div className="flex items-center gap-1.5">
+                <div className="w-3.5 h-3.5 rounded border border-white/10" style={{ backgroundColor: style.textColor }} />
+                <span className="font-mono font-semibold text-foreground">{style.textColor}</span>
+              </div>
+            </div>
+            <div className="flex items-center justify-between">
+              <span className="text-muted-foreground">Background</span>
+              <div className="flex items-center gap-1.5">
+                <div className="w-3.5 h-3.5 rounded border border-white/10" style={{ backgroundColor: style.bgColor, opacity: style.bgOpacity / 100 }} />
+                <span className="font-mono font-semibold text-foreground">{style.bgColor} ({style.bgOpacity}%)</span>
+              </div>
+            </div>
+            <div className="flex items-center justify-between">
+              <span className="text-muted-foreground">Posisi / Arah</span>
+              <span className="font-semibold text-foreground">{style.position === 'top' ? 'Atas' : 'Bawah'} / {style.direction === 'left' ? 'Kiri' : 'Kanan'}</span>
+            </div>
+          </div>
+        </div>
+
         {/* Status Card */}
         <div className="card rounded-2xl p-5 border border-border bg-card text-card-foreground shadow-sm space-y-4">
           <h3 className="text-sm font-semibold text-foreground">Status Preview Live</h3>
@@ -279,20 +649,6 @@ export default function RunningTextPanelClient({
               <span className="font-semibold text-foreground">{displaySeconds > 0 ? `${displaySeconds} dtk` : 'Tidak ada'}</span>
             </div>
           </div>
-
-          {/* Preview marquee */}
-          {activeItems.length > 0 && (
-            <div className="rounded-xl bg-amber-500/5 border border-amber-500/15 p-3.5 space-y-1">
-              <div className="text-[9px] font-bold uppercase tracking-wider text-amber-400">Preview Bottom Marquee</div>
-              <div className="rounded-lg border border-white/5 bg-black/30 px-3 py-2">
-                <div className="text-[9px] uppercase tracking-[0.24em] text-amber-300/80">Live Feed</div>
-                <div className="mt-1 overflow-hidden whitespace-nowrap text-xs font-medium text-amber-100">
-                  {activeItems.slice(0, 4).map((i) => i.text).join('   |   ')}
-                  {activeItems.length > 4 && `   |   +${activeItems.length - 4} pesan lagi`}
-                </div>
-              </div>
-            </div>
-          )}
         </div>
 
         {/* Live Push Form */}
@@ -307,6 +663,7 @@ export default function RunningTextPanelClient({
           <input type="hidden" name="rtRotationSeconds" value={rotationSeconds} />
           <input type="hidden" name="rtDisplaySeconds" value={displaySeconds} />
           <input type="hidden" name="rtItemsJson" value={JSON.stringify(items)} />
+          <input type="hidden" name="rtStyleJson" value={styleJsonValue} />
 
           <div>
             <h3 className="text-sm font-semibold text-foreground mb-1">Kirim Live ke Device</h3>
@@ -322,7 +679,7 @@ export default function RunningTextPanelClient({
               disabled={!hasTargets}
               className="w-full rounded-xl border border-emerald-400/20 bg-emerald-500/10 hover:bg-emerald-500/15 py-2.5 text-xs font-bold text-emerald-300 transition-all cursor-pointer select-none disabled:opacity-40 disabled:cursor-not-allowed"
             >
-              📢 Kirim Live
+              Kirim Live
             </button>
             <button
               type="button"
@@ -330,7 +687,7 @@ export default function RunningTextPanelClient({
               disabled={!hasTargets}
               className="w-full rounded-xl border border-rose-400/20 bg-rose-500/10 hover:bg-rose-500/15 py-2.5 text-xs font-bold text-rose-300 transition-all cursor-pointer select-none disabled:opacity-40 disabled:cursor-not-allowed"
             >
-              ⏹ Stop Broadcast
+              Stop Broadcast
             </button>
           </div>
 

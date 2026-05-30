@@ -314,9 +314,10 @@ class MainActivity : ComponentActivity() {
                         }
 
                         if (currentScreen != "splash" && effectiveRunningText.enabled && effectiveRunningText.items.isNotEmpty()) {
+                            val rtAlignment = if (effectiveRunningText.style.position == "top") Alignment.TopCenter else Alignment.BottomCenter
                             Box(
                                 modifier = Modifier
-                                    .align(Alignment.BottomCenter)
+                                    .align(rtAlignment)
                                     .fillMaxWidth()
                                     .safeDrawingPadding()
                                     .padding(horizontal = 14.dp, vertical = 8.dp)

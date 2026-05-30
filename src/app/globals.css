@@ -359,6 +359,16 @@ input[type="file"]:focus-visible {
   animation: scaleIn 0.25s ease forwards;
 }
 
+/* ===== Running Text Marquee Preview ===== */
+@keyframes marqueePreview {
+  0% { transform: translateX(100%); }
+  100% { transform: translateX(-100%); }
+}
+
+.animate-marquee-preview {
+  animation: marqueePreview 8s linear infinite;
+}
+
 /* ===== Glass Card (for remote modal inner) ===== */
 .glass-card {
   background: rgba(15, 23, 42, 0.9);

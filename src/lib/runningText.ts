@@ -18,12 +18,45 @@ export type RunningTextProfileExport = {
   config: RunningTextConfig
 }
 
+export type RunningTextStyle = {
+  fontFamily: string
+  fontSize: number          // px (10–120)
+  fontWeight: 'normal' | 'bold' | 'bolder' | 'lighter'
+  fontStyle: 'normal' | 'italic'
+  textColor: string         // hex color
+  bgColor: string           // hex color
+  bgOpacity: number         // 0–100 (%)
+  position: 'bottom' | 'top'
+  direction: 'left' | 'right'
+  paddingY: number          // px (0–60)
+  separator: string         // character(s) between messages
+  textShadow: boolean
+  textTransform: 'none' | 'uppercase' | 'lowercase' | 'capitalize'
+}
+
+export const FALLBACK_RUNNING_TEXT_STYLE: RunningTextStyle = {
+  fontFamily: 'sans-serif',
+  fontSize: 24,
+  fontWeight: 'normal',
+  fontStyle: 'normal',
+  textColor: '#FFF3C7',
+  bgColor: '#121A24',
+  bgOpacity: 88,
+  position: 'bottom',
+  direction: 'left',
+  paddingY: 8,
+  separator: '   |   ',
+  textShadow: false,
+  textTransform: 'none',
+}
+
 export type RunningTextConfig = {
   enabled: boolean
   visibleCount: number
   rotationSeconds: number
   displaySeconds: number
   items: HomeExperienceRunningTextItem[]
+  style: RunningTextStyle
 }
 
 export const FALLBACK_RUNNING_TEXT_CONFIG: RunningTextConfig = {
@@ -38,6 +71,7 @@ export const FALLBACK_RUNNING_TEXT_CONFIG: RunningTextConfig = {
       text: 'Selamat datang. Running text ini dapat diubah dari Web Admin.',
     },
   ],
+  style: FALLBACK_RUNNING_TEXT_STYLE,
 }
 
 const RUNNING_PROFILES_META_KEY = 'runningText.profiles'
@@ -357,7 +391,34 @@ export async function resolveEffectiveRunningText(deviceId: string): Promise<Run
     ...group,
     ...device,
     items: device?.items || group?.items || base.items,
+    style: device?.style || group?.style || base.style,
   })
+}
+
+function normalizeRunningTextStyle(value: unknown): RunningTextStyle {
+  if (typeof value !== 'object' || value === null) return FALLBACK_RUNNING_TEXT_STYLE
+  const s = value as Record<string, unknown>
+  const VALID_FONT_WEIGHTS = ['normal', 'bold', 'bolder', 'lighter'] as const
+  const VALID_FONT_STYLES = ['normal', 'italic'] as const
+  const VALID_POSITIONS = ['bottom', 'top'] as const
+  const VALID_DIRECTIONS = ['left', 'right'] as const
+  const VALID_TEXT_TRANSFORMS = ['none', 'uppercase', 'lowercase', 'capitalize'] as const
+
+  return {
+    fontFamily: typeof s.fontFamily === 'string' && s.fontFamily.trim() ? s.fontFamily.trim() : FALLBACK_RUNNING_TEXT_STYLE.fontFamily,
+    fontSize: clamp(s.fontSize, 10, 120, FALLBACK_RUNNING_TEXT_STYLE.fontSize),
+    fontWeight: VALID_FONT_WEIGHTS.includes(s.fontWeight as typeof VALID_FONT_WEIGHTS[number]) ? s.fontWeight as RunningTextStyle['fontWeight'] : FALLBACK_RUNNING_TEXT_STYLE.fontWeight,
+    fontStyle: VALID_FONT_STYLES.includes(s.fontStyle as typeof VALID_FONT_STYLES[number]) ? s.fontStyle as RunningTextStyle['fontStyle'] : FALLBACK_RUNNING_TEXT_STYLE.fontStyle,
+    textColor: typeof s.textColor === 'string' && /^#[0-9a-fA-F]{6}$/.test(s.textColor) ? s.textColor : FALLBACK_RUNNING_TEXT_STYLE.textColor,
+    bgColor: typeof s.bgColor === 'string' && /^#[0-9a-fA-F]{6}$/.test(s.bgColor) ? s.bgColor : FALLBACK_RUNNING_TEXT_STYLE.bgColor,
+    bgOpacity: clamp(s.bgOpacity, 0, 100, FALLBACK_RUNNING_TEXT_STYLE.bgOpacity),
+    position: VALID_POSITIONS.includes(s.position as typeof VALID_POSITIONS[number]) ? s.position as RunningTextStyle['position'] : FALLBACK_RUNNING_TEXT_STYLE.position,
+    direction: VALID_DIRECTIONS.includes(s.direction as typeof VALID_DIRECTIONS[number]) ? s.direction as RunningTextStyle['direction'] : FALLBACK_RUNNING_TEXT_STYLE.direction,
+    paddingY: clamp(s.paddingY, 0, 60, FALLBACK_RUNNING_TEXT_STYLE.paddingY),
+    separator: typeof s.separator === 'string' ? s.separator : FALLBACK_RUNNING_TEXT_STYLE.separator,
+    textShadow: typeof s.textShadow === 'boolean' ? s.textShadow : FALLBACK_RUNNING_TEXT_STYLE.textShadow,
+    textTransform: VALID_TEXT_TRANSFORMS.includes(s.textTransform as typeof VALID_TEXT_TRANSFORMS[number]) ? s.textTransform as RunningTextStyle['textTransform'] : FALLBACK_RUNNING_TEXT_STYLE.textTransform,
+  }
 }
 
 function normalizeRunningTextConfig(value: unknown): RunningTextConfig {
@@ -378,6 +439,7 @@ function normalizeRunningTextConfig(value: unknown): RunningTextConfig {
         text: typeof item.text === 'string' ? item.text.trim() : '',
       }))
       .filter((item) => item.text.length > 0),
+    style: normalizeRunningTextStyle(src.style),
   }
 }
 

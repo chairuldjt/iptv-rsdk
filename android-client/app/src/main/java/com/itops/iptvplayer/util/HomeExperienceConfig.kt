@@ -165,12 +165,29 @@ data class HomeOverlayItem(
     val sortOrder: Int = 0
 )
 
+data class RunningTextStyle(
+    val fontFamily: String = "sans-serif",
+    val fontSize: Int = 24,           // px (10-120)
+    val fontWeight: String = "normal", // normal | bold | bolder | lighter
+    val fontStyle: String = "normal",  // normal | italic
+    val textColor: String = "#FFF3C7",
+    val bgColor: String = "#121A24",
+    val bgOpacity: Int = 88,           // 0-100 (%)
+    val position: String = "bottom",   // bottom | top
+    val direction: String = "left",    // left | right
+    val paddingY: Int = 8,             // px (0-60)
+    val separator: String = "   |   ",
+    val textShadow: Boolean = false,
+    val textTransform: String = "none" // none | uppercase | lowercase | capitalize
+)
+
 data class HomeExperienceRunningText(
     val enabled: Boolean = false,
     val visibleCount: Int = 1,
     val rotationSeconds: Int = 10,
     val displaySeconds: Int = 10,
-    val items: List<HomeExperienceRunningTextItem> = emptyList()
+    val items: List<HomeExperienceRunningTextItem> = emptyList(),
+    val style: RunningTextStyle = RunningTextStyle()
 )
 
 data class HomeExperienceRunningTextItem(
@@ -395,7 +412,49 @@ object HomeExperienceParser {
             visibleCount = obj.optInt("visibleCount", 1).coerceIn(1, 10),
             rotationSeconds = obj.optInt("rotationSeconds", 10).coerceIn(1, 600),
             displaySeconds = obj.optInt("displaySeconds", 10).coerceIn(0, 600),
-            items = items
+            items = items,
+            style = parseRunningTextStyle(obj.optJSONObject("style"))
+        )
+    }
+
+    private fun parseRunningTextStyle(obj: JSONObject?): RunningTextStyle {
+        if (obj == null) return RunningTextStyle()
+        val d = RunningTextStyle()
+        val fontWeight = obj.optString("fontWeight", d.fontWeight).let {
+            if (it in listOf("normal", "bold", "bolder", "lighter")) it else d.fontWeight
+        }
+        val fontStyle = obj.optString("fontStyle", d.fontStyle).let {
+            if (it in listOf("normal", "italic")) it else d.fontStyle
+        }
+        val position = obj.optString("position", d.position).let {
+            if (it in listOf("bottom", "top")) it else d.position
+        }
+        val direction = obj.optString("direction", d.direction).let {
+            if (it in listOf("left", "right")) it else d.direction
+        }
+        val textTransform = obj.optString("textTransform", d.textTransform).let {
+            if (it in listOf("none", "uppercase", "lowercase", "capitalize")) it else d.textTransform
+        }
+        val textColor = obj.optString("textColor", d.textColor).let {
+            if (it.matches(Regex("^#[0-9a-fA-F]{6}$"))) it else d.textColor
+        }
+        val bgColor = obj.optString("bgColor", d.bgColor).let {
+            if (it.matches(Regex("^#[0-9a-fA-F]{6}$"))) it else d.bgColor
+        }
+        return RunningTextStyle(
+            fontFamily = obj.optString("fontFamily", d.fontFamily).ifBlank { d.fontFamily },
+            fontSize = obj.optInt("fontSize", d.fontSize).coerceIn(10, 120),
+            fontWeight = fontWeight,
+            fontStyle = fontStyle,
+            textColor = textColor,
+            bgColor = bgColor,
+            bgOpacity = obj.optInt("bgOpacity", d.bgOpacity).coerceIn(0, 100),
+            position = position,
+            direction = direction,
+            paddingY = obj.optInt("paddingY", d.paddingY).coerceIn(0, 60),
+            separator = obj.optString("separator", d.separator),
+            textShadow = obj.optBoolean("textShadow", d.textShadow),
+            textTransform = textTransform
         )
     }
 

@@ -17,7 +17,9 @@ import {
   toggleRunningTextProfileEnabled,
   renameRunningTextProfile,
   unsetRunningGlobalProfile,
+  FALLBACK_RUNNING_TEXT_STYLE,
   type RunningTextProfileExport,
+  type RunningTextStyle,
 } from '@/lib/runningText'
 import type { HomeExperienceRunningTextItem } from '@/lib/homeExperience'
 import { pushCommand } from '@/lib/remoteQueue'
@@ -34,6 +36,17 @@ function parseRunningTextItems(formData: FormData): HomeExperienceRunningTextIte
     } catch { /* ignore */ }
   }
   return []
+}
+
+function parseRunningTextStyle(formData: FormData): RunningTextStyle {
+  const raw = formData.get('rtStyleJson')
+  if (typeof raw === 'string') {
+    try {
+      const parsed = JSON.parse(raw)
+      if (typeof parsed === 'object' && parsed !== null) return { ...FALLBACK_RUNNING_TEXT_STYLE, ...parsed }
+    } catch { /* ignore */ }
+  }
+  return FALLBACK_RUNNING_TEXT_STYLE
 }
 
 function hasActiveRunningItems(items: HomeExperienceRunningTextItem[]): boolean {
@@ -63,6 +76,7 @@ export async function saveRunningProfileConfigAction(formData: FormData) {
   const profileId = (formData.get('profileId') as string) || ''
   if (!profileId) return
   const items: HomeExperienceRunningTextItem[] = parseRunningTextItems(formData)
+  const style: RunningTextStyle = parseRunningTextStyle(formData)
   const visibleCount = parseInt((formData.get('rtVisibleCount') as string) || '1', 10)
   const rotationSeconds = parseInt((formData.get('rtRotationSeconds') as string) || '10', 10)
   const displaySeconds = parseInt((formData.get('rtDisplaySeconds') as string) || '10', 10)
@@ -73,6 +87,7 @@ export async function saveRunningProfileConfigAction(formData: FormData) {
     rotationSeconds: Math.max(1, Math.min(600, rotationSeconds)),
     displaySeconds: Math.max(0, Math.min(600, displaySeconds)),
     items,
+    style,
   })
 
   revalidatePath('/dashboard/broadcast')
@@ -228,6 +243,7 @@ export async function assignRunningDeviceModalAction(profileId: string, deviceId
 export async function pushRunningTextLiveAction(formData: FormData) {
   const profileId = (formData.get('profileId') as string) || ''
   const items: HomeExperienceRunningTextItem[] = parseRunningTextItems(formData)
+  const style: RunningTextStyle = parseRunningTextStyle(formData)
   const enabled = hasActiveRunningItems(items)
   const visibleCount = parseInt((formData.get('rtVisibleCount') as string) || '1', 10)
   const rotationSeconds = parseInt((formData.get('rtRotationSeconds') as string) || '10', 10)
@@ -239,6 +255,7 @@ export async function pushRunningTextLiveAction(formData: FormData) {
     visibleCount,
     rotationSeconds: Math.max(1, Math.min(600, rotationSeconds)),
     displaySeconds: Math.max(0, Math.min(600, displaySeconds)),
+    style,
   })
 
   const recipients = await resolveProfileRecipientDevices(profileId, 'running')
