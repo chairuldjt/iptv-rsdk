@@ -191,8 +191,8 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
             if (active) {
                 // Initial configurations and playlist sync
                 val activeConfig = repository.syncConfig()
-                _isDeviceActive.value = activeConfig
-                if (activeConfig) {
+                _isDeviceActive.value = activeConfig.isNotEmpty()
+                if (activeConfig.isNotEmpty()) {
                     repository.syncChannels()
                 }
             }
@@ -210,11 +210,11 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                     _isDeviceActive.value = status.active ?: true
                     if (status.force_sync) {
                         viewModelScope.launch {
-                            val activeConfig = repository.syncConfig()
-                            _isDeviceActive.value = activeConfig
-                            if (activeConfig) {
-                                repository.syncChannels()
-                            }
+                val activeConfig = repository.syncConfig()
+                _isDeviceActive.value = activeConfig.isNotEmpty()
+                if (activeConfig.isNotEmpty()) {
+                    repository.syncChannels()
+                }
                         }
                     }
                 }
@@ -228,8 +228,8 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                 val intervalSeconds = dataStoreManager.syncIntervalFlow.first()
                 delay(intervalSeconds * 1000L)
                 val activeConfig = repository.syncConfig()
-                _isDeviceActive.value = activeConfig
-                if (activeConfig) {
+                _isDeviceActive.value = activeConfig.isNotEmpty()
+                if (activeConfig.isNotEmpty()) {
                     repository.syncChannels()
                 }
             }

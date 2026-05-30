@@ -108,10 +108,10 @@ class IptvRepository(
     }
 
     // Sync Server configurations
-    suspend fun syncConfig(): Boolean {
+    suspend fun syncConfig(isRetry: Boolean = false): String {
         val serverApiEnabled = dataStoreManager.serverApiEnabledFlow.first()
         if (!serverApiEnabled) {
-            return true
+            return ""
         }
 
         val deviceId = dataStoreManager.getDeviceId()
@@ -278,23 +278,31 @@ class IptvRepository(
                     }
 
                     dataStoreManager.addLog("Server config sync successful!")
-                    return config.active
+                    return config.home_experience_json ?: ""
                 }
             } else {
                 if (response.code() == 403) {
                     dataStoreManager.addLog("Config sync blocked: Device is inactive on server.")
-                    return false
+                    return ""
                 }
                 if (response.code() == 404) {
+                    if (isRetry) {
+                        dataStoreManager.addLog("Config sync failed: Device still missing after retry.")
+                        return ""
+                    }
                     dataStoreManager.addLog("Config sync: Device missing on server. Re-registering...")
-                    return registerDevice()
+                    if (registerDevice()) {
+                        dataStoreManager.addLog("Registration successful, retrying config sync...")
+                        return syncConfig(isRetry = true)
+                    }
+                    return ""
                 }
                 dataStoreManager.addLog("Config sync failed: HTTP ${response.code()}")
             }
         } catch (e: Exception) {
             dataStoreManager.addLog("Config sync network error: ${e.message}")
         }
-        return true
+        return ""
     }
 
     // Sync local custom M3U playlist

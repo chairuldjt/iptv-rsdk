@@ -110,7 +110,7 @@ fun SplashScreen(
         loadingStatus = "Memuat konfigurasi..."
         val syncConfigJob = async {
             withTimeoutOrNull(4_000L) {
-                try { app.repository.syncConfig() } catch (_: Exception) {}
+                try { app.repository.syncConfig() } catch (_: Exception) { null }
             }
         }
 
@@ -122,29 +122,16 @@ fun SplashScreen(
         // Wait for animation and config sync only
         animJob.await()
         loadingProgress = 0.25f
-        syncConfigJob.await()
+        val syncedJsonResult = syncConfigJob.await() as? String
         loadingProgress = 0.50f
         // syncChannels continues in background — don't await
-
-        // Jika device baru saja register ke server untuk pertama kali,
-        // restart app sekarang agar boot berikutnya berjalan dengan config
-        // fresh dari server (preload, home experience, dll semua ter-inisialisasi).
-        val isNewlyRegistered = app.dataStoreManager.consumeNewlyRegistered()
-        if (isNewlyRegistered) {
-            app.dataStoreManager.addLog("Newly registered device detected — restarting app for fresh boot.")
-            val launchIntent = context.packageManager.getLaunchIntentForPackage(context.packageName)
-            val restartIntent = android.content.Intent.makeRestartActivityTask(launchIntent?.component)
-            context.startActivity(restartIntent)
-            Runtime.getRuntime().exit(0)
-            return@LaunchedEffect
-        }
 
         // After sync, fetch the server-side preload manifest which includes ALL
         // asset URLs (images + sounds) resolved for this device — including overlay
         // images that the local parser would miss. Falls back to local parsing if
         // the server is unreachable so the splash never gets stuck.
         loadingStatus = "Memuat aset tampilan..."
-        val freshJson = app.dataStoreManager.homeExperienceJsonFlow.first()
+        val freshJson = if (!syncedJsonResult.isNullOrBlank()) syncedJsonResult else app.dataStoreManager.getHomeExperienceJson()
         val freshExp = HomeExperienceParser.parse(freshJson)
         val imageLoader = coil.Coil.imageLoader(context)
 

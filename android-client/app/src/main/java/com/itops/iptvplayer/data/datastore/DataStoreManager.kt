@@ -383,18 +383,23 @@ class DataStoreManager(private val context: Context) {
         }
     }
 
+    @Volatile
+    private var inMemoryHomeExperienceJson: String? = null
+
     val homeExperienceJsonFlow: Flow<String> = context.dataStore.data.map { prefs ->
         prefs[HOME_EXPERIENCE_JSON] ?: ""
     }
 
     suspend fun getHomeExperienceJson(): String {
+        if (inMemoryHomeExperienceJson != null) return inMemoryHomeExperienceJson!!
         val prefs = context.dataStore.data.first()
         return prefs[HOME_EXPERIENCE_JSON] ?: ""
     }
 
     suspend fun setHomeExperienceJson(json: String) {
         val normalized = json.trim()
-        val current = getHomeExperienceJson()
+        inMemoryHomeExperienceJson = normalized
+        val current = context.dataStore.data.first()[HOME_EXPERIENCE_JSON] ?: ""
         if (current != normalized) {
             context.dataStore.edit { prefs ->
                 prefs[HOME_EXPERIENCE_JSON] = normalized
@@ -580,19 +585,6 @@ class DataStoreManager(private val context: Context) {
             prefs[NEWLY_REGISTERED] = true
         }
         addLog("Device newly registered — will restart on next splash.")
-    }
-
-    /**
-     * Read-and-clear: returns true jika device baru saja register, lalu reset flag ke false.
-     * Dipanggil sekali di SplashScreen — setelah dikonsumsi flag tidak akan trigger restart lagi.
-     */
-    suspend fun consumeNewlyRegistered(): Boolean {
-        val prefs = context.dataStore.data.first()
-        val isNew = prefs[NEWLY_REGISTERED] ?: false
-        if (isNew) {
-            context.dataStore.edit { it.remove(NEWLY_REGISTERED) }
-        }
-        return isNew
     }
 
     // ── Channel Play Tracking ─────────────────────────────────────────────────
